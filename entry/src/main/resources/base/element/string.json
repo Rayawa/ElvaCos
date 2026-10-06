@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "你的 Cos 生活，持续沉淀在这里。"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "你的 Cos 生活，持续沉淀在这里。"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "绮秀"
+    },
+    {
+      "name": "grip_reason",
+      "value": "在您开启智感握姿后，将出门清单的常用操作调整到握持侧。"
+    },
+    {
+      "name": "home_welcome",
+      "value": "欢迎来到绮秀"
+    }
+  ]
+}

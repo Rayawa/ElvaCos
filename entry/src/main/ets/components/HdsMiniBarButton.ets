@@ -1,0 +1,121 @@
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { hdsEffect, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
+import { curves } from '@kit.ArkUI';
+import { pressLightFieldFilter, pressVisualEffect } from '../common/visualEffects';
+import { HDS_MATERIAL_TYPE_ADAPTIVE } from '../common/platformCompatibility';
+
+/**
+ * 基于 HdsTabs 迷你栏材质的通用按钮承载层。
+ * 保留独立组件，方便后续重新接入智感握持位置策略。
+ */
+@Component
+export struct HdsMiniBarButton {
+  @Prop controlLabel: string = '页面视图切换';
+  @Prop barWidth: number = 240;
+  @Prop barHeight: number = 52;
+  @StorageLink('visualEffectsEnabled') effectsEnabled: boolean = true;
+  @StorageLink('immersiveMaterialLevel') materialLevel: number = 1;
+  @Prop materialType: number = HDS_MATERIAL_TYPE_ADAPTIVE;
+  @BuilderParam buttonContent: () => void = this.defaultContent;
+  public onButtonClick: (() => void) | undefined = undefined;
+  private controller: HdsTabsController = new HdsTabsController();
+  @State private pressed: boolean = false;
+
+  @Builder
+  private defaultContent(): void {
+    Blank()
+  }
+
+  @Builder
+  private miniBarBackground(): void {
+    Blank()
+      .width('100%')
+      .height('100%')
+  }
+
+  @Builder
+  private miniBarContent(): void {
+    Stack({ alignContent: Alignment.Center }) {
+      this.buttonContent()
+    }
+    .width('100%')
+    .height('100%')
+    .borderRadius(this.barHeight / 2)
+    .clip(true)
+    .scale({ x: this.pressed ? 0.985 : 1, y: this.pressed ? 0.985 : 1 })
+    .animation({ duration: 130, curve: curves.springMotion(0.35, 0.9) })
+    .visualEffect(pressVisualEffect(
+      this.pressed, hdsEffect.PointLightIlluminatedType.BORDER_CONTENT, 6, 96))
+    .compositingFilter(pressLightFieldFilter(this.pressed))
+    .onTouch((event: TouchEvent): void => {
+      if (event.type === TouchType.Down) {
+        this.pressed = true;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressed = false;
+      }
+    })
+    .onClick(() => {
+      if (this.onButtonClick) {
+        this.onButtonClick();
+      }
+    })
+    .accessibilityText(this.controlLabel)
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (deviceInfo.distributionOSApiVersion >= 60100) {
+        HdsTabs({ controller: this.controller }) {
+          TabContent()
+            .backgroundColor(Color.Transparent)
+        }
+        .height(this.barHeight - 12)
+        .barWidth(this.barWidth)
+        .barHeight(this.barHeight - 12)
+        .barOverlap(true)
+        .barPosition(BarPosition.End)
+        .backgroundColor(Color.Transparent)
+        .barFloatingStyle({
+          barWidth: {
+            smallWidth: this.barWidth,
+            mediumWidth: this.barWidth,
+            largeWidth: this.barWidth,
+          },
+          gradientMask: { maskColor: Color.Transparent },
+          barBottomMargin: 0,
+          barSideMargin: 0,
+          lightColor: $r('app.color.diff_content'),
+          systemMaterialEffect: {
+            materialType: this.effectsEnabled ? this.materialType : hdsMaterial.MaterialType.NONE,
+            materialLevel: this.materialLevel,
+          },
+          miniBar: {
+            miniBarBuilder: () => {
+              this.miniBarBackground()
+            },
+            miniBarStyle: 1,
+          },
+        })
+        Column() {
+          this.miniBarContent()
+        }
+        .width(this.barWidth)
+        .height(this.barHeight - 12)
+        .justifyContent(FlexAlign.Center)
+        .zIndex(1)
+      } else {
+        Row() {
+          this.miniBarContent()
+        }
+        .width(this.barWidth)
+        .height(this.barHeight - 12)
+        .borderRadius(this.barHeight / 2)
+        .backgroundColor($r('app.color.v3_surface'))
+      }
+    }
+    .width(this.barWidth)
+    .height(this.barHeight)
+    .backgroundColor(Color.Transparent)
+    .accessibilityText(this.controlLabel)
+  }
+}

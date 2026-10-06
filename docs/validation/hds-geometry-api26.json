@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-06",
+  "deviceApi": 26,
+  "viewportPx": [
+    1216,
+    2688
+  ],
+  "comparison": [
+    {
+      "component": "HdsTitleBar",
+      "dashboardBoundsPx": [
+        0,
+        107,
+        1216,
+        289
+      ],
+      "elvaCosBoundsPx": [
+        0,
+        107,
+        1216,
+        289
+      ]
+    },
+    {
+      "component": "titleBar Segment inner Tabs",
+      "dashboardBoundsPx": [
+        304,
+        134,
+        912,
+        264
+      ],
+      "elvaCosBoundsPx": [
+        304,
+        134,
+        912,
+        264
+      ]
+    },
+    {
+      "component": "Home greeting text",
+      "dashboardBoundsPx": [
+        58,
+        371,
+        828,
+        470
+      ],
+      "elvaCosBoundsPx": [
+        58,
+        371,
+        828,
+        470
+      ]
+    },
+    {
+      "component": "floating tab item vertical range",
+      "dashboardBoundsPx": [
+        2428,
+        2584
+      ],
+      "elvaCosBoundsPx": [
+        2428,
+        2584
+      ]
+    }
+  ],
+  "projectToolbarBoundsPx": [
+    0,
+    2220,
+    1216,
+    2376
+  ],
+  "toolbarToFloatingTabsGapPx": 52,
+  "source": "HDC uitest dumpLayout on running Dashboard and ElvaCos; screenshots manually inspected",
+  "limits": "One API 26 phone at its current font/window settings. Five business tabs versus four reference tabs. Material painting follows each application saved preferences."
+}

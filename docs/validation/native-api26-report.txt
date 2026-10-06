@@ -1,0 +1,347 @@
+
+OHOS_REPORT_SUM: 6
+OHOS_REPORT_STATUS: class=DomainRules
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=moneyUsesIntegerCents
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=moneyUsesIntegerCents
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=invalidAmountsAreRejected
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=invalidAmountsAreRejected
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=dateChecksCalendarAndLeapYears
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=dateChecksCalendarAndLeapYears
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=onlyOwnedAssetsCountAsReady
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=onlyOwnedAssetsCountAsReady
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=checklistProgressHandlesEmptyAndComplete
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=checklistProgressHandlesEmptyAndComplete
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=0
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=namesTrimWhitespaceAndRejectEmpty
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=namesTrimWhitespaceAndRejectEmpty
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=1
+
+
+OHOS_REPORT_STATUS: class=DomainRules
+OHOS_REPORT_STATUS: suiteconsuming=5
+
+
+OHOS_REPORT_SUM: 11
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=migrationAndCrudWorkOnNativeRdb
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=migrationAndCrudWorkOnNativeRdb
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=22
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=8
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=assetAssociationAndChecklistGenerationAreIdempotent
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=8
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=assetAssociationAndChecklistGenerationAreIdempotent
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=29
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=9
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=foreignKeysProtectLinkedCharacters
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=9
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=foreignKeysProtectLinkedCharacters
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=8
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=10
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=encryptedDataPersistsAfterReopening
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=10
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=encryptedDataPersistsAfterReopening
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=39
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=11
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portableMetadataRestoresAndRejectsFutureVersions
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=11
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portableMetadataRestoresAndRejectsFutureVersions
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=69
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=12
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=invalidBackupForeignKeyRollsBackReplacement
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=12
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=invalidBackupForeignKeyRollsBackReplacement
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=20
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=13
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mediaImportMakesIndependentOriginalAndThumbnail
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=13
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mediaImportMakesIndependentOriginalAndThumbnail
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=81
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=14
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=preferencesMigratePersistAndPreserveExistingValues
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=14
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=preferencesMigratePersistAndPreserveExistingValues
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=39
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=15
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=uxPreferencesPreserveDisabledEffectsAndUnifyHandModes
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=15
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=uxPreferencesPreserveDisabledEffectsAndUnifyHandModes
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=77
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=16
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=cacheClearRemovesOnlyIsolatedTemporaryFiles
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=16
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=cacheClearRemovesOnlyIsolatedTemporaryFiles
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=17
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=17
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=projectDeleteCascadesLinksAndKeepsReusableAsset
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: current=17
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=17
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=projectDeleteCascadesLinksAndKeepsReusableAsset
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=9
+
+
+OHOS_REPORT_STATUS: class=NativePersistenceAndMedia
+OHOS_REPORT_STATUS: suiteconsuming=410
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 17, Failure: 0, Error: 0, Pass: 17, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=415
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.
