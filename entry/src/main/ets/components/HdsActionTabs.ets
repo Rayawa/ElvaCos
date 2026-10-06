@@ -2,6 +2,7 @@ import { HdsTabs, HdsTabsController, BlurStrategy } from '@kit.UIDesignKit';
 import { Theme } from '../common/Theme';
 import { Icons } from '../common/Icons';
 import { SystemCapability } from '../services/capability/SystemCapability';
+import { HapticService } from '../services/haptic/HapticService';
 
 // HdsTabs owns the floating action bar; action clicks never replace the detail content.
 @ComponentV2
@@ -11,6 +12,8 @@ export struct HdsActionTabs {
   @Param materialLevel: number = 1;
   @Param availableWidth: number = 360;
   @Param busy: boolean = false;
+  @Param haptic: boolean = true;
+  @Param hapticLevel: number = 1;
   @BuilderParam content: () => void = this.emptyContent;
   private controller: HdsTabsController = new HdsTabsController();
   @Builder emptyContent() { Blank() }
@@ -34,7 +37,10 @@ export struct HdsActionTabs {
       .barFloatingStyle(SystemCapability.tabs(this.effects, this.materialLevel))
       .onContentWillChange((): boolean => false)
       .onTabBarClick((index: number): void => {
-        if (!this.busy) { this.items[index]?.action?.(); }
+        if (this.busy) { return; }
+        // 详情操作栏的每个动作都先给一次点击反馈，避免个别动作缺少振动。
+        HapticService.confirm(this.haptic, this.hapticLevel);
+        this.items[index]?.action?.();
       })
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])

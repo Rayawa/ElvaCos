@@ -1,4 +1,4 @@
-import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 
@@ -53,11 +53,8 @@ export default class EntryAbility extends UIAbility {
       hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
     });
 
-    try {
-      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
-    }
+    // 深浅色由「应用外观」决定：SettingsService 会在加载偏好后设置 ColorMode，
+    // 这里不再强制 NOT_SET，避免把用户选择的浅色/深色覆盖回跟随系统。
   }
 
   onWindowStageDestroy(): void {

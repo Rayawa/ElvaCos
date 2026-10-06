@@ -5,6 +5,7 @@ import { ArrayDataSource } from '../../common/ArrayDataSource';
 import { photoStage } from '../../model/Rules';
 import { PhotoAsset, PhotoStatus, PHOTO_LABELS, PHOTO_STATUSES } from '../../model/Entities';
 import { EmptyState, InteractiveCard } from '../../components/Surfaces';
+import { vibration } from '../../common/vibration';
 
 @ComponentV2
 export struct PhotoGrid {
@@ -36,18 +37,18 @@ export struct PhotoGrid {
       Row({ space: 12 }) {
         Select(['全部', '待选', '已选', '待修', '成片'].map((label: string): SelectOption => { return { value: label }; }))
           .value(['全部', '待选', '已选', '待修', '成片'][this.filter]).layoutWeight(1).enabled(!this.state.busy)
-          .onSelect((index: number) => { this.filter = index; this.selectedIds = []; }).accessibilityText('照片状态筛选')
-        Button(this.selecting ? '取消选择' : '批量选片').backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy && this.photos.length > 0).onClick(() => { this.selecting = !this.selecting; this.selectedIds = []; })
+          .onSelect((index: number) => { vibration.dotVibration(); this.filter = index; this.selectedIds = []; }).accessibilityText('照片状态筛选')
+        Button(this.selecting ? '取消选择' : '批量选片').backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy && this.photos.length > 0).onClick(() => { vibration.dotVibration(); this.selecting = !this.selecting; this.selectedIds = []; }).accessibilityText(this.selecting ? '取消选择' : '批量选片')
       }.width('100%')
       if (this.selecting) {
         Row() {
           Text('已选 ' + this.selectedIds.length + ' 张').fontSize(14).fontColor(Theme.ink).layoutWeight(1)
-          Button(this.selectedIds.length === this.visible().length ? '取消全选' : '全选当前筛选').backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy).onClick(() => { this.selectedIds = this.selectedIds.length === this.visible().length ? [] : this.visible().map((photo: PhotoAsset) => photo.id); })
+          Button(this.selectedIds.length === this.visible().length ? '取消全选' : '全选当前筛选').backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy).onClick(() => { vibration.dotVibration(); this.selectedIds = this.selectedIds.length === this.visible().length ? [] : this.visible().map((photo: PhotoAsset) => photo.id); }).accessibilityText(this.selectedIds.length === this.visible().length ? '取消全选' : '全选当前筛选')
         }.width('100%')
         Row({ space: 12 }) {
           Select([{ value: '标为已选' }, { value: '标为待修' }, { value: '标为成片' }, { value: '退回待选' }]).value(this.targetStatus === PhotoStatus.WAITING ? '标为待修' : this.targetStatus === PhotoStatus.FINAL ? '标为成片' : this.targetStatus === PhotoStatus.RAW ? '退回待选' : '标为已选').layoutWeight(1).enabled(!this.state.busy)
-            .onSelect((index: number) => { this.targetStatus = [PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.FINAL, PhotoStatus.RAW][index]; }).accessibilityText('批量照片状态')
-          Button(this.state.busy ? '更新中…' : '应用').backgroundColor(Theme.accent).fontColor(Theme.onAccent).enabled(!this.state.busy && this.selectedIds.length > 0).onClick(() => this.apply())
+            .onSelect((index: number) => { vibration.dotVibration(); this.targetStatus = [PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.FINAL, PhotoStatus.RAW][index]; }).accessibilityText('批量照片状态')
+          Button(this.state.busy ? '更新中…' : '应用').backgroundColor(Theme.accent).fontColor(Theme.onAccent).enabled(!this.state.busy && this.selectedIds.length > 0).onClick(() => { vibration.dotVibration(); this.apply(); }).accessibilityText(this.state.busy ? '更新中' : '应用状态')
         }.width('100%')
       }
     }.width('100%')

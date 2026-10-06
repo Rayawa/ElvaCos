@@ -12,3 +12,5 @@
 /.appanalyzer
 # DevEco local signing configuration; use the sanitized example in version control.
 /build-profile.json5
+# 本机真机截图/布局 dump 与调试脚本，不入库
+/.shots

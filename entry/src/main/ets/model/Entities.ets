@@ -23,5 +23,7 @@ export class ChecklistItem { id: string = newId(); projectId: string = ''; asset
 export class PhotoAsset { id: string = newId(); projectId: string = ''; sourceUri: string = ''; localPath: string = ''; thumbnailPath: string = ''; status: PhotoStatus = PhotoStatus.IMPORTED; caption: string = ''; createdAt: number = Date.now(); }
 export class PhotoVersion { id: string = newId(); photoId: string = ''; name: string = 'Original'; recipe: string = '{}'; renderedPath: string = ''; createdAt: number = Date.now(); }
 export class DiaryEntry { id: string = newId(); projectId: string = ''; text: string = ''; createdAt: number = Date.now(); }
-export class AppSettings { username: string = ''; hapticLevel: number = 1; lightFieldLevel: number = 1; materialLevel: number = 1; theme: string = 'system'; haptic: boolean = true; effects: boolean = true; hand: string = 'left'; grip: boolean = false; }
+export class AppSettings { username: string = ''; hapticLevel: number = 1; lightFieldLevel: number = 1; materialLevel: number = 1; haptic: boolean = true; effects: boolean = true; hand: string = 'left'; grip: boolean = false; /** sky=浅色，mist=深色，system=跟随系统 */ appearance: string = 'system'; }
+/** 华为账号登录态；未登录时 signedIn 为 false，其余字段为空。 */
+export class HuaweiAccount { signedIn: boolean = false; openId: string = ''; unionId: string = ''; displayName: string = ''; signedAt: number = 0; }
 export interface ProjectProgress { ready: number; total: number; percent: number; }

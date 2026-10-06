@@ -2,14 +2,16 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import { Database } from '../data/database/Database';
 import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, CosEventRepository, ChecklistItemRepository, PhotoAssetRepository, DiaryEntryRepository, RelationRepository } from '../data/repository/Repositories';
-import { Character, CharacterVariant, CosProject, Asset, CosEvent, ChecklistItem, PhotoAsset, DiaryEntry, ProjectAsset, AppSettings, ProjectStatus, PhotoStatus, PROJECT_LABELS, PROJECT_STATUSES } from '../model/Entities';
+import { Character, CharacterVariant, CosProject, Asset, CosEvent, ChecklistItem, PhotoAsset, DiaryEntry, ProjectAsset, AppSettings, HuaweiAccount, ProjectStatus, PhotoStatus, PROJECT_LABELS, PROJECT_STATUSES } from '../model/Entities';
 import { requiredName, safeUrl, validDate, checkProjectDate, projectProgress } from '../model/Rules';
 import { MediaRepository } from '../data/media/MediaRepository';
 import { SettingsService } from '../services/SettingsService';
+import { AccountService, AccountResult } from '../services/account/AccountService';
 import { HapticService } from '../services/haptic/HapticService';
 import { GripService } from '../services/grip/GripService';
 import { ShareService } from '../services/share/ShareService';
 import { BackupService } from '../services/BackupService';
+import { clearStoredAccount, getStoredAccount, setStoredAccount, StoredAccount } from './storage';
 
 @ObservedV2
 export class AppState {
@@ -28,6 +30,7 @@ export class AppState {
   @Trace diary: DiaryEntry[] = [];
   @Trace links: ProjectAsset[] = [];
   @Trace settings: AppSettings = new AppSettings();
+  @Trace account: HuaweiAccount = new HuaweiAccount();
   @Trace sensedHand: string = 'auto';
   private db: Database = new Database();
   private characterRepo = new CharacterRepository(this.db);
@@ -48,10 +51,59 @@ export class AppState {
     await this.perform(async () => {
       await this.db.open(context);
       this.settings = await this.preference.load(context);
+      this.account = this.toAccount(await getStoredAccount());
       await this.refresh();
       await this.media?.collect(this.photos);
       this.ready = true;
     }, false);
+  }
+  private toAccount(stored: StoredAccount): HuaweiAccount {
+    const account = new HuaweiAccount();
+    account.signedIn = stored.openId.length > 0;
+    account.openId = stored.openId;
+    account.unionId = stored.unionId;
+    account.displayName = stored.name;
+    account.signedAt = stored.signedAt;
+    return account;
+  }
+  /** 华为账号登录入口；云同步尚未开放，登录态当前只用于本机身份展示。 */
+  async signInHuawei(): Promise<boolean> {
+    if (!this.context) { return false; }
+    if (this.busy) { return false; }
+    this.busy = true; this.error = ''; this.notice = '';
+    try {
+      const result: AccountResult = await new AccountService().signIn(this.context);
+      if (result.ok) {
+        this.account = result.account;
+        await setStoredAccount({ openId: result.account.openId, unionId: result.account.unionId, name: result.account.displayName, signedAt: result.account.signedAt });
+      }
+      this.reportNotice(result.message);
+      return result.ok;
+    } catch (error) {
+      this.reportError((error as Error).message || '华为账号登录失败，请重试');
+      return false;
+    } finally {
+      this.busy = false;
+    }
+  }
+  async signOutHuawei(): Promise<boolean> {
+    if (!this.context) { return false; }
+    if (this.busy) { return false; }
+    this.busy = true; this.error = ''; this.notice = '';
+    try {
+      const result: AccountResult = await new AccountService().signOut(this.context);
+      if (result.ok) {
+        this.account = new HuaweiAccount();
+        await clearStoredAccount();
+      }
+      this.reportNotice(result.message);
+      return result.ok;
+    } catch (error) {
+      this.reportError((error as Error).message || '退出登录失败，请重试');
+      return false;
+    } finally {
+      this.busy = false;
+    }
   }
   async refresh(): Promise<void> {
     this.characters = await this.characterRepo.list(); this.variants = await this.variantRepo.list();
@@ -171,7 +223,10 @@ export class AppState {
   }
   async updateSettings(settings: AppSettings): Promise<boolean> {
     return this.perform(async () => { if (this.context) {
-        if (settings.grip && !this.settings.grip) { try { await this.grip.start(this.context, (hand: string) => { this.sensedHand = hand; }); } catch (error) { this.grip.stop(); throw error as Error; } this.grip.stop(); this.sensedHand = 'auto'; }
+        if (settings.grip && !this.settings.grip) {
+          try { await this.grip.start(this.context, (hand: string) => { this.sensedHand = hand; }); }
+          catch (error) { this.grip.stop(); this.sensedHand = 'auto'; }
+        }
         await this.preference.save(this.context, settings); this.settings = settings;
         if (!settings.grip) { this.grip.stop(); this.sensedHand = 'auto'; }
       } }, false);

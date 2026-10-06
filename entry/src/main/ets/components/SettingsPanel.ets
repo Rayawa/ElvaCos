@@ -1,4 +1,5 @@
 import { Icons } from '../common/Icons';
+import { Theme } from '../common/Theme';
 import { vibration } from '../common/vibration';
 import { common } from '@kit.AbilityKit';
 import {
@@ -60,7 +61,7 @@ struct UsernameEditor {
         }) {
             Text('用户名')
                 .fontSize(16)
-                .fontColor($r('app.color.v3_text_primary'))
+                .fontColor(Theme.ink)
                 .maxLines(2)
                 .accessibilityText('用户名')
 
@@ -73,7 +74,7 @@ struct UsernameEditor {
                     .constraintSize({ minWidth: 120 })
                     .height(40)
                     .enableKeyboardOnFocus(false)
-                    .backgroundColor($r('app.color.v3_surface_alt'))
+                    .backgroundColor(Theme.tint)
                     .onChange((value: string): void => {
                         this.draftUsername = value;
                     })
@@ -121,8 +122,11 @@ export struct SettingsPanel {
     @Prop @Watch('onActiveChanged') active: boolean = false;
     @StorageLink('vibrationLevel') vibrationLevel: number = 1;
     @StorageLink('lightFieldLevel') lightFieldLevel: number = 1;
-    @StorageLink('immersiveMaterialLevel') immersiveMaterialLevel: number = 1;
+    @StorageLink('immersiveMaterialLevel') @Watch('materialLevelChanged') immersiveMaterialLevel: number = 1;
     @StorageLink('username') username: string = '';
+    // 材质档位在界面上是反向的（流畅在左，精美在右），用镜像值做 $$ 双向绑定，
+    // 保证拖动时滑块连续跟随手指，松手才提交 —— 与振动强度滑块的写法一致。
+    @State private materialSliderValue: number = 1;
 
     @State handlePopupTrash: boolean = false;
     @State cacheSize: string = '计算中…';
@@ -157,7 +161,17 @@ export struct SettingsPanel {
     });
 
     private onActiveChanged(): void {
+        this.syncMaterialSlider();
         if (this.active) this.scheduleCacheSizeRefresh();
+    }
+
+    private syncMaterialSlider(): void {
+        const mirrored = 2 - this.immersiveMaterialLevel;
+        if (this.materialSliderValue !== mirrored) this.materialSliderValue = mirrored;
+    }
+
+    private materialLevelChanged(): void {
+        this.syncMaterialSlider();
     }
 
     private scheduleCacheSizeRefresh(): void {
@@ -255,7 +269,7 @@ export struct SettingsPanel {
             this.usernameItem()
 
             Divider()
-                .color($r('app.color.border'))
+                .color(Theme.line)
                 .strokeWidth(0.5)
                 .margin({
                     left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -266,7 +280,7 @@ export struct SettingsPanel {
                 this.vibrationLevelItem()
 
                 Divider()
-                    .color($r('app.color.border'))
+                    .color(Theme.line)
                     .strokeWidth(0.5)
                     .margin({
                         left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -278,7 +292,7 @@ export struct SettingsPanel {
 
             if (SUPPORTS_HARMONY_API_23) {
                 Divider()
-                    .color($r('app.color.border'))
+                    .color(Theme.line)
                     .strokeWidth(0.5)
                     .margin({
                         left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -289,7 +303,7 @@ export struct SettingsPanel {
             }
 
             Divider()
-                .color($r('app.color.border'))
+                .color(Theme.line)
                 .strokeWidth(0.5)
                 .margin({
                     left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -300,15 +314,16 @@ export struct SettingsPanel {
             this.trashItem()
         }
         .width('100%')
-        .backgroundColor($r('app.color.v3_surface'))
+        .backgroundColor(Theme.surface)
         .borderRadius(16)
         .shadow({
             radius: 8,
-            color: $r('app.color.v3_shadow'),
+            color: Theme.shadow,
             offsetY: 2
         })
         .clip(true)
         .onAppear((): void => {
+            this.syncMaterialSlider();
             if (this.active) this.scheduleCacheSizeRefresh();
         })
         .onAreaChange((_oldValue: Area, newValue: Area): void => {
@@ -344,7 +359,7 @@ export struct SettingsPanel {
                 },
             },
             cardHeight: this.isNarrowSettings() ? 116 : 68,
-            cardBackgroundColor: $r('app.color.v3_surface'),
+            cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
             cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
@@ -365,7 +380,7 @@ export struct SettingsPanel {
         }) {
             Text('振动强度')
                 .fontSize(16)
-                .fontColor($r('app.color.v3_text_primary'))
+                .fontColor(Theme.ink)
                 .maxLines(2)
                 .accessibilityText('振动强度')
 
@@ -378,9 +393,9 @@ export struct SettingsPanel {
                     style: SliderStyle.InSet,
                 })
                     .width(190)
-                    .selectedColor($r('app.color.diff_content'))
-                    .trackColor($r('app.color.v3_surface_alt'))
-                    .blockBorderColor($r('app.color.v3_surface'))
+                    .selectedColor(Theme.accent)
+                    .trackColor(Theme.tint)
+                    .blockBorderColor(Theme.surface)
                     .showSteps(true)
                     .showTips(false)
                     .onChange((value: number, mode: SliderChangeMode) => {
@@ -435,8 +450,8 @@ export struct SettingsPanel {
             )
             .fontColor(
                 this.vibrationLevel === level ?
-                    $r('app.color.diff_content') :
-                    $r('app.color.v3_text_secondary')
+                    Theme.accent :
+                    Theme.muted
             )
             .width(40)
             .textAlign(TextAlign.Center)
@@ -509,7 +524,7 @@ export struct SettingsPanel {
                 },
             },
             cardHeight: this.isNarrowSettings() ? 116 : 68,
-            cardBackgroundColor: $r('app.color.v3_surface'),
+            cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
             cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
@@ -529,7 +544,7 @@ export struct SettingsPanel {
         }) {
             Text('光场视效')
                 .fontSize(16)
-                .fontColor($r('app.color.v3_text_primary'))
+                .fontColor(Theme.ink)
                 .maxLines(2)
                 .accessibilityText('光场视效')
 
@@ -542,9 +557,9 @@ export struct SettingsPanel {
                     style: SliderStyle.InSet,
                 })
                     .width(190)
-                    .selectedColor($r('app.color.diff_content'))
-                    .trackColor($r('app.color.v3_surface_alt'))
-                    .blockBorderColor($r('app.color.v3_surface'))
+                    .selectedColor(Theme.accent)
+                    .trackColor(Theme.tint)
+                    .blockBorderColor(Theme.surface)
                     .showSteps(true)
                     .showTips(false)
                     .onChange((value: number, mode: SliderChangeMode): void => {
@@ -575,14 +590,14 @@ export struct SettingsPanel {
             .fontSize(12)
             .fontWeight(this.lightFieldLevel === level ? FontWeight.Medium : FontWeight.Regular)
             .fontColor(level === 2 && !isHdrLightFieldSupported() ?
-                $r('app.color.v3_text_secondary') :
+                Theme.muted :
                 this.lightFieldLevel === level ?
-                    $r('app.color.diff_content') : $r('app.color.v3_text_secondary'))
+                    Theme.accent : Theme.muted)
             .opacity(level === 2 && !isHdrLightFieldSupported() ? 0.55 : 1)
             .decoration({
                 type: level === 2 && !isHdrLightFieldSupported() ?
                     TextDecorationType.LineThrough : TextDecorationType.None,
-                color: $r('app.color.v3_text_secondary'),
+                color: Theme.muted,
             })
             .width(40)
             .textAlign(TextAlign.Center)
@@ -612,7 +627,7 @@ export struct SettingsPanel {
                 },
             },
             cardHeight: this.isNarrowSettings() ? 116 : 68,
-            cardBackgroundColor: $r('app.color.v3_surface'),
+            cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
             cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
@@ -633,22 +648,22 @@ export struct SettingsPanel {
         }) {
             Text('材质等级')
                 .fontSize(16)
-                .fontColor($r('app.color.v3_text_primary'))
+                .fontColor(Theme.ink)
                 .maxLines(2)
                 .accessibilityText('材质等级')
 
             Column({ space: 1 }) {
                 Slider({
-                    value: 2 - this.immersiveMaterialLevel,
+                    value: $$this.materialSliderValue,
                     min: 0,
                     max: 2,
                     step: 1,
                     style: SliderStyle.InSet,
                 })
                     .width(190)
-                    .selectedColor($r('app.color.diff_content'))
-                    .trackColor($r('app.color.v3_surface_alt'))
-                    .blockBorderColor($r('app.color.v3_surface'))
+                    .selectedColor(Theme.accent)
+                    .trackColor(Theme.tint)
+                    .blockBorderColor(Theme.surface)
                     .showSteps(true)
                     .showTips(false)
                     .onChange((value: number, mode: SliderChangeMode) => {
@@ -657,6 +672,7 @@ export struct SettingsPanel {
                         if (mode === SliderChangeMode.Click ||
                             mode === SliderChangeMode.End) {
                             this.immersiveMaterialLevel = nextLevel;
+                            this.materialSliderValue = 2 - nextLevel;
 
                             vibration.dotVibration();
 
@@ -705,8 +721,8 @@ export struct SettingsPanel {
             )
             .fontColor(
                 this.immersiveMaterialLevel === level ?
-                    $r('app.color.diff_content') :
-                    $r('app.color.v3_text_secondary')
+                    Theme.accent :
+                    Theme.muted
             )
             .width(40)
             .textAlign(TextAlign.Center)
@@ -729,7 +745,7 @@ export struct SettingsPanel {
                 },
             },
             cardHeight: this.isNarrowSettings() ? 108 : 68,
-            cardBackgroundColor: $r('app.color.v3_surface'),
+            cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
             cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
@@ -764,7 +780,7 @@ export struct SettingsPanel {
                 this.trash();
             },
             cardHeight: 52,
-            cardBackgroundColor: $r('app.color.v3_surface'),
+            cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
             cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
@@ -784,13 +800,13 @@ export struct SettingsPanel {
         }) {
             Text('清除缓存')
                 .fontSize(16)
-                .fontColor($r('app.color.v3_text_primary'))
+                .fontColor(Theme.ink)
                 .accessibilityText('清除缓存')
 
             Row({ space: 8 }) {
                 Text(`缓存文件总大小：${this.cacheSize}`)
                     .fontSize(13)
-                    .fontColor($r('app.color.v3_text_secondary'))
+                    .fontColor(Theme.muted)
                     .accessibilityText(
                         `缓存文件总大小${this.cacheSize}`
                     )

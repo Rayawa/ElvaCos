@@ -3,8 +3,10 @@ import { common } from '@kit.AbilityKit';
 import { AppState, applicationState } from '../common/AppState';
 import { confirm } from '../common/Confirm';
 import { showToastSafely } from '../common/safeUi';
+import { appSheetOptions } from '../common/sheet';
 import { Theme } from '../common/Theme';
 import { Icons } from '../common/Icons';
+import { SheetHeader } from '../components/SheetHeader';
 import { SegmentButtonV2Items, SegmentButtonV2ItemOptions } from '@kit.ArkUI';
 import { HdsTitleBarSegment } from '../components/HdsTitleBarSegment';
 import { HdsActionTabs } from '../components/HdsActionTabs';
@@ -48,6 +50,28 @@ struct Index {
   @Local viewportWidth: number = 360;
   aboutToAppear(): void { if (!this.state.ready) { this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext); } }
   onPageHide(): void { this.state.suspend(); }
+
+  /**
+   * 标题栏内分段按钮的宽度规划。
+   * - 标题为空（分段独立占据中间区域）时按内容取宽，最多不超过标题栏可用宽度的一半；
+   * - 标题非空时按标题文字长度预留左右空间，避免分段盖住标题或右侧菜单。
+   */
+  private segmentWidth(itemCount: number, titleLength: number): number {
+    const viewport = Math.max(320, this.viewportWidth);
+    // 每项 88vp 与 Dashboard 的 50% 结果一致（本机 378vp 宽时 2 项 ≈ 50%），
+    // 只有标题较长时才按标题字数收缩，避免分段压住标题或右侧菜单。
+    const naturalWidth = itemCount * 88 + 14;
+    const cap = Math.min(320, viewport * 0.5);
+    const titleReserve = titleLength > 0 ? Math.min(120, 56 + titleLength * 14) : 56;
+    const available = viewport - titleReserve * 2;
+    return Math.floor(Math.max(150, Math.min(naturalWidth, cap, available)));
+  }
+
+  /** 二级页面返回：Dashboard AppDetailPage 的 closePage 语义 + 显式返回振动。 */
+  private closeDetail(): void {
+    HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
+    if (this.detailStack.size() > 0) { this.detailStack.pop(); }
+  }
   private open(kind: string, id: string): void { if (id) { HapticService.confirm(this.state.settings.haptic); this.outing = false; this.state.suspend(); if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos') { this.detailStack.pushPathByName('project', new ProjectRoute(id, kind === 'packing' ? 1 : kind === 'projectPhotos' ? 2 : 0)); } else { this.detailStack.pushPathByName(kind, id); } } }
   private edit(kind: string, id: string = '', parent: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
@@ -65,13 +89,21 @@ struct Index {
     const accepted = await confirm(this.getUIContext(), kind === 'restore' ? '替换当前元数据？' : '清空本地数据？', kind === 'restore' ? '建议先导出当前记录。恢复会替换全部角色、计划和衣柜记录；本机未保存的照片需重新导入。' : '全部本地记录和照片副本将删除，系统相册原图保留。建议先完成备份。', kind === 'restore' ? '选择备份' : '清空');
     if (accepted) { if (kind === 'restore') { await this.state.restoreData(); } else { await this.state.clearData(); } this.detailStack.clear(); }
   }
-  @Builder form() { FormEditor({ state: this.state, draft: this.draft, done: () => { this.formOpen = false; }, saved: (kind: string, id: string, created: boolean) => { if (kind === 'project' && created) { this.open('project', id); } } }) }
+
+  @Builder form() {
+    FormEditor({
+      state: this.state, draft: this.draft,
+      done: (): void => { this.formOpen = false; },
+      saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('project', id); } },
+    })
+  }
+
   @Builder detailContent(kind: string, param: Object) {
     Column() {
       if (kind === 'character') { CharacterDetail({ state: this.state, character: this.state.characters.find((c: Character) => c.id === (param as string)) || new Character(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       else if (kind === 'project') {
-        if ((param as ProjectRoute).section === 2) { PhotoGrid({ state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, sidePadding: Theme.pagePadding, photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as ProjectRoute).id), open: (k: string, id: string) => this.open(k, id) }) }
-        else { ProjectDetail({ state: this.state, route: param as ProjectRoute, project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) || new CosProject(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
+        if ((param as ProjectRoute).section === 2) { PhotoGrid({ state: this.state, topInset: Theme.detailTopWithSegment, bottomInset: Theme.contentBottom, sidePadding: Theme.pagePadding, photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as ProjectRoute).id), open: (k: string, id: string) => this.open(k, id) }) }
+        else { ProjectDetail({ state: this.state, route: param as ProjectRoute, topInset: Theme.detailTopWithSegment, project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) || new CosProject(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       }
       else if (kind === 'asset') { AssetDetail({ state: this.state, asset: this.state.assets.find((a: Asset) => a.id === (param as string)) || new Asset(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       else if (kind === 'event') { EventDetail({ state: this.state, event: this.state.events.find((e: CosEvent) => e.id === (param as string)) || new CosEvent(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
@@ -79,19 +111,24 @@ struct Index {
       else if (kind === 'projectPhotos') { Column({ space: 12 }) { PhotoGrid({ state: this.state, topInset: Theme.contentTop, sidePadding: Theme.pagePadding, photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as string)), open: (k: string, id: string) => this.open(k, id) }).layoutWeight(1) }.height('100%').width('100%') }
     }.width('100%').height('100%')
   }
+
   @Builder destination(kind: string, param: Object) {
     HdsNavDestination() {
       if (kind === 'settings') {
-        SettingsPage({ state: this.state, bottomInset: 24, destructive: (k: string): void => { this.destructive(k); } })
+        SettingsPage({ state: this.state, bottomInset: Theme.contentBottom, destructive: (k: string): void => { this.destructive(k); } })
       } else {
         HdsActionTabs({
           items: this.detailTools(kind, param), effects: this.state.settings.effects,
           materialLevel: this.state.settings.materialLevel, availableWidth: this.viewportWidth,
-          busy: this.state.busy, content: (): void => { this.detailContent(kind, param); },
+          busy: this.state.busy, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+          content: (): void => { this.detailContent(kind, param); },
         })
       }
-    }.titleBar(SystemCapability.titleBar(kind === 'project' ? '' : this.destinationTitle(kind, param as string), this.state.settings.effects, this.state.settings.materialLevel, kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined))
+    }.titleBar(SystemCapability.titleBar(kind === 'project' ? '' : this.destinationTitle(kind, param as string), this.state.settings.effects, this.state.settings.materialLevel, kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined, [], false, (): void => { this.closeDetail(); }))
       .titleMode(HdsNavDestinationTitleMode.MINI).hideToolBar(true).backgroundColor(Theme.bg)
+      // 与首页一致：标题栏避让系统顶部，内容区上下全屏沉浸（滚到浮动操作栏下方）。
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .onBackPressed((): boolean => { this.closeDetail(); return true; })
       .onHidden((): void => { this.outing = false; this.state.suspend(); })
   }
 
@@ -115,16 +152,22 @@ struct Index {
     }
     await this.state.setCover(photo);
   }
+
   @Builder importSheet() {
     Column({ space: 16 }) {
-      Text('选择照片所属计划').fontSize(24).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
+      SheetHeader({
+        title: '选择照片所属计划', hint: '导入的照片只保存在本机',
+        haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+        close: (): void => { this.importOpen = false; },
+      })
       List({ space: 10 }) {
         ForEach(this.state.projects, (p: CosProject) => {
-          ListItem() { Button(p.name).width('100%').constraintSize({ minHeight: 56 }).backgroundColor(Theme.tint).fontColor(Theme.accent).onClick(() => { this.importOpen = false; this.state.importPhotos(p.id); }) }
+          ListItem() { Button(p.name).width('100%').constraintSize({ minHeight: 56 }).backgroundColor(Theme.tint).fontColor(Theme.accent).onClick(() => { HapticService.confirm(this.state.settings.haptic); this.importOpen = false; this.state.importPhotos(p.id); }) }
         }, (p: CosProject) => p.id)
       }.layoutWeight(1).width('100%')
     }.padding(24).height('100%').width('100%').backgroundColor(Theme.surface)
   }
+
   private rootTools(index: number): ToolbarItem[] {
     if (index === 1) { return [{ value: this.cosProjects ? '新建计划' : '添加角色', icon: Icons.add, action: () => this.edit(this.cosProjects ? 'project' : 'character') }]; }
     if (index === 2) { return [{ value: '记录漫展', icon: Icons.event, action: () => this.edit('event') }]; }
@@ -137,11 +180,21 @@ struct Index {
       return { content: { label: item.value, icon: item.icon as Resource, isEnabled: this.state.ready && !this.state.busy, action: item.action, componentId: 'root-action-' + item.value } };
     });
   }
+
   @Builder projectSegment(route: ProjectRoute) {
     Column() {
-      HdsTitleBarSegment({ componentId: 'project-task-segment', items: new SegmentButtonV2Items(['准备', '打包', '照片'].map((label: string): SegmentButtonV2ItemOptions => { return { text: label, accessibilityText: label }; })), selectedIndexes: [route.section], normalWidth: '50%', experimentalWidth: '50%', onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } }).margin({ top: 8 })
+      HdsTitleBarSegment({
+        componentId: 'project-task-segment',
+        items: this.buildSegmentItems(['准备', '打包', '照片']),
+        selectedIndexes: [route.section],
+        normalWidth: this.taskSegmentWidth(),
+        experimentalWidth: this.taskSegmentWidth(),
+        onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); },
+        onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); },
+      }).margin({ top: 8 })
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
+
   private detailTools(kind: string, param: Object): ToolbarItem[] {
     const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
     if (kind === 'settings') { return []; }
@@ -166,24 +219,62 @@ struct Index {
     return [{ value: '选中照片', icon: Icons.check, action: () => { const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); if (photo) { this.state.setPhotoStatus(photo, PhotoStatus.SELECTED); } } }, { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => { const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); if (photo) { this.setCover(photo); } } }, { value: '删除', icon: Icons.remove, action: () => this.remove('photo', id) }];
   }
 
+  private segmentLabels(index: number): string[] {
+    if (index === 1) { return ['角色', '计划']; }
+    if (index === 2) { return ['即将', '过去', '想去']; }
+    if (index === 3) { return ['装备', '照片']; }
+    return ['作品', '时间轴'];
+  }
+
+  private segmentTitle(index: number): string {
+    const titles: string[] = ['首页', 'Cos', '漫展', '衣柜', '我的'];
+    return index >= 0 && index < titles.length ? titles[index] : '';
+  }
+
+  private segmentSelection(index: number): number {
+    if (index === 1) { return this.cosProjects ? 1 : 0; }
+    if (index === 2) { return this.eventFilter; }
+    if (index === 3) { return this.libraryPhotos ? 1 : 0; }
+    return this.meSection;
+  }
+
+  private buildSegmentItems(labels: string[]): SegmentButtonV2Items {
+    const options: SegmentButtonV2ItemOptions[] = [];
+    for (let position = 0; position < labels.length; position++) {
+      const label = labels[position];
+      const spoken = label === '即将' ? '即将参加' : label === '过去' ? '已过去' : label;
+      options.push({ text: label, accessibilityText: spoken });
+    }
+    return new SegmentButtonV2Items(options);
+  }
+
+  private taskSegmentWidth(): number {
+    return this.segmentWidth(3, 0);
+  }
+
+  private titleSegmentWidth(index: number): number {
+    return this.segmentWidth(this.segmentLabels(index).length, this.segmentTitle(index).length);
+  }
+
   @Builder titleSegment(index: number) {
     Column() {
-    HdsTitleBarSegment({
-      componentId: 'secondary-segment-' + index,
-      items: new SegmentButtonV2Items((index === 1 ? ['角色', '计划'] : index === 2 ? ['即将', '过去', '想去'] : index === 3 ? ['装备', '照片'] : ['作品', '时间轴']).map((label: string): SegmentButtonV2ItemOptions => { return { text: label, accessibilityText: label === '即将' ? '即将参加' : label === '过去' ? '已过去' : label }; })),
-      selectedIndexes: [index === 1 ? (this.cosProjects ? 1 : 0) : index === 2 ? this.eventFilter : index === 3 ? (this.libraryPhotos ? 1 : 0) : this.meSection],
-      experimentalWidth: '50%',
-      normalWidth: '50%',
-      onSelectedIndexChanged: (selected: number) => {
-        if (index === 1) { this.cosProjects = selected === 1; }
-        else if (index === 2) { this.eventFilter = selected; }
-        else if (index === 3) { this.libraryPhotos = selected === 1; }
-        else { this.meSection = selected; }
-      },
-      onItemClicked: (_selected: number): void => { HapticService.confirm(this.state.settings.haptic); },
-    }).align(Alignment.Center).margin({ top: 8 })
+      HdsTitleBarSegment({
+        componentId: 'secondary-segment-' + index,
+        items: this.buildSegmentItems(this.segmentLabels(index)),
+        selectedIndexes: [this.segmentSelection(index)],
+        experimentalWidth: this.titleSegmentWidth(index),
+        normalWidth: this.titleSegmentWidth(index),
+        onSelectedIndexChanged: (selected: number): void => {
+          if (index === 1) { this.cosProjects = selected === 1; }
+          else if (index === 2) { this.eventFilter = selected; }
+          else if (index === 3) { this.libraryPhotos = selected === 1; }
+          else { this.meSection = selected; }
+        },
+        onItemClicked: (_selected: number): void => { HapticService.confirm(this.state.settings.haptic); },
+      }).align(Alignment.Center).margin({ top: 8 })
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
+
   @Monitor('state.error', 'state.notice', 'state.feedbackVersion')
   private feedbackChanged(): void {
     const message = this.state.error || this.state.notice;
@@ -192,6 +283,7 @@ struct Index {
   @Builder loadingOverlay() {
     if (this.state.busy) { LoadingProgress().width(40).height(40).color(Theme.accent).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中') }
   }
+
   @Builder mainNavigation(index: number) {
     HdsNavigation(this.stacks[index]) {
       Column() {
@@ -199,10 +291,10 @@ struct Index {
         if (!this.state.busy && this.state.error) { EmptyState({ title: '暂时无法打开记录', message: '请重试加载本地数据。', button: '重试', action: (): void => { this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext); } }).margin({ top: Theme.contentTop, left: Theme.pagePadding, right: Theme.pagePadding }) }
       }
       else if (index === 0) { HomePage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.homeContentBottom, active: this.tab === index, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
-      else if (index === 1) { CosPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, projects: this.cosProjects, selection: (projects: boolean) => { this.cosProjects = projects; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
-      else if (index === 2) { EventsPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, filter: this.eventFilter, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
-      else if (index === 3) { LibraryPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, photos: this.libraryPhotos, selection: (photos: boolean) => { this.libraryPhotos = photos; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
-      else { MePage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, section: this.meSection, open: (k: string, id: string) => this.open(k, id), destructive: (kind: string) => this.destructive(kind) }) }
+      else if (index === 1) { CosPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, projects: this.cosProjects, selection: (projects: boolean) => { this.cosProjects = projects; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
+      else if (index === 2) { EventsPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, filter: this.eventFilter, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
+      else if (index === 3) { LibraryPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, photos: this.libraryPhotos, selection: (photos: boolean) => { this.libraryPhotos = photos; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
+      else { MePage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, section: this.meSection, open: (k: string, id: string) => this.open(k, id), destructive: (kind: string) => this.destructive(kind) }) }
       }.width('100%').height('100%')
     }.mode(NavigationMode.Stack)
       .customNavContentTransition((_from: NavContentInfo, _to: NavContentInfo, operation: NavigationOperation) => {
@@ -210,8 +302,10 @@ struct Index {
         return undefined;
       })
       .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
-      .titleBar(SystemCapability.titleBar(['首页', 'Cos', '漫展', '衣柜', '我的'][index], this.state.settings.effects, this.state.settings.materialLevel, index > 0 ? (): void => { this.titleSegment(index); } : undefined, this.rootMenus(index)))
+      // 外层 HdsTabs 已忽略安全区，内层 HdsNavigation 需要显式避让，标题才不会进入状态栏。
+      .titleBar(SystemCapability.titleBar(['首页', 'Cos', '漫展', '衣柜', '我的'][index], this.state.settings.effects, this.state.settings.materialLevel, index > 0 ? (): void => { this.titleSegment(index); } : undefined, this.rootMenus(index), true))
       .hideToolBar(true)
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%').height('100%').backgroundColor(Theme.bg)
   }
 
@@ -235,6 +329,7 @@ struct Index {
           .onChange((index: number) => { this.tab = index; this.outing = false; this.state.suspend(); HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel); })
               .height(LayoutPolicy.matchParent).width('100%').ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM]).backgroundColor(Theme.bg).accessibilityText('首页、Cos、漫展、衣柜、我的五个标签页').onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
   }
+
   build() {
     HdsNavigation(this.detailStack) {
       this.mainTabs()
@@ -247,7 +342,7 @@ struct Index {
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-      .bindSheet(this.importOpen, this.importSheet(), { height: SheetSize.LARGE, showClose: true, maskColor: Theme.scrim, blurStyle: BlurStyle.COMPONENT_ULTRA_THICK, onDisappear: () => { this.importOpen = false; } })
-      .bindSheet(this.formOpen, this.form(), { height: SheetSize.LARGE, showClose: false, maskColor: Theme.scrim, blurStyle: BlurStyle.COMPONENT_ULTRA_THICK, onDisappear: () => { this.formOpen = false; } })
+      .bindSheet(this.importOpen, this.importSheet(), appSheetOptions((): void => { this.importOpen = false; }))
+      .bindSheet(this.formOpen, this.form(), appSheetOptions((): void => { this.formOpen = false; }))
   }
 }

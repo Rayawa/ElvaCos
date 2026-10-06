@@ -17,6 +17,7 @@ export default function fidelityLayoutTest(): void {
       await (await driver.findWindow({ bundleName: bundle })).focus();
       let matches = await driver.findComponents(ON.text(label).inWindow(bundle));
       if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id('root-action-' + label).inWindow(bundle)); }
+      if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id(label).inWindow(bundle)); }
       if (!matches || matches.length === 0) { throw new Error('Missing visible label: ' + label); }
       await matches[matches.length - 1].click();
       await driver.delayMs(400);
@@ -71,8 +72,15 @@ export default function fidelityLayoutTest(): void {
         const titleBefore = await titles[0].getBounds();
         expect(titleBefore.top > window.top).assertTrue();
         expect(segmentBefore.top < titleBefore.bottom && segmentBefore.bottom > titleBefore.top).assertTrue();
-        if (baselineSegment) { sameRect(baselineSegment, segmentBefore); }
-        else { baselineSegment = segmentBefore; }
+        // 分段宽度按标题长度与项数规划，各页宽度可以不同，但必须水平居中且不压住左侧标题。
+        const segmentCenter = (segmentBefore.left + segmentBefore.right) / 2;
+        const windowCenter = (window.left + window.right) / 2;
+        expect(Math.abs(segmentCenter - windowCenter) <= 2).assertTrue();
+        expect(titleBefore.right <= segmentBefore.left).assertTrue();
+        if (baselineSegment) {
+          expect(segmentBefore.top).assertEqual(baselineSegment.top);
+          expect(segmentBefore.bottom).assertEqual(baselineSegment.bottom);
+        } else { baselineSegment = segmentBefore; }
         sameRect(baselineTabs, await tabs());
         await scrollBody();
         sameRect(segmentBefore, await segment.getBounds());
@@ -119,7 +127,7 @@ export default function fidelityLayoutTest(): void {
       await driver.delayMs(2300); await tap('保存');
       sameRect(before, await field.getBounds());
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-toast-repeat.png');
-      await tap('取消');
+      await tap('sheet-close');
       expect((await driver.findComponents(ON.id('root-action-添加角色').inWindow(bundle))).length > 0).assertTrue();
     });
     it('planTaskSegmentsAndActionBarStayFixedAndReturnToTheSelectedView', 0, async () => {

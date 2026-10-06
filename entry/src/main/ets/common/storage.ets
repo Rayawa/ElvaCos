@@ -9,7 +9,9 @@ import { migrateElvaPreferences, migrateUxPreferences } from './SettingsMigratio
 import getDiskStorageInstance, { DiskStorageInstance } from './DiskStorage';
 import {
     APP_VERSION,
+    DEFAULT_APPEARANCE,
     DEFAULT_BUTTON_RIGHT,
+    DEFAULT_HAND,
     DEFAULT_HOLD_CHECK_ENABLED,
     DEFAULT_IMMERSIVE_MATERIAL_LEVEL,
     DEFAULT_LIGHT_FIELD_LEVEL,
@@ -18,8 +20,14 @@ import {
     LEGACY_PROFILE_FILE_NAME,
     LEGACY_SETTINGS_FILE_NAME,
     STORAGE_FILE_NAME,
+    STORAGE_KEY_ACCOUNT_NAME,
+    STORAGE_KEY_ACCOUNT_OPEN_ID,
+    STORAGE_KEY_ACCOUNT_SIGNED_AT,
+    STORAGE_KEY_ACCOUNT_UNION_ID,
+    STORAGE_KEY_APPEARANCE,
     STORAGE_KEY_BUTTON_RIGHT,
     STORAGE_KEY_FIRST_LAUNCH,
+    STORAGE_KEY_HAND,
     STORAGE_KEY_HOLD_CHECK,
     STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL,
     STORAGE_KEY_LIGHT_FIELD_LEVEL,
@@ -43,6 +51,12 @@ const KEY_HOLD_CHECK = STORAGE_KEY_HOLD_CHECK;
 const KEY_BUTTON_RIGHT = STORAGE_KEY_BUTTON_RIGHT;
 const KEY_IMMERSIVE_MATERIAL_LEVEL = STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL;
 const KEY_SEARCH_HISTORY = STORAGE_KEY_SEARCH_HISTORY;
+const KEY_APPEARANCE = STORAGE_KEY_APPEARANCE;
+const KEY_HAND = STORAGE_KEY_HAND;
+const KEY_ACCOUNT_OPEN_ID = STORAGE_KEY_ACCOUNT_OPEN_ID;
+const KEY_ACCOUNT_UNION_ID = STORAGE_KEY_ACCOUNT_UNION_ID;
+const KEY_ACCOUNT_NAME = STORAGE_KEY_ACCOUNT_NAME;
+const KEY_ACCOUNT_SIGNED_AT = STORAGE_KEY_ACCOUNT_SIGNED_AT;
 
 export interface AppSettings {
     vibrationLevel: number;
@@ -50,6 +64,16 @@ export interface AppSettings {
     holdCheckON: boolean;
     buttonPositionRIGHT: boolean;
     immersiveMaterialLevel: number;
+    appearance: string;
+    hand: string;
+}
+
+/** 华为账号登录态：只保存本机可离线使用的最小信息，不保存任何令牌。 */
+export interface StoredAccount {
+    openId: string;
+    unionId: string;
+    name: string;
+    signedAt: number;
 }
 
 // 所有持久化 key 的默认值；@StorageLink 装饰器的初始值必须与此保持一致
@@ -58,7 +82,9 @@ const DEFAULT_SETTINGS: AppSettings = {
     lightFieldLevel: DEFAULT_LIGHT_FIELD_LEVEL,
     holdCheckON: DEFAULT_HOLD_CHECK_ENABLED,
     buttonPositionRIGHT: DEFAULT_BUTTON_RIGHT,
-    immersiveMaterialLevel: DEFAULT_IMMERSIVE_MATERIAL_LEVEL
+    immersiveMaterialLevel: DEFAULT_IMMERSIVE_MATERIAL_LEVEL,
+    appearance: DEFAULT_APPEARANCE,
+    hand: DEFAULT_HAND
 };
 
 // ===== 单例与一次性迁移 =====
@@ -305,6 +331,69 @@ export async function setImmersiveMaterialLevel(level: number): Promise<void> {
     AppStorage.setOrCreate('visualEffectsEnabled', normalized !== 2);
 }
 
+// ===== 应用外观（天蓝 / 雾蓝 / 跟随系统）=====
+export async function getAppearance(): Promise<string> {
+    const s = await ensureReady();
+    const stored = (await s.get(KEY_APPEARANCE, DEFAULT_APPEARANCE)) as string;
+    return stored === 'sky' || stored === 'mist' ? stored : DEFAULT_APPEARANCE;
+}
+
+export async function setAppearance(mode: string): Promise<void> {
+    const normalized = mode === 'sky' || mode === 'mist' ? mode : DEFAULT_APPEARANCE;
+    const s = await ensureReady();
+    await s.set(KEY_APPEARANCE, normalized);
+    AppStorage.setOrCreate(KEY_APPEARANCE, normalized);
+}
+
+// ===== 单手操作（left / auto / right）=====
+export async function getHand(): Promise<string> {
+    const s = await ensureReady();
+    const stored = (await s.get(KEY_HAND, DEFAULT_HAND)) as string;
+    return stored === 'left' || stored === 'auto' || stored === 'right' ? stored : DEFAULT_HAND;
+}
+
+export async function setHand(hand: string): Promise<void> {
+    const normalized = hand === 'auto' || hand === 'right' ? hand : DEFAULT_HAND;
+    const s = await ensureReady();
+    await s.set(KEY_HAND, normalized);
+    AppStorage.setOrCreate(KEY_HAND, normalized);
+    await s.set(KEY_HOLD_CHECK, normalized === 'auto');
+    AppStorage.setOrCreate(KEY_HOLD_CHECK, normalized === 'auto');
+    await s.set(KEY_BUTTON_RIGHT, normalized === 'right');
+    AppStorage.setOrCreate(KEY_BUTTON_RIGHT, normalized === 'right');
+}
+
+// ===== 华为账号登录态 =====
+export async function getStoredAccount(): Promise<StoredAccount> {
+    const s = await ensureReady();
+    return {
+        openId: (await s.get(KEY_ACCOUNT_OPEN_ID, '')) as string,
+        unionId: (await s.get(KEY_ACCOUNT_UNION_ID, '')) as string,
+        name: (await s.get(KEY_ACCOUNT_NAME, '')) as string,
+        signedAt: (await s.get(KEY_ACCOUNT_SIGNED_AT, 0)) as number
+    };
+}
+
+export async function setStoredAccount(account: StoredAccount): Promise<void> {
+    const s = await ensureReady();
+    await s.set(KEY_ACCOUNT_OPEN_ID, account.openId);
+    await s.set(KEY_ACCOUNT_UNION_ID, account.unionId);
+    await s.set(KEY_ACCOUNT_NAME, account.name);
+    await s.set(KEY_ACCOUNT_SIGNED_AT, account.signedAt);
+    AppStorage.setOrCreate(KEY_ACCOUNT_OPEN_ID, account.openId);
+    AppStorage.setOrCreate(KEY_ACCOUNT_NAME, account.name);
+}
+
+export async function clearStoredAccount(): Promise<void> {
+    const s = await ensureReady();
+    await s.remove(KEY_ACCOUNT_OPEN_ID);
+    await s.remove(KEY_ACCOUNT_UNION_ID);
+    await s.remove(KEY_ACCOUNT_NAME);
+    await s.remove(KEY_ACCOUNT_SIGNED_AT);
+    AppStorage.setOrCreate(KEY_ACCOUNT_OPEN_ID, '');
+    AppStorage.setOrCreate(KEY_ACCOUNT_NAME, '');
+}
+
 export async function getAllSettings(): Promise<AppSettings> {
     // 首次读取可能落到 Preferences；各 key 相互独立，可并行等待以缩短启动水合时间。
     const vibrationLevelPromise = getVibrationLevel();
@@ -312,12 +401,16 @@ export async function getAllSettings(): Promise<AppSettings> {
     const holdCheckPromise = getHoldCheckEnabled();
     const buttonPositionPromise = getButtonPosition();
     const immersiveMaterialPromise = getImmersiveMaterialLevel();
+    const appearancePromise = getAppearance();
+    const handPromise = getHand();
     return {
         vibrationLevel: await vibrationLevelPromise,
         lightFieldLevel: await lightFieldLevelPromise,
         holdCheckON: await holdCheckPromise,
         buttonPositionRIGHT: await buttonPositionPromise,
         immersiveMaterialLevel: await immersiveMaterialPromise,
+        appearance: await appearancePromise,
+        hand: await handPromise,
     };
 }
 
@@ -336,6 +429,12 @@ export async function updateSettings(settings: Partial<AppSettings>): Promise<vo
     }
     if (settings.immersiveMaterialLevel !== undefined) {
         await setImmersiveMaterialLevel(settings.immersiveMaterialLevel);
+    }
+    if (settings.appearance !== undefined) {
+        await setAppearance(settings.appearance);
+    }
+    if (settings.hand !== undefined) {
+        await setHand(settings.hand);
     }
 }
 
@@ -390,6 +489,8 @@ export async function loadPersistedState(ctx?: common.Context): Promise<void> {
         AppStorage.setOrCreate(KEY_IMMERSIVE_MATERIAL_LEVEL, settings.immersiveMaterialLevel);
         AppStorage.setOrCreate('visualEffectsEnabled', settings.immersiveMaterialLevel !== 2);
         AppStorage.setOrCreate(KEY_USERNAME, username);
+        AppStorage.setOrCreate(KEY_APPEARANCE, settings.appearance);
+        AppStorage.setOrCreate(KEY_HAND, settings.hand);
     } catch (error) {
         console.error('[Dashboard][common/storage][ERROR]', `[storage] AppStorage 水合失败: ${JSON.stringify(error)}`);
     }

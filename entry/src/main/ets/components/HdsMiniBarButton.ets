@@ -3,6 +3,8 @@ import { hdsEffect, hdsMaterial, HdsTabs, HdsTabsController } from '@kit.UIDesig
 import { curves } from '@kit.ArkUI';
 import { pressLightFieldFilter, pressVisualEffect } from '../common/visualEffects';
 import { HDS_MATERIAL_TYPE_ADAPTIVE } from '../common/platformCompatibility';
+import { Theme } from '../common/Theme';
+import { vibration } from '../common/vibration';
 
 /**
  * 基于 HdsTabs 迷你栏材质的通用按钮承载层。
@@ -55,6 +57,7 @@ export struct HdsMiniBarButton {
       }
     })
     .onClick(() => {
+      vibration.dotVibration();
       if (this.onButtonClick) {
         this.onButtonClick();
       }
@@ -84,7 +87,7 @@ export struct HdsMiniBarButton {
           gradientMask: { maskColor: Color.Transparent },
           barBottomMargin: 0,
           barSideMargin: 0,
-          lightColor: $r('app.color.diff_content'),
+          lightColor: Theme.accent,
           systemMaterialEffect: {
             materialType: this.effectsEnabled ? this.materialType : hdsMaterial.MaterialType.NONE,
             materialLevel: this.materialLevel,
@@ -110,7 +113,7 @@ export struct HdsMiniBarButton {
         .width(this.barWidth)
         .height(this.barHeight - 12)
         .borderRadius(this.barHeight / 2)
-        .backgroundColor($r('app.color.v3_surface'))
+        .backgroundColor(Theme.surface)
       }
     }
     .width(this.barWidth)

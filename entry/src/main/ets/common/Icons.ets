@@ -21,6 +21,7 @@ export class Icons {
   static check: Resource = $r('sys.media.ohos_ic_public_ok');
   static remove: Resource = $r('sys.media.ohos_ic_public_remove');
   static importPhoto: Resource = $r('sys.media.ohos_ic_public_albums');
+  static cloud: Resource = $r('app.media.cloud');
   static toolbarAdd(): SymbolGlyphModifier { return new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('sys.color.icon_primary')]); }
   static toolbarCover(): SymbolGlyphModifier { return new SymbolGlyphModifier($r('sys.symbol.picture')).fontColor([$r('sys.color.icon_primary')]); }
 }

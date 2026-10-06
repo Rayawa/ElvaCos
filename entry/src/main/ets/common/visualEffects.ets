@@ -1,6 +1,7 @@
 import { hdsEffect } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { uiEffect } from '@kit.ArkGraphics2D';
+import { Theme } from './Theme';
 import {
     DEFAULT_LIGHT_FIELD_LEVEL,
     STORAGE_KEY_LIGHT_FIELD_LEVEL,
@@ -63,7 +64,7 @@ export function pressVisualEffect(
                     hdsEffect.PointLightSourceType.BRIGHT,
             illuminatedType,
             options: {
-                color: $r('app.color.diff_content'),
+                color: Theme.accent,
                 intensity: resolvedIntensity,
                 height: resolvedHeight,
                 bloom: resolvedBloom,

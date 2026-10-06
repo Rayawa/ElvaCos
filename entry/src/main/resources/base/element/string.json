@@ -19,6 +19,14 @@
     {
       "name": "home_welcome",
       "value": "欢迎来到绮秀"
+    },
+    {
+      "name": "app_display_name",
+      "value": "绮秀"
+    },
+    {
+      "name": "account_login_reason",
+      "value": "用于在你主动点击登录时展示华为账号登录界面。"
     }
   ]
 }

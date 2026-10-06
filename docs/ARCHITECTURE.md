@@ -66,3 +66,12 @@ P0 是本轮交付目标。P1/P2 在 ROADMAP 中单独管理；未经设备验�
 - 计划内新增装备不访问 SQL；EditDraft 将项目上下文传入 AppState，AssetRepository 在同一事务保存装备、关联和打包项。漫展内可以创建自动关联的计划，也可通过 Sheet 关联尚未绑定漫展的既有计划。
 - PhotoAssetRepository 在事务中核对批量选择是否仍存在，再统一更新，任一记录失效全部回滚。
 - 本轮未改变关系结构，继续使用 schema v1 与既有元数据备份。视频中的分类准备任务、参考图、团队、待定/多天日程属于后续领域扩展，不能由装备可用率或打包确认代替。
+
+## 2026-10-06 全局一致性修正
+
+- 安全区：外层 HdsNavigation、每个 Tab 的内层 HdsNavigation 与 HdsNavDestination 统一 `ignoreLayoutSafeArea(SYSTEM, TOP|BOTTOM)`，标题栏 `avoidLayoutSafeArea`；内容顶部留白按页面级别分档（一级 `contentTop`=100vp，二级 `detailTop`=100vp，标题栏含分段时 `detailTopWithSegment`=112vp），底部留白 96/110vp，均以滚动内容内的 `Blank()` 实现，页面不依赖 padding。
+- 主题：`common/Theme.ets` 由静态类改为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace`，颜色值全部是 Dashboard 的同名资源。外观三档 **天蓝=浅色 / 雾蓝=深色 / 跟随系统**，实现为 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，由 `dark` 资源目录解析深浅色；`SettingsService.load/save` 负责从 Preferences 读取并应用，`EntryAbility` 不再强制 NOT_SET。业务页面不直接引用 `app.color.*`。
+- 安全区分级：内层 HdsNavigation 的标题栏 `avoidLayoutSafeArea: true`，HdsNavDestination 为 `false`（HDS 已自行避让，再开一次会把标题栏下移一个状态栏高度）。
+- 偏好：仍在单一 `app_storage`。新增 `appearance`（sky/mist/system）与 `hand` 两个 key（`getAppearance/setAppearance`、`getHand/setHand`），`hand` 同时同步旧的 `holdCheckON` / `buttonPositionRIGHT`，旧数据由 `SettingsMigration` 显式转换。华为账号只持久化 OpenID / UnionID / 展示名 / 登录时间，不保存 authorizationCode 与 idToken。
+- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `components/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Index`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
+- 华为账号：`services/account/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。

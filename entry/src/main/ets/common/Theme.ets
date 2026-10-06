@@ -1,25 +1,56 @@
-export class Theme {
-  static bg: ResourceColor = $r('app.color.background');
-  static surface: ResourceColor = $r('app.color.v3_surface');
-  static ink: ResourceColor = $r('app.color.v3_text_primary');
-  static muted: ResourceColor = $r('app.color.v3_text_secondary');
-  static line: ResourceColor = $r('app.color.nd_card_border');
-  static onAccent: ResourceColor = $r('app.color.on_accent');
-  static accent: ResourceColor = $r('app.color.diff_content');
-  static tint: ResourceColor = $r('app.color.v3_surface_alt');
-  static shadow: ResourceColor = $r('app.color.v3_shadow');
-  static scrim: ResourceColor = $r('app.color.v3_scrim');
-  static contentTop: number = 100;
-  static contentBottom: number = 110;
-  static homeContentBottom: number = 96;
-  static toolbarBottomReservation: number = 96;
-  static sectionSpacing: number = 14;
-  static sectionContentGap: number = 8;
-  static sectionTitlePadding: number = 4;
-  static cardRadius: number = 16;
-  static pagePadding: number = 14;
-  static danger: ResourceColor = $r('app.color.v3_accent_red');
+/**
+ * 全应用唯一的视觉令牌入口。
+ *
+ * 与 Dashboard 保持一致：颜色全部走同名资源，深浅色由 dark 资源目录解析。
+ * 主题是一份 @ObservedV2 单例：颜色值来自 Dashboard 同名资源，深浅色由「应用外观」
+ * （天蓝=浅色 / 雾蓝=深色 / 跟随系统）决定的 ColorMode 解析，切换后即时刷新。
+ */
+/**
+ * 应用外观三档（设置页顺序）：天蓝 = 浅色，雾蓝 = 深色，跟随系统。
+ * 三档只切换应用的深浅色模式，颜色资源仍然是 Dashboard 那一套同名资源。
+ */
+export const APPEARANCE_LIGHT: string = 'sky';
+export const APPEARANCE_DARK: string = 'mist';
+export const APPEARANCE_SYSTEM: string = 'system';
+export const APPEARANCE_VALUES: string[] = [APPEARANCE_LIGHT, APPEARANCE_DARK, APPEARANCE_SYSTEM];
+export const APPEARANCE_LABELS: string[] = ['天蓝', '雾蓝', '跟随系统'];
+
+/** 单手操作三档：左手、智感握持、右手。 */
+export const HAND_VALUES: string[] = ['left', 'auto', 'right'];
+export const HAND_LABELS: string[] = ['左手', '智感握持', '右手'];
+
+@ObservedV2
+class ThemeTokens {
+  @Trace bg: Resource = $r('app.color.background');
+  @Trace surface: Resource = $r('app.color.v3_surface');
+  @Trace ink: Resource = $r('app.color.v3_text_primary');
+  @Trace muted: Resource = $r('app.color.v3_text_secondary');
+  @Trace line: Resource = $r('app.color.nd_card_border');
+  @Trace onAccent: Resource = $r('app.color.on_accent');
+  @Trace accent: Resource = $r('app.color.diff_content');
+  @Trace tint: Resource = $r('app.color.v3_surface_alt');
+  @Trace shadow: Resource = $r('app.color.v3_shadow');
+  @Trace scrim: Resource = $r('app.color.v3_scrim');
+  @Trace danger: Resource = $r('app.color.v3_accent_red');
+  @Trace segmentedSelected: Resource = $r('app.color.segmented_color_selected');
+
+  readonly contentTop: number = 100;
+  /** 二级页面与一级页面共用同一套标题栏几何，顶部留白一致（与 Dashboard AppDetailPage 对照确认）。 */
+  readonly detailTop: number = 100;
+  /** 标题栏内还有分段按钮时，分段会向下溢出标题栏，内容再多留一点。 */
+  readonly detailTopWithSegment: number = 112;
+  readonly contentBottom: number = 110;
+  readonly homeContentBottom: number = 96;
+  readonly toolbarBottomReservation: number = 96;
+  readonly sectionSpacing: number = 14;
+  readonly sectionContentGap: number = 8;
+  readonly sectionTitlePadding: number = 4;
+  readonly cardRadius: number = 16;
+  readonly pagePadding: number = 14;
 }
+
+export const Theme: ThemeTokens = new ThemeTokens();
+
 export function today(): string {
   const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

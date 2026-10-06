@@ -54,3 +54,57 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 业务提示统一从 Index 调用复用的 showToastSafely；AppState.reportError / reportNotice 为每次报告递增反馈版本，使相同提示能再次显示。FormEditor 将校验异常交给这一入口，不在内容区插入错误文字或维护另一套提示组件。
 
 计划详情复用相同 HdsTitleBarSegment，在标题栏 50% 居中区域切换准备 / 打包 / 照片；计划名称保留在滚动内容首部。底部 HdsTabs 只显示当前视图相关动作。新建计划优先显示角色、计划名称和可选日期，扩展信息通过「更多设置」展开；所有新增/关联继续使用 bindSheet。
+
+## 2026-10-06 全局一致性修正（安全区 / 外观 / 弹层 / 动效）
+
+### 安全区：以首页为唯一基准
+
+一级页面与二级页面使用同一套规则：**HdsNav 标题栏避让系统顶部，内容区上下全屏沉浸**。
+
+- 外层 `HdsNavigation`、内层每个 Tab 的 `HdsNavigation`、以及 `HdsNavDestination` 都显式 `.ignoreLayoutSafeArea([SYSTEM], [TOP, BOTTOM])`。
+- 标题栏 `avoidLayoutSafeArea` 必须分级设置：内层 HdsNavigation 传 `true`（外层 HdsTabs 已忽略安全区，不避让标题会进入状态栏）；HdsNavDestination 传 `false`（与 Dashboard AppDetailPage 相同，HDS 自身已避让，再开一次会把标题栏整体下移一个状态栏高度 33vp）。`SystemCapability.titleBar` 的 `avoidSafeArea` 参数就是为此保留。
+- 滚动内容的第一项是 `Blank()`，最后一项也是 `Blank()`，不留底部 padding：
+  - 一级页面（首页、Cos、漫展、衣柜、我的）：`Theme.contentTop`(100vp) + `Theme.homeContentBottom`(96vp) / `Theme.contentBottom`(110vp)。
+  - 二级页面：`Theme.detailTop`(100vp) 与一级页面一致；标题栏内还有分段按钮时用 `Theme.detailTopWithSegment`(112vp)（分段会向下溢出标题栏，计划详情的准备/打包/照片与计划照片列表）。
+- `scrollEffectOpts.enableScrollEffect` 与 Dashboard 一致保持关闭。
+
+### 应用外观：天蓝（浅色）/ 雾蓝（深色）/ 跟随系统
+
+- 三档顺序固定为**天蓝 / 雾蓝 / 跟随系统**，对应 **浅色 / 深色 / 跟随系统**，默认跟随系统。`APPEARANCE_LIGHT='sky'`、`APPEARANCE_DARK='mist'`、`APPEARANCE_SYSTEM='system'`。
+- 实现方式是 `context.getApplicationContext().setColorMode(...)`：天蓝 → `COLOR_MODE_LIGHT`，雾蓝 → `COLOR_MODE_DARK`，跟随系统 → `COLOR_MODE_NOT_SET`。切换后系统按 ColorMode 解析 `base` / `dark` 资源，全应用立即刷新。
+- **不新增颜色资源**：`resources/base|dark/element/color.json` 与 Dashboard 逐项一致（仅多 `on_accent`，Dashboard 无同名 token），没有第二套调色板。
+- 深浅色偏好持久化在 `app_storage` 的 `appearance`，`SettingsService.load` 在启动时应用，`EntryAbility` 不再强制 `COLOR_MODE_NOT_SET`。
+- 颜色一律走 `Theme.*`；`common/Theme.ets` 的 `@ObservedV2` 单例只提供 Dashboard 同名资源，组件读 `Theme.*` 即可，深浅色由 ColorMode 决定。
+
+### 弹层
+
+- 内容型弹层一律 `bindSheet`，并且**右上角必须是关闭按钮**（`components/SheetHeader`），因此关闭系统自带关闭按钮（`showClose: false`）。
+- `common/sheet.ets` 的 `appSheetOptions()` 统一 Sheet 高度、圆角拖拽条、遮罩色与 `onDisappear`；返回键与侧滑关闭同样走 `onDisappear`，调用方状态一定复位。
+- 破坏性动作（删除、清空、替换封面）继续使用系统确认 Dialog，不与内容弹层混用。
+
+### 动效与反馈
+
+- `animStep` 分组出现动画：**一级 HdsTabs 页面在进入应用后只播放一次**（`enterPlayed` 守卫 + `@Monitor('active')`），**二级页面每次进入都播放**（`aboutToAppear` 起、`aboutToDisappear` 取消并归零）。分组数按页面内容 2–4 组。
+- 所有可点元素都有短振动：卡片走 `InteractiveCard` 内置反馈，详情操作栏在 `HdsActionTabs` 统一反馈，迷你栏在 `HdsMiniBarButton` 反馈，确认弹窗在 `Confirm.confirm` 反馈，其余按钮/下拉/自绘可点行调用 `vibration.dotVibration()`（内部读取用户振动强度，强度为关闭时静默）。返回、页签切换、分段点击沿用 `HapticService`。
+- 返回有三重保障：底部/标题栏返回按钮（`content.backIcon.action`，与 Dashboard AppDetailPage 一致）、`onBackPressed`（自行消费并出栈）、以及路由 `customNavContentTransition` 的 POP，去重由 `vibration.backVibration` 的 120ms 窗口负责。
+- `common/vibration.ets` 在原 Dashboard 实现上增加回落：`haptic.effect.*` 不受支持或查询失败时改用时长振动（`type: 'time'`），保证有振动硬件的设备不会静默无反馈。
+- 有文字的可点元素都要 `accessibilityText`；装饰性文字（`›`、`★`、`○`、首字占位）标 `accessibilityLevel('no')`。
+
+### 顶部 SegmentButtons 宽度规划
+
+`Index.segmentWidth(itemCount, titleLength)` 统一计算，结果与 Dashboard 的固定 50% 对齐：每项 88vp + 14vp，上限窗口一半（最大 320vp）；标题非空时按标题字数预留左右空间（56vp + 每字 14vp，上限 120vp），保证分段既不压标题也不压右侧菜单。本机 378vp 宽、2 字标题时得到 50% = Dashboard 实测的 608px；`Cos` 这种 3 字标题会略窄；计划详情的 3 项分段也是 50%。
+
+### 信息层级：去掉大标题 + 小标题
+
+- 页面标题只出现在导航标题栏；内容区不再重复 26–32vp 的实体大标题。
+- 分组标题统一 `SectionHeading({ title, trailing })`：15vp Medium + 次级色，一行，数量/状态放 `trailing`；`subtitle` 参数已删除。
+- 详情页的「标签：取值」改用 `FactRow`；空状态标题降到 16vp。
+- 设置页分组标题 13vp Medium + 强调色。
+
+### 设置页结构（自上而下）
+
+应用图标 + 中文名 + 英文名 → 分割线 → 华为账号（登录/退出 + 云同步状态）→ 数据与备份 → 设置（用户名、振动强度、材质等级、应用外观、操作模式、清除缓存）→ 帮助（使用说明、隐私协议）→ 版本与版权信息。外观（天蓝=浅色 / 雾蓝=深色 / 跟随系统）与操作模式插在同一张设置卡片内、清除缓存之前，复用 `SettingsChoiceSlider` 的 190vp 三档表达；三档滑块一律用 `$$` 双向绑定（拖动连续跟随手指、松手才提交），与 Dashboard 振动强度滑块写法一致，材质等级滑块也用镜像值做到同样效果。
+
+### 华为账号
+
+`services/account/AccountService.ets` 使用 Account Kit 的 `authentication`（`HuaweiIDProvider` / `AuthenticationController`）获取本机可离线使用的 OpenID / UnionID，只保存标识与昵称占位，不保存 authorizationCode / idToken。未在 AGC 为当前包名与签名开通 Account Kit 时系统返回 1001500001，界面按错误码给出可读提示且不写入登录态。云空间云同步尚未实现，设置页只显示「暂未开启」说明，不做假入口。

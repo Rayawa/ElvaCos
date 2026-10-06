@@ -162,3 +162,59 @@ HDC_TARGET_ID=<device-id> ./scripts/layout-test.sh
 ```
 
 签名正式包：`entry/build/default/outputs/default/entry-default-signed.hap`。设备测试日志可由命令保存；提交工程时不提交签名配置或本机证书。
+
+## 2026-10-06 全局一致性修正（真机回归）
+
+设备：BRA-AL00，OpenHarmony-7.0.0.105 / API 26，屏幕 1216×2688px（当前字号下 1vp≈3.21px），通过 `hdc` 远程连接。过程证据为 `uitest dumpLayout` 边界 + `snapshot_display` 截图，逐项人工比对。
+
+### 修复前后对比（同一设备、同一数据）
+
+| 检查 | 修复前 | 修复后 |
+|---|---|---|
+| 计划详情首行内容 | `[45,371]`，落在标题栏 `[0,161]–[1216,450]` 内，标题被分段按钮压住 | 首行落在标题栏下方，`Blank(126vp)` 生效后不再重叠 |
+| 角色/装备/漫展/照片详情首行 | `[45,371]`，与标题栏下沿相差约 24px | `Blank(108vp)`，完全让开标题栏 |
+| 标题栏滚动效果 | 关闭，滚动时正文与标题文字互相压叠 | 开启渐变模糊，正文滚到标题栏下方时标题可读 |
+| Cos/漫展/衣柜/我的 顶部分段宽度 | 固定窗口 50%（实测 605px） | 按标题长度规划，实测 488px（`segmentWidth`），标题、分段、菜单互不接触 |
+| 设置页顺序 | 设置 → 数据与备份 → 帮助 | 图标中英文 → 分割线 → 华为账号 → 数据与备份 → 设置 → 帮助 → 版本信息 |
+| 应用外观 | 只有「跟随系统」提示 | 天蓝 / 雾蓝 / 跟随系统三档，切换后全应用配色即时生效 |
+
+### 应用外观真机证据
+
+在同一设置页点击「天蓝」后，页面背景、强调色（滑块、分组标题、选中标签）在无重启、无重进页面的情况下立即变为天蓝；点击「雾蓝」后同样立即变灰蓝；返回「我的」页签后新配色保持；杀掉进程重新启动后，外观选择与配色仍为上次选择（Preferences 持久化）。最后已恢复为「跟随系统」，与 ROADMAP 的默认值一致。
+
+### 弹层与返回
+
+`新建 Cos 计划` 表单 Sheet 顶部为标题 + 说明 + 右上角关闭按钮（截图确认，无系统自带关闭按钮）；按系统返回键后 Sheet 关闭、页面仍停在 Cos 列表且表单状态复位（再次打开为空表单）。`使用说明` Sheet 同样带右上角关闭且可滚读。设置页的 `使用说明 / 隐私协议` 两个入口分别打开对应内容。
+
+### 华为账号
+
+真机点击「登录」会真实调用 Account Kit（日志出现 `huaweiId_framewrok_base` 初始化）。当前工程没有 AGC 侧开通与签名指纹配置，系统返回 1001500001，界面按错误码提示且不写入登录态、不崩溃、不产生假数据。云同步行固定显示「暂未开启」，不可点击。
+
+### 自动化验证（本轮全部通过）
+
+| 检查 | 结果 | 报告 |
+|---|---|---|
+| SQL 关系测试 | 9 / 9 | `python3 scripts/test_schema.py` |
+| 真机 Hypium（隔离数据库与 Preferences） | 23 / 23，Failure 0、Error 0 | `scripts/device-test.sh` |
+| 真机 UI（HdsShell） | 6 / 6，Failure 0、Error 0 | `docs/validation/consistency-ui-api26-report.txt` |
+| 真机固定区域（FidelityLayout） | 4 / 4，Failure 0、Error 0 | `docs/validation/consistency-layout-api26-report.txt` |
+
+测试用例随本轮 UI 变更同步更新：设置页顺序变化后先滚动再断言「材质等级」；分段按钮不再固定 50% 宽，用例改为断言「水平居中 + 不压住左侧标题 + 各页上下边界一致 + 滚动后不动」；帮助 Sheet 的关闭按钮由文字「完成」改为右上角图标，用例通过 `sheet-close` id 点击（`SheetHeader` 已为该按钮提供稳定 id）。
+
+### 2026-10-06 复核修正（二级页避让 / 滑块连续性 / 振动补齐 / 颜色风格）
+
+- **二级页面 HDS 避让**：用 `uitest dumpLayout` 与 Dashboard（同机 `top.rayawa.dashboard`）逐项对照后发现，二级页标题栏被整体下移了正好一个状态栏高度（标题文字 267–343px，一级页与 Dashboard 均为 160–236px）。原因是 HdsNavDestination 已由 HDS 自行避让，`avoidLayoutSafeArea: true` 又叠加了一次。改为：内层 HdsNavigation 传 `true`、HdsNavDestination 传 `false`。修正后二级页标题回到 160–236px，计划详情分段落在 [304,134]–[912,264]，与 Dashboard 根页完全一致；`detailTop` 从 108/126vp 回到 100/112vp。
+- **分段宽度**：改为每项 88vp + 14vp、上限窗口一半，结果与 Dashboard 的固定 50% 一致（本机实测同为 608px），仅在标题较长时收缩。Dashboard 的 `enableScrollEffect` 为关闭，本应用同步关闭。
+- **滑块连续性**：应用外观/操作模式改用 `$$` 双向绑定 + 松手提交；材质等级滑块用镜像 `@State` 做到同样效果（Dashboard 该滑块是单向绑定，拖动时拇指不跟随）。真机横向拖动应用外观滑块，值由 2 变为 0 并即时切换配色。
+- **振动补齐**：详情操作栏（`HdsActionTabs`）、迷你栏（`HdsMiniBarButton`）、确认弹窗（`Confirm`）原来没有反馈，已补齐；返回新增 `backIcon.action` + `onBackPressed` 出栈路径。真机 `hilog` 确认 `PlayPrimitiveEffect ... package:top.rayawa.elvacos, effect:haptic.effect.hard` 在点击与返回时都有触发。`common/vibration.ets` 增加时长振动回落，避免设备不支持 `haptic.effect.*` 时静默。
+- **应用外观语义修正**：用户明确三档就是浅色 / 深色 / 跟随系统，不是两套强调色。实现改为 `setColorMode(COLOR_MODE_LIGHT / COLOR_MODE_DARK / COLOR_MODE_NOT_SET)`，并按此语义更新帮助文案；`EntryAbility` 不再在启动后强制 `COLOR_MODE_NOT_SET`，避免覆盖用户选择。
+- **颜色资源**：`resources/base|dark/element/color.json` 与 Dashboard 同名 token 值逐项零差异（此前为外观新增的 12 项底色/表面/边框 token 已全部删除，`sky_accent` / `mist_accent` 也已删除），现在没有任何第二套配色；只有 Dashboard 未定义的 `on_accent` 是本工程既有项。
+- **真机外观证据**：设置「雾蓝」后全应用立即切到 Dashboard 的深色资源（底色 #1A2B3C、表面 #182231、强调色 #4A9CE2、浅色文字），杀进程重启后仍为深色；切回「跟随系统」后恢复与系统一致的浅色。
+- 复核后重跑：SQL 9/9、真机 Hypium 23/23、UI 6/6、固定区域 4/4，Failure/Error 全 0。检查结束后已把真机偏好恢复为「跟随系统 / 灵动 / 轻柔 / 左手」。
+
+### 本轮验证边界
+
+- 以上为 API 26 单台手机、当前系统字号下的证据；API 23、大字体、多窗、折叠与平板分栏仍需设备验收。
+- 深色模式下天蓝/雾蓝的 `dark` 色值已写入资源并通过编译，但未在深色模式下逐档截图比对。
+- 振动、按压光场与转场动画只能人工感受，本轮只确认了调用路径与编译产物，未量化硬件触感。
+- 华为账号登录成功路径（AGC 已配置）未验证；云同步未实现。

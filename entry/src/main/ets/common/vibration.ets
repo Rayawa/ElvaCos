@@ -11,6 +11,7 @@ export class vibration {
   private static lastBackVibrationAt: number = 0;
   private static hardwareSupported?: boolean;
   private static effectSupport: Map<string, boolean> = new Map();
+  private static loggedFallback: boolean = false;
 
   /**
    * 查询本机振动器列表。空列表表示当前设备没有振动硬件。
@@ -23,10 +24,36 @@ export class vibration {
       return vibration.hardwareSupported;
     } catch (error) {
       const businessError = error as BusinessError;
-      console.warn('[Dashboard][common/vibration][WARN]',
+      console.warn('[ElvaCos][common/vibration][WARN]',
         `Failed to query vibrator info. Code: ${businessError.code}, message: ${businessError.message}`,
       );
       return false;
+    }
+  }
+
+  /**
+   * 部分设备不支持 haptic.effect.* 预置效果。预置效果不可用时回落到时长振动，
+   * 保证「有振动硬件就一定有点击/返回反馈」，而不是静默失败。
+   */
+  private static startTimeVibration(duration: number): void {
+    if (!vibration.isSupported()) return;
+    try {
+      vibrator.startVibration(
+        { type: 'time', duration },
+        { usage: 'touch' },
+        (error: BusinessError) => {
+          if (error) {
+            console.error('[ElvaCos][common/vibration][ERROR]',
+              `Failed to start time vibration. Code: ${error.code}, message: ${error.message}`,
+            );
+          }
+        },
+      );
+    } catch (error) {
+      const businessError = error as BusinessError;
+      console.error('[ElvaCos][common/vibration][ERROR]',
+        `Failed to start time vibration. Code: ${businessError.code}, message: ${businessError.message}`,
+      );
     }
   }
 
@@ -44,16 +71,25 @@ export class vibration {
         vibration.effectSupport.set(effectId, supported);
       } catch (error) {
         const businessError = error as BusinessError;
-        console.error('[Dashboard][common/vibration][ERROR]',
+        console.error('[ElvaCos][common/vibration][ERROR]',
           `Failed to query effect ${effectId}. Code: ${businessError.code}, message: ${businessError.message}`,
         );
+        // 查询失败不能吞掉反馈：按不支持处理并回落到时长振动。
+        vibration.effectSupport.set(effectId, false);
+        vibration.startTimeVibration(24);
         return;
       }
       if (!supported) {
-        console.warn('[Dashboard][common/vibration][WARN]', `Vibration effect is unsupported: ${effectId}`);
+        if (!vibration.loggedFallback) {
+          vibration.loggedFallback = true;
+          console.warn('[ElvaCos][common/vibration][WARN]',
+            `Vibration effect is unsupported: ${effectId}; falling back to timed vibration.`);
+        }
+        vibration.startTimeVibration(count > 1 ? 32 : 24);
         return;
       }
     } else if (!supported) {
+      vibration.startTimeVibration(count > 1 ? 32 : 24);
       return;
     }
     try {
@@ -67,7 +103,7 @@ export class vibration {
         { usage: 'touch' },
         (error: BusinessError) => {
           if (error) {
-            console.error('[Dashboard][common/vibration][ERROR]',
+            console.error('[ElvaCos][common/vibration][ERROR]',
               `Failed to start ${effectId}. Code: ${error.code}, message: ${error.message}`,
             );
           }
@@ -75,7 +111,7 @@ export class vibration {
       );
     } catch (error) {
       const businessError = error as BusinessError;
-      console.error('[Dashboard][common/vibration][ERROR]',
+      console.error('[ElvaCos][common/vibration][ERROR]',
         `Failed to start ${effectId}. Code: ${businessError.code}, message: ${businessError.message}`,
       );
     }
