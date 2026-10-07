@@ -359,3 +359,37 @@ HDC_TARGET_ID=<device-id> ./scripts/layout-test.sh
 已检查签名 HAP 内 Client ID 完整一致；实际叶证书 SHA-256 与配置证书一致。SDK verify-app 验证整个签名包、代码签名、权限签名成功，Profile 在有效期内。Profile 包名为 top.rayawa.elvacos，app-identifier 为 6918744149341255159；仍待核对其与用户 AGC 应用的对应关系。中间证书与叶证书不是同一张证书，不能以两者指纹不同宣称 Profile 损坏或不匹配。
 
 报告：`validation/account-client-id-api26-report.txt`、`validation/account-signature-api26-report.txt`。账号失败不触发云数据上传；应用云同步仍未接入。接入步骤和当前公开指纹见 HUAWEI_ACCOUNT_SETUP.md。
+
+## 2026-10-07 · 光场与入场规则补齐
+
+完成普通按钮、表单、设置行、静态信息卡片和紧凑标签的公共反馈接入；大框 BORDER，小控件 BORDER_CONTENT。主页一次性记录提升到 Index 启动会话，详情由独立 HdsNavDestination 的显示生命周期重播，Sheet 使用打开生命周期重播。参考图、花费统计、计划照片和宽屏设置介绍补齐入场。
+
+正式与测试包编译/签名通过。首轮隔离布局 Hypium **Pass 5 / Failure 0 / Error 0**，涵盖窄/手机/宽屏、左右滚动隔离、任务路由与两倍字体；测试使用临时主模块、内存数据，未启动生产 AppState 服务，结束恢复正式包。随后补入缓存详情返回和重复 Sheet 的实际生命周期检查，以及按钮重复点击、滑块双向拖动和释放后尺寸复原检查，最终复测结果见下文。
+
+本轮新增 API 的 since/syscap/permission 已核对华为官方资料与本机 SDK，见 UI_STYLE。没有关系结构/权限变更。光场亮度、HDR 和各类业务组件实际触摸观感尚未逐项人工验收；API 26 自动化通过不代表 API 23 或其他设备的视觉效果已验收。
+
+第二轮隔离套件前 6 项（含按钮/滑块专项）通过，第 7 项打开详情时发生 App died；正式 UI 套件同样在详情进入时崩溃。错误日志定位为带参数匿名 BuilderParam 回调未生成 UI 构造逻辑（class constructor cannot called without new）。改用显式 @Builder 的绑定方法，正式包重新构建通过；不能把修复前部分用例通过当成完整套件通过。失败记录保存在 `validation/light-motion-before-builder-fix-layout-api26-report.txt` 和 `validation/light-motion-before-builder-fix-ui-api26-report.txt`，最终复测继续记录在下文。
+
+修复后隔离布局与动效专项 Hypium **Pass 7 / Failure 0 / Error 0**。实际 HdsNavigation 先进入一级详情、再压入子详情、返回缓存父详情，入场启动次数从 1 变为 2；同一 Sheet 连续两次打开，打开次数从 1 变为 2，完成 step 均为 3；按钮两次点击分别到达回调，Slider 原生手势从 0→2→0，释放后按钮/滑块边界恢复。原 5 项窄屏/宽屏/大字体/滚动/任务路由也全部通过。报告 `validation/light-motion-layout-api26-report.txt`，测试结束已覆盖恢复最新正式与测试包，业务数据保留。
+
+最终正式页面 Hypium **Pass 11 / Failure 0 / Error 0**，包含五个 Tab/分段、覆盖式详情与操作栏、连续新建/编辑取消、准备模板/衣柜关联/打包/照片返回、活动日期和月历、导入所属计划选择、花费统计和帮助 Sheet。正式包和测试包最终构建/签名及覆盖安装成功，保留用户数据；`git diff --check` 通过。报告 `validation/light-motion-ui-api26-report.txt`。本轮通过的是交互、布局和生命周期检查，光场/HDR 的人工视觉验收仍按 ROADMAP 跟踪。
+
+收尾期间工程同步调整为 pages/Dashboard、pages/main|detail|more 与 component 目录；本轮 PressFeedback、DetailDestination、启动会话和 Sheet 进度逻辑已保留在新结构。同步调整过程中曾遇到常量迁移缺少 TaskTemplate 导入，随后当前工程已补齐，重新执行 scripts/build.sh 成功。以上 7/7 与 11/11 真机报告对应目录调整前的修复安装包；当前结构已再次验证编译，目录重组本身不以旧包的设备报告替代重新验收。
+
+## 2026-10-07 · Dashboard 结构重构 / 1.0.0-beta.1（10000001）
+
+本轮在编辑前对照读取两个工程的主源码、配置、文档及 ElvaCos 测试/脚本；Dashboard 保持只读。ElvaCos 的原有光场、动效、业务事务、v1→v2→v3 迁移、备份与媒体规则均保留。ets 目录归 ability/common/component/pages/main|detail|more，model/data 独立；同时迁移导入、主入口与备份入口、页面 profile、测试引用。仅大小写不同的 appState 文件名已显式记录重命名，避免在大小写敏感检出上丢失路径。
+
+应用公共状态使用 AppStorageV2 单一实例，V1 设置通过原有 Preferences 与 @StorageLink 绑定，明确 Builder 桥接。移除默认状态实例、无消费的 WindowInsets 监听、废弃偏好/动画辅助入口、注释旧设置 UI 和未消费的分段输入。首帧后数据加载与维护分阶段执行，销毁先等待进行中的操作，Timer/握姿/异步回写有取消守卫；RdbStore.close 按官方 SDK 的 Promise 签名等待关闭。新增 AppLog 与原生 privacy.html 阅读页，宽高响应式、内容上限、花费原生条形图与筛选、中文无障碍；配色保留 Dashboard 同名资源，透明背景也纳入 base/dark。
+
+正式包与测试包需同版本覆盖安装。device-test/ui-test/layout-test/settings-layout-test 均检查安装成功，再检查 Hypium 的 Tests run / Pass / Failure / Error / Ignore 字段；aa test 的返回码不能作为通过依据。关系测试使用临时加密库，媒体测试使用隔离目录，布局宿主只使用内存数据；未清空 personal.db。源码比对确认迁移 SQL 与提供的 privacy.html 均未改动，base/dark 颜色 key 一致；未修改 build-profile.json5、local.properties 或证书。
+
+初轮页面复测在进入设置时发生 class constructor cannot called without new，定位为匿名 BuilderParam 回调直接构造 PreferenceSettings。改为明确的 @Builder 绑定后，设备日志完整记录页面套件 Pass 11 / Failure 0 / Error 0；最终脚本报告在收尾复测后记录。原生回归新增共享实例、本地文档可见正文/隐藏模板/实际 rawfile 及销毁等待用例，已完整运行 Pass 55 / Failure 0 / Error 0；SQL 关系检查 12/12 通过。
+
+初轮隔离布局报告 Pass 7 / Failure 1 / Error 1，新增短横屏与图表用例通过；默认行高受 TestKit 可见区域截取影响，改为让完整行进入视口后测量。随后默认行高检查通过，大字体窄屏的材质行滚动定位继续专项复测；设备组件树确认 HDS 自定义卡片的行 ID 未进入 TestKit 树，改为按文字逐段滚动并处理空查询结果，保持原高度、字体缩放及完整文本检查。最终两倍字体专项 Pass 1 / Failure 0 / Error 0；不以专项通过代替完整套件。初轮失败报告保留为 validation/structure-initial-settings-layout-api26-report.txt。
+
+### 验收边界
+
+当前连接设备为 BRA-AL00 / API 26。同一手机上的 320、378、920vp 与短横屏画布只验证组件布局、滚动、字号和交互；真实 Tablet/2in1/折叠、多窗安全区、API 23 真机、系统字体跟随与读屏人工操作继续列为未验收。真实账号登录、云同步、代理提醒送达与 HDR/握姿硬件观感保留原未验收记录。
+
+privacy.html 是提供的唯一正文源；其云端服务、服务器、账号注销与撤回同意描述与当前离线实现有差异。正文未改写，未增加对应假功能；本轮完成的是阅读页及内容来源验证，发布前仍需维护者核对政策与实际能力。

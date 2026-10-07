@@ -3,7 +3,7 @@ import { relationalStore } from '@kit.ArkData';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { TestContext } from '../testability/TestContext';
 import { Database } from '../../../main/ets/data/database/Database';
-import { SCHEMA } from '../../../main/ets/data/database/Schema';
+import { baseSchema } from '../../../main/ets/data/database/Schema';
 import { CosProjectRepository, ChecklistItemRepository } from '../../../main/ets/data/repository/Repositories';
 import { PreparationRepository } from '../../../main/ets/data/repository/PreparationRepository';
 import { MetadataBackupRepository } from '../../../main/ets/data/repository/MetadataBackupRepository';
@@ -27,24 +27,24 @@ export default function preparationTest(): void {
       const legacy = await relationalStore.getRdbStore(context, { name: name, securityLevel: relationalStore.SecurityLevel.S3, encrypt: true });
       try {
         await legacy.executeSql('PRAGMA foreign_keys=ON');
-        for (const sql of SCHEMA) { await legacy.executeSql(sql); }
+        for (const sql of baseSchema()) { await legacy.executeSql(sql); }
         await legacy.executeSql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('legacy-c','Old role',1,1)");
         await legacy.executeSql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('legacy-p','legacy-c','Old plan','Preparing',1,1)");
         await legacy.executeSql("INSERT INTO assets(id,name,type,status,created_at) VALUES('legacy-a','Old wig','Wig','Owned',1)");
         await legacy.executeSql("INSERT INTO checklist_items VALUES('legacy-pack','legacy-p','legacy-a','Old wig',1,0)");
         await legacy.executeSql("INSERT INTO photos VALUES('legacy-photo','legacy-p','test://old','/original','/thumb','Raw','',1)");
         await legacy.executeSql('PRAGMA user_version=1');
-      } finally { legacy.close(); }
+      } finally { await legacy.close(); }
       await db.open(context);
     });
-    afterAll(async () => { db.close(); await relationalStore.deleteRdbStore(context, name); });
+    afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('nativeV1MigrationPreservesPackingAndMediaWithoutInventingPreparation', 0, async () => {
       expect(db.getStore().version).assertEqual(3);
       expect((await checklist.list())[0].done).assertTrue();
       expect((await repo.tasks()).length).assertEqual(0);
       const rows = await db.getStore().querySql("SELECT local_path FROM photos WHERE id='legacy-photo'");
       try { rows.goToFirstRow(); expect(rows.getString(0)).assertEqual('/original'); } finally { rows.close(); }
-      db.close(); await db.open(context); expect((await checklist.list())[0].done).assertTrue();
+      await db.close(); await db.open(context); expect((await checklist.list())[0].done).assertTrue();
     });
     it('planRoleAndSelectedTemplateCommitAtomically', 0, async () => {
       const role = new Character(); role.name = 'Template role';

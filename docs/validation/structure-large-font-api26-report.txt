@@ -1,0 +1,39 @@
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=1
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=1
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=101098
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: suiteconsuming=101098
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 1, Failure: 0, Error: 0, Pass: 1, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=101098
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.
+OHOS_REPORT_RESULT: stream=Tests run: 1, Failure: 0, Error: 0, Pass: 1, Ignore: 0
+force stop process successfully.
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/default/entry-default-signed.hap msg:install bundle successfully. 
+AppMod finish
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap msg:install bundle successfully. 
+AppMod finish

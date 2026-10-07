@@ -14,12 +14,15 @@ export class MediaRepository {
   private mediaRoot: string;
   constructor(context: common.Context, testRoot?: string) {
     this.context = context;
-    if (testRoot && (!testRoot.startsWith(context.filesDir + '/verification-') || testRoot.slice(context.filesDir.length + 1).includes('/'))) { throw new Error('Invalid verification media path'); }
+    if (testRoot && (!testRoot.startsWith(context.filesDir + '/verification-') || testRoot.slice(context.filesDir.length + 1).includes('/'))) { 
+    throw new Error('Invalid verification media path'); }
     this.mediaRoot = testRoot || context.filesDir + '/media';
   }
-  async exists(media: ManagedMedia): Promise<boolean> { return !!media.localPath && !!media.thumbnailPath && await fs.access(media.localPath) && await fs.access(media.thumbnailPath); }
+  async exists(media: ManagedMedia): Promise<boolean> { 
+  return !!media.localPath && !!media.thumbnailPath && await fs.access(media.localPath) && await fs.access(media.thumbnailPath); }
   private cacheRoot(testRoot?: string): string {
-    if (testRoot && (!testRoot.startsWith(this.context.cacheDir + '/verification-') || testRoot.slice(this.context.cacheDir.length + 1).includes('/'))) { throw new Error('Invalid verification cache path'); }
+    if (testRoot && (!testRoot.startsWith(this.context.cacheDir + '/verification-') || testRoot.slice(this.context.cacheDir.length + 1).includes('/'))) { 
+    throw new Error('Invalid verification cache path'); }
     return testRoot || this.context.cacheDir;
   }
   async cacheSize(testRoot?: string): Promise<number> {
@@ -79,7 +82,14 @@ export class MediaRepository {
   }
   async importReference(uri: string, projectId: string, characterId: string): Promise<ReferenceImage> {
     const media = await this.import(uri, projectId);
-    const r = new ReferenceImage(); r.id = media.id; r.projectId = projectId; r.characterId = characterId; r.sourceUri = media.sourceUri; r.localPath = media.localPath; r.thumbnailPath = media.thumbnailPath; return r;
+    const r = new ReferenceImage(); 
+  r.id = media.id; 
+  r.projectId = projectId; 
+  r.characterId = characterId; 
+  r.sourceUri = media.sourceUri; 
+  r.localPath = media.localPath; 
+  r.thumbnailPath = media.thumbnailPath; 
+  return r;
   }
   async remove(photo: ManagedMedia): Promise<void> {
     for (const path of [photo.localPath, photo.thumbnailPath]) {

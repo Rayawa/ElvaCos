@@ -1,5 +1,5 @@
-import { DeviceCalendarService } from '../../../main/ets/services/DeviceCalendarService';
-import { AccountService } from '../../../main/ets/services/account/AccountService';
+import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
+import { AccountService } from '../../../main/ets/common/AccountService';
 import { CosEvent } from '../../../main/ets/model/Entities';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
@@ -124,7 +124,7 @@ export default function uiShellTest(): void {
       const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
       await scrollBody(); await present('材质等级');
       await scrollBody(); await scrollBody();
-      const footer = await driver.findComponent(ON.text('版本 1.0.0').inWindow(bundle));
+      const footer = await driver.findComponent(ON.text('版本 1.0.0-beta.1').inWindow(bundle));
       expect((await footer.getBounds()).bottom < windowBounds.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-bottom.png');
       await back(); await driver.delayMs(250); await present('作品集');
@@ -257,9 +257,10 @@ export default function uiShellTest(): void {
       expect(((await driver.findComponents(ON.type('Toggle').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-preferences.png');
       await scrollBody(); await scrollBody(); await present('使用说明'); await tap('使用说明');
-      await present('准备一次 Cos'); await tap('sheet-close'); await present('隐私协议');
-      await tap('隐私协议'); await present('本地存储'); await present('备份与清除');
-      await tap('sheet-close'); await back(); await driver.delayMs(350); await present('作品集');
+      await present('准备一次 Cos'); await tap('sheet-close'); await present('隐私政策');
+      await tap('更新日志'); await present('1.0.0-beta.1'); await present('app-log-scroll'); await back();
+      await tap('隐私政策'); await present('关于绮秀与隐私的声明'); await present('privacy-scroll');
+      await back(); await back(); await driver.delayMs(350); await present('作品集');
     });
   });
 }

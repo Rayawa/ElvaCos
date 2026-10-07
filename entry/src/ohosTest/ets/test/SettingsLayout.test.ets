@@ -9,7 +9,6 @@ export default function settingsLayoutTest(): void {
     const required = async (selector: On, name: string): Promise<Component> => {
       const component = await driver.waitForComponent(selector.inWindow(bundle), 3000);
       if (!component) {
-        await driver.dumpLayout('/data/storage/el2/base/cache/elvacos-settings-missing.json');
         throw new Error('Missing settings layout component: ' + name);
       }
       return component;
@@ -33,6 +32,35 @@ export default function settingsLayoutTest(): void {
       }
       throw new Error('Missing native HDS item containing ' + label);
     };
+    const revealRow = async (scroll: Component, label: string): Promise<Rect> => {
+      // TestKit 返回与滚动视口相交的边界；先让完整行可见再检查高度。
+      await scroll.scrollToTop(1000);
+      await driver.delayMs(400);
+      const viewport = await scroll.getBounds();
+      const x = Math.round((viewport.left + viewport.right) / 2);
+      const height = viewport.bottom - viewport.top;
+      // HDS 自定义卡片的 id 不一定进入 TestKit 树，按文字逐段滚动，避免跳过窄屏的大字体行。
+      let found = false;
+      for (let attempt = 0; attempt < 25; attempt++) {
+        const matches = await driver.findComponents(ON.text(label).inWindow(bundle));
+        if (matches && matches.length > 0) {
+          found = true;
+          break;
+        }
+        await driver.swipe(x, Math.round(viewport.top + height * 0.8), x,
+          Math.round(viewport.top + height * 0.4), 600);
+        await driver.delayMs(250);
+      }
+      if (!found) { throw new Error('Settings row remains unreachable: ' + label); }
+      const row = await itemBounds(label);
+      if (row.bottom >= viewport.bottom - 2) {
+        const x = Math.round((viewport.left + viewport.right) / 2);
+        const height = viewport.bottom - viewport.top;
+        await driver.swipe(x, Math.round(viewport.top + height * 0.7), x, Math.round(viewport.top + height * 0.35), 800);
+        await driver.delayMs(500);
+      }
+      return itemBounds(label);
+    };
     beforeAll(async () => {
       driver = Driver.create();
       if (!(await driver.waitForComponent(ON.id('layout-width-phone').inWindow(bundle), 5000))) { throw new Error('Settings layout host did not appear'); }
@@ -46,10 +74,8 @@ export default function settingsLayoutTest(): void {
         await selectWidth(width);
         expect(((await driver.findComponents(ON.id('settings-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
         const scroll = await required(ON.id('settings-scroll'), width + ' scroll');
-        await scroll.scrollSearch(ON.text('材质等级').inWindow(bundle));
-        const referenceBounds = await itemBounds('材质等级');
-        await scroll.scrollSearch(ON.text('应用外观').inWindow(bundle));
-        const preferenceBounds = await itemBounds('应用外观');
+        const referenceBounds = await revealRow(scroll, '材质等级');
+        const preferenceBounds = await revealRow(scroll, '应用外观');
         const sky = await (await required(ON.text('天蓝'), 'light appearance')).getBounds();
         const system = await (await required(ON.text('跟随系统'), 'system appearance')).getBounds();
         const mist = await (await required(ON.text('雾蓝'), 'dark appearance')).getBounds();
@@ -58,11 +84,15 @@ export default function settingsLayoutTest(): void {
         const pixelsPerVp = (canvas.right - canvas.left) / (width === 'narrow' ? 320 : 378);
         const expectedHeight = width === 'narrow' ? 116 : 68;
         // HDS native bounds include its insets; also compare against the copied Dashboard material row.
-        expect(Math.abs((preferenceBounds.bottom - preferenceBounds.top) / pixelsPerVp - expectedHeight) <= 8).assertTrue();
+        const actualHeight = (preferenceBounds.bottom - preferenceBounds.top) / pixelsPerVp;
+        if (Math.abs(actualHeight - expectedHeight) > 8) {
+          throw new Error(width + ' appearance height ' + actualHeight + ', expected ' + expectedHeight + ', bounds ' + JSON.stringify(preferenceBounds));
+        }
+        expect(Math.abs(actualHeight - expectedHeight) <= 8).assertTrue();
         expect(Math.abs((preferenceBounds.bottom - preferenceBounds.top) - (referenceBounds.bottom - referenceBounds.top)) <= 2).assertTrue();
         await scroll.scrollToBottom(1000); await driver.delayMs(500);
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-' + width + '-layout.png');
-        const bounds = await itemBounds('隐私协议');
+        const bounds = await itemBounds('隐私政策');
         const viewport = await scroll.getBounds();
         expect(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom).assertTrue();
       }
@@ -82,7 +112,7 @@ export default function settingsLayoutTest(): void {
       await scroll.scrollToBottom(1000); await driver.delayMs(500);
       sameRect(before, await information.getBounds());
       sameRect(logoBefore, await logo.getBounds());
-      const helpBounds = await itemBounds('隐私协议');
+      const helpBounds = await itemBounds('隐私政策');
       expect(helpBounds.left >= viewport.left && helpBounds.bottom <= viewport.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-wide-layout.png');
     });
@@ -210,13 +240,91 @@ export default function settingsLayoutTest(): void {
           const wrappedLabel = await (await required(ON.text('跟随系统'), 'large appearance label')).getBounds();
           // Full four-character label needs two lines at 2x; one clipped line formerly passed bounds-only checks.
           expect(wrappedLabel.bottom - wrappedLabel.top > (normalLabel.bottom - normalLabel.top) * 3.4).assertTrue();
-          await scroll.scrollSearch(ON.text('材质等级').inWindow(bundle));
-          const reference = await itemBounds('材质等级');
+          const reference = await revealRow(scroll, '材质等级');
           expect(Math.abs((card.bottom - card.top) - (reference.bottom - reference.top)) <= 2).assertTrue();
         } finally {
           await (await required(ON.id('layout-font-default'), 'restore font control')).click(); await driver.delayMs(1000);
           sameRect(normal, await probe.getBounds());
         }
+      }
+    });
+    it('sharedPressFeedbackKeepsClicksAndSliderDraggingFunctional', 0, async () => {
+      await (await required(ON.id('layout-font-default'), 'default font')).click();
+      await selectWidth('phone');
+      await (await required(ON.id('layout-page-feedback'), 'feedback fixture')).click();
+      await driver.delayMs(800);
+      const button = await required(ON.id('feedback-button'), 'press button');
+      const baseline = await button.getBounds();
+      await button.click(); await driver.delayMs(300);
+      await button.click(); await driver.delayMs(300);
+      expect(await (await required(ON.id('feedback-clicks'), 'click callback')).getText()).assertEqual('点击 2');
+      sameRect(baseline, await button.getBounds());
+      const slider = await required(ON.id('feedback-slider'), 'native slider');
+      const bounds = await slider.getBounds();
+      const y = Math.round((bounds.top + bounds.bottom) / 2);
+      await driver.swipe(bounds.left + 20, y, bounds.right - 20, y, 400);
+      await driver.delayMs(500);
+      expect(await (await required(ON.id('feedback-slider-value'), 'slider binding')).getText()).assertEqual('滑块 2');
+      await driver.swipe(bounds.right - 20, y, bounds.left + 20, y, 400);
+      await driver.delayMs(500);
+      expect(await (await required(ON.id('feedback-slider-value'), 'slider binding')).getText()).assertEqual('滑块 0');
+      sameRect(bounds, await slider.getBounds());
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-feedback-controls.png');
+    });
+    it('cachedDestinationAndEverySheetOpenReplayEntrance', 0, async () => {
+      await (await required(ON.id('motion-open-detail'), 'open detail')).click();
+      await driver.delayMs(1600);
+      expect(await (await required(ON.id('motion-first-probe'), 'first entrance')).getText()).assertEqual('first:1:4');
+      await (await required(ON.id('motion-next'), 'push child')).click();
+      await driver.delayMs(1600);
+      expect(await (await required(ON.id('motion-second-probe'), 'second entrance')).getText()).assertEqual('second:1:4');
+      await driver.pressBack(); await driver.delayMs(1600);
+      expect(await (await required(ON.id('motion-first-probe'), 'cached parent replay')).getText()).assertEqual('first:2:4');
+      await driver.pressBack(); await driver.delayMs(800);
+      for (let run = 1; run <= 2; run++) {
+        await (await required(ON.id('motion-open-sheet'), 'open sheet')).click(); await driver.delayMs(1600);
+        expect(await (await required(ON.id('motion-sheet-probe'), 'sheet replay')).getText()).assertEqual(run + ':3');
+        await (await required(ON.id('sheet-close'), 'close sheet')).click(); await driver.delayMs(800);
+      }
+    });
+    it('shortWideWindowKeepsOverviewAndLastSettingsReachableInOneScroll', 0, async () => {
+      await (await required(ON.id('layout-page-settings'), 'settings fixture')).click();
+      await selectWidth('short');
+      expect(((await driver.findComponents(ON.id('settings-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      const scroll = await required(ON.id('settings-scroll'), 'short window settings');
+      await scroll.scrollToBottom(1000); await driver.delayMs(500);
+      const row = await itemBounds('隐私政策');
+      expect(row.bottom <= (await scroll.getBounds()).bottom).assertTrue();
+      await (await required(ON.id('layout-page-home'), 'home fixture')).click();
+      await driver.delayMs(800);
+      expect(((await driver.findComponents(ON.id('home-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      const home = await required(ON.id('home-phone-scroll'), 'short window home');
+      await home.scrollToBottom(1000); await driver.delayMs(500);
+      const photos = await driver.findComponents(ON.text('照片待恢复').inWindow(bundle));
+      expect(photos.length).assertEqual(3);
+      expect((await photos[2].getBounds()).bottom <= (await home.getBounds()).bottom).assertTrue();
+    });
+    it('expenseChartShowsCorrectRatiosAndFiltersRecordsAtEveryWidth', 0, async () => {
+      for (const width of ['narrow', 'phone', 'wide']) {
+        await selectWidth(width);
+        await (await required(ON.id('layout-page-statistics'), 'statistics fixture')).click();
+        await driver.delayMs(800);
+        const scroll = await required(ON.id('expense-scroll'), 'statistics scroll');
+        await scroll.scrollSearch(ON.id('expense-category:服装').inWindow(bundle));
+        expect(await (await required(ON.text('¥3.00 · 75.0%'), 'clothing ratio')).getText()).assertEqual('¥3.00 · 75.0%');
+        const category = await required(ON.id('expense-category:服装'), 'category filter');
+        const bounds = await category.getBounds();
+        const viewport = await scroll.getBounds();
+        expect(bounds.left >= viewport.left && bounds.right <= viewport.right).assertTrue();
+        await category.click(); await driver.delayMs(300);
+        await scroll.scrollToBottom(1000); await driver.delayMs(500);
+        expect(((await driver.findComponents(ON.id('expense-record:chart-clothing').inWindow(bundle)))?.length || 0)).assertEqual(1);
+        expect(((await driver.findComponents(ON.id('expense-record:chart-photo').inWindow(bundle)))?.length || 0)).assertEqual(0);
+        await (await required(ON.text('显示全部分类'), 'clear filter')).click();
+        await driver.delayMs(300);
+        expect(((await driver.findComponents(ON.id('expense-record:chart-photo').inWindow(bundle)))?.length || 0)).assertEqual(1);
+        await scroll.scrollSearch(ON.id('expense-category:其他').inWindow(bundle));
+        expect(await (await required(ON.text('¥0.00 · 0.0%'), 'zero ratio')).getText()).assertEqual('¥0.00 · 0.0%');
       }
     });
   });

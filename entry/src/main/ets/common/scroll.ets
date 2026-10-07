@@ -22,6 +22,6 @@ export function scrollByAxis(scroller: Scroller, event: AxisEvent): void {
     try {
         scroller.scrollBy(0, vertical);
     } catch (error) {
-        console.warn('[Dashboard][common/scroll][WARN]', `转发滚轮事件失败: ${JSON.stringify(error)}`);
+        console.warn('[ElvaCos][common/scroll][WARN]', `转发滚轮事件失败: ${JSON.stringify(error)}`);
     }
 }

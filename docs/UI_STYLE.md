@@ -4,16 +4,16 @@
 
 | 参照文件 | 本工程接入 | 接入范围 |
 |---|---|---|
-| pages/Dashboard.ets | pages/Index、SystemCapability | HdsTabsController、BottomTabBarStyle、缓存、浮动栏、28vp 底距、渐变遮罩、titleBar originalStyle/scrollEffectStyle、标题菜单、返回振动 |
-| component/HdsMiniBarButton.ets | components/HdsMiniBarButton | 直接复制迷你材质栏、弹簧按压、点光源和滤镜；增加全局视效开关，适配无障碍文案 |
-| component/HdsTitleBarSegment.ets | components/HdsTitleBarSegment | 直接复用 TabSegmentButtonV2、材质选中背景、尺寸和动画；改为状态管理 V2 输入/回调 |
+| pages/Dashboard.ets | pages/Dashboard、SystemCapability | HdsTabsController、BottomTabBarStyle、缓存、浮动栏、28vp 底距、渐变遮罩、titleBar originalStyle/scrollEffectStyle、标题菜单、返回振动 |
+| component/HdsMiniBarButton.ets | component/HdsMiniBarButton | 直接复制迷你材质栏、弹簧按压、点光源和滤镜；增加全局视效开关，适配无障碍文案 |
+| component/HdsTitleBarSegment.ets | component/HdsTitleBarSegment | 直接复用 TabSegmentButtonV2、材质选中背景、尺寸和动画；改为状态管理 V2 输入/回调 |
 | common/vibration.ets | common/vibration | 原文件直接复制；软/硬预置、硬件/效果缓存、返回反馈去重；业务通过 HapticService 接入 |
 | common/visualEffects.ets | common/visualEffects、InteractiveCard | 复制点光源、暗淡/明亮/高亮强度和 API 24 HDR 隔离；按原要求加上官方 pressShadow，接入视效开关 |
 | common/motion.ets | common/motion、HomePage、详情、表单 | 原文件直接复制；三组入场、弹簧过渡、130ms 按压与分页动效 |
 | common/scroll.ets | common/scroll、五个主页、SettingsPage | 原文件直接复制；滚轮 / 触控板纵向事件转发，保留 Ctrl、横向输入与异常降级逻辑 |
 | pages/main/MyPage MoreRow | SettingsActionRow | HdsListItemCard、PrefixIcon、SuffixCustomBuilder、TextModifier、行高与边距 |
 | component/SettingsPanel、common/DiskStorage、common/storage | SettingsPanel、DiskStorage、storage | 原版用户名、振动、材质、缓存顺序、滑块和卡片；单一 app_storage、内存缓存、旧偏好迁移 |
-| pages/main/AppsPage commonHeader | components/DashboardSearch | 48vp 搜索框、背景、边框、130ms 弹簧按压；本应用内联筛选保留直接键盘输入 |
+| pages/main/AppsPage commonHeader | component/DashboardSearch | 48vp 搜索框、背景、边框、130ms 弹簧按压；本应用内联筛选保留直接键盘输入 |
 | resources/base、dark/element/color.json | 同名颜色资源、Theme | 直接复用相关底色、表面、文字、强调、边框、阴影与遮罩；不复制无关图表配色 |
 
 主路由 HdsNavigation 覆盖完整主页；主页 HdsTabs 的五个 TabContent 分别承载独立 HdsNavigation/NavPathStack，详情压入主路由并使用 HdsNavDestination。Tab 切换保留各自导航位置；重复点击当前一级 Tab 使用参考工程的 300ms 滚动返回顶部。角色/计划、活动列表/日历、装备/照片、作品/时间轴使用 HdsTitleBarSegment 包装原生 TabSegmentButtonV2，放在 titleBar.stackBuilder 的 50% 宽居中区域，尺寸沿用 Dashboard。标题栏、二级分段和浮动底栏保持固定，页面滚动只影响业务内容。各 TabContent 不对整块导航进行缩放或淡入动画。
@@ -52,7 +52,7 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 
 分段控件按参考文件分别处理 $selectedIndex 与 onItemClicked：切换只更新外部选中状态，点击通过同一 HapticService 提供反馈，重复点击当前分段也遵循原版行为。HdsMiniBarButton 同步 Dashboard 2026-10-07 的阴影修复：HdsTabs 材质背景单独以实际高度（barHeight − 12）的一半为圆角裁剪，阻止灰色矩形背景外露；背景层不参与命中测试，前景按压光场保持独立。TabSegmentButtonV2 显式关闭背景模糊，统一由迷你栏提供材质。公共卡片沿用 0.985 缩放与 130ms 弹簧参数。
 
-业务提示统一从 Index 调用复用的 showToastSafely；AppState.reportError / reportNotice 为每次报告递增反馈版本，使相同提示能再次显示。FormEditor 将校验异常交给这一入口，不在内容区插入错误文字或维护另一套提示组件。
+业务提示统一从 Dashboard 调用复用的 showToastSafely；AppState.reportError / reportNotice 为每次报告递增反馈版本，使相同提示能再次显示。FormEditor 将校验异常交给这一入口，不在内容区插入错误文字或维护另一套提示组件。
 
 计划详情复用相同 HdsTitleBarSegment，在标题栏 50% 居中区域切换准备 / 打包 / 照片；计划名称保留在滚动内容首部。底部 HdsTabs 只显示当前视图相关动作。新建计划优先显示角色、计划名称和可选日期，扩展信息通过「更多设置」展开；所有新增/关联继续使用 bindSheet。
 
@@ -73,7 +73,7 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 
 - 三档顺序固定为**天蓝 / 跟随系统 / 雾蓝**（索引 0 / 1 / 2），对应 **浅色 / 跟随系统 / 深色**，默认跟随系统。`APPEARANCE_LIGHT='sky'`、`APPEARANCE_DARK='mist'`、`APPEARANCE_SYSTEM='system'`；持久化字符串不变。
 - 实现方式是 `context.getApplicationContext().setColorMode(...)`：天蓝 → `COLOR_MODE_LIGHT`，雾蓝 → `COLOR_MODE_DARK`，跟随系统 → `COLOR_MODE_NOT_SET`。切换后系统按 ColorMode 解析 `base` / `dark` 资源，全应用立即刷新。
-- **不新增颜色资源**：`resources/base|dark/element/color.json` 与 Dashboard 逐项一致（仅多 `on_accent`，Dashboard 无同名 token），没有第二套调色板。
+- **业务配色保持不变**：`resources/base|dark/element/color.json` 与 Dashboard 逐项一致（仅多 `on_accent`，Dashboard 无同名 token），没有第二套调色板；透明背景统一使用 base/dark 的 transparent 资源。
 - 深浅色偏好持久化在 `app_storage` 的 `appearance`，`SettingsService.load` 在启动时应用，`EntryAbility` 不再强制 `COLOR_MODE_NOT_SET`。
 - 颜色一律走 `Theme.*`；`common/Theme.ets` 的 `@ObservedV2` 单例只提供 Dashboard 同名资源，组件读 `Theme.*` 即可，深浅色由 ColorMode 决定。
 
@@ -86,7 +86,7 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 
 ### 弹层
 
-- 内容型弹层一律 `bindSheet`，并且**右上角必须是关闭按钮**（`components/SheetHeader`），因此关闭系统自带关闭按钮（`showClose: false`）。
+- 内容型弹层一律 `bindSheet`，并且**右上角必须是关闭按钮**（`component/SheetHeader`），因此关闭系统自带关闭按钮（`showClose: false`）。
 - `common/sheet.ets` 的 `appSheetOptions()` 统一 Sheet 高度、圆角拖拽条、遮罩色与 `onDisappear`；返回键与侧滑关闭同样走 `onDisappear`，调用方状态一定复位。
 - 破坏性动作（删除、清空、替换封面）继续使用系统确认 Dialog，不与内容弹层混用。
 
@@ -100,7 +100,7 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 
 ### 顶部 SegmentButtons 宽度
 
-一级页面与计划详情统一使用 Theme.titleSegmentWidth（`'50%'`），直接复用 Dashboard.appsTitleSegment 的 normalWidth / experimentalWidth 和居中 builder。移除按标题长度、项数计算及 320vp 封顶，英文标题不再缩窄分段，大窗口仍占标题栏一半。标题、菜单和分段的可见边界与固定位置须通过布局测试核验；系统大字体和真实多窗另行验收。
+一级页面与计划详情统一使用 Theme.titleSegmentWidth（`'50%'`），直接复用 Dashboard.appsTitleSegment 的 experimentalWidth 和居中 builder（移除未消费的 normalWidth 兼容输入）。移除按标题长度、项数计算及 320vp 封顶，英文标题不再缩窄分段，大窗口仍占标题栏一半。标题、菜单和分段的可见边界与固定位置须通过布局测试核验；系统大字体和真实多窗另行验收。
 
 ### 信息层级：去掉大标题 + 小标题
 
@@ -111,11 +111,11 @@ HDR 仅在 API 24+、用户选“高亮”且发生按压时尝试；已声明 H
 
 ### 设置页结构（自上而下）
 
-应用图标 + 中文名 + 英文名 → 分割线 → 华为账号（登录/退出 + 云同步状态）→ 数据与备份 → 设置（用户名、振动强度、材质等级、应用外观、操作模式、清除缓存）→ 帮助（使用说明、隐私协议）→ 版本与版权信息。外观（天蓝=浅色 / 雾蓝=深色 / 跟随系统）与操作模式插在同一张设置卡片内、清除缓存之前，复用 `SettingsChoiceSlider` 的 190vp 三档表达；三档滑块一律用 `$$` 双向绑定（拖动连续跟随手指、松手才提交），与 Dashboard 振动强度滑块写法一致，材质等级滑块也用镜像值做到同样效果。
+应用图标 + 中文名 + 英文名 → 分割线 → 华为账号（登录/退出 + 云同步状态）→ 数据与备份 → 设置（用户名、振动强度、材质等级、应用外观、操作模式、清除缓存）→ 帮助（使用说明、更新日志、隐私政策）→ 版本与版权信息。外观（天蓝=浅色 / 雾蓝=深色 / 跟随系统）与操作模式插在同一张设置卡片内、清除缓存之前，复用 `SettingsChoiceSlider` 的 190vp 三档表达；三档滑块一律用 `$$` 双向绑定（拖动连续跟随手指、松手才提交），与 Dashboard 振动强度滑块写法一致，材质等级滑块也用镜像值做到同样效果。
 
 ### 华为账号
 
-`services/account/AccountService.ets` 使用 Account Kit 的 `authentication`（`HuaweiIDProvider` / `AuthenticationController`）获取本机可离线使用的 OpenID / UnionID，只保存标识与昵称占位，不保存 authorizationCode / idToken。未在 AGC 为当前包名与签名开通 Account Kit 时系统返回 1001500001，界面按错误码给出可读提示且不写入登录态。云空间云同步尚未实现，设置页只显示「暂未开启」说明，不做假入口。
+`common/AccountService.ets` 使用 Account Kit 的 `authentication`（`HuaweiIDProvider` / `AuthenticationController`）获取本机可离线使用的 OpenID / UnionID，只保存标识与昵称占位，不保存 authorizationCode / idToken。未在 AGC 为当前包名与签名开通 Account Kit 时系统返回 1001500001，界面按错误码给出可读提示且不写入登录态。云空间云同步尚未实现，设置页只显示「暂未开启」说明，不做假入口。
 
 ### 设置分割线与宽屏布局
 
@@ -138,3 +138,27 @@ settings-layout-test.sh 在临时工程副本中把不导出的 SettingsLayoutAb
 外观 / 操作模式的 SettingsChoiceSlider 标签保留 Dashboard 的 12fp、40 / 64vp 宽度和 190vp 控件宽度，允许最多两行。默认字号仍是一行；两倍字号时完整显示四字档位，与原版振动 / 材质标签的自然换行一致。禁止通过缩小字号或锁定字体倍率隐藏裁切。
 
 大字体组件测试仅在隔离主模块中调用 ApplicationContext.setFontSizeScale(2)，由 Text 探针高度确认实际缩放，再检查卡片边界与四字标签的两行高度。测试恢复到 1 并停止测试进程，不修改系统字号或 app_storage；这一证据不代表系统字体跟随、原生导航大字体与全部业务页面已经验收。
+
+## 2026-10-07 · 全面按压光场与显示生命周期
+
+按用户本轮要求，光场由按压阴影和点光源组成。大卡片、信息框、分组框与列表卡片使用 `BORDER`，紧凑按钮、关闭按钮、输入/搜索框、下拉、滑块、复选框、开关和状态标签使用 `BORDER_CONTENT`。信息框即使没有点击动作也可响应按压；基础布局容器、导航根背景和装饰内容不增加反馈。流畅档、轻柔/精美档、浅深色资源及 API 24 HDR 隔离继续由已有 `visualEffects` 工具决定。
+
+`common/pressFeedback.ets` 统一普通节点反馈，基于 AttributeUpdater 给实际节点更新既有 `pressVisualEffect` / `pressLightFieldFilter` 与 0.985 缩放、130ms 弹簧；不添加布局层，不覆盖 onClick/onChange，不阻止原生触摸事件传播。每个页面/组件维护独立节点注册表，重复列表与 builder 控件的 key 必须包含实体 ID，不能让多个节点共用 updater。交互卡片和迷你栏继续复用原有反馈；大型项目卡片不再因 hero 样式改为照亮全部内容。卡片自身的出现 transition 已移除，避免主页列表重建时绕过一次性入场规则。
+
+五个主页保留分组入场和 active 守卫，并共享 Dashboard 持有的 `MainEntranceSession`：同一次启动中，每页只领取一次入场机会，内容重建也不会重播。二级页面由 `DetailDestination` 为每个实际导航节点独立持有 `StaggerEntrance`，onWillShow 归零、onShown 播放、onHidden 取消，覆盖从子页返回缓存页面的情况。内容不再以 aboutToAppear 作为受导航管理时的唯一触发点；独立布局宿主仍可启动自己的入场。
+
+全部 bindSheet 通过 `appSheetOptions` 接入独立的 `StaggerEntrance`：打开前归零、显示后播放、开始关闭时取消剩余定时器并完成内容、消失后归零及复位调用方状态。表单、导入所属计划、关联衣柜、准备模板、关联计划和帮助内容按头部/主体/底部动作分组。参考图详情、花费统计、计划照片和宽屏设置介绍补齐内容入场。
+
+API 核对：本机 SDK 的 AttributeModifier / attributeModifier 为 since 11，AttributeUpdater（含 initializeModifier、attribute、onComponentChanged）为 since 12，syscap `SystemCapability.ArkUI.ArkUI.Full`；SheetOptions onWillAppear/onWillDisappear 为 since 12、onAppear/onDisappear 为 since 10；HdsNavDestination onWillShow/onShown/onHidden 为 5.1.0(18)，syscap `SystemCapability.UIDesign.HDSComponent.Core`。这些接口不要求额外权限，满足最低 API 23。[华为 AttributeUpdater](https://developer.huawei.com/consumer/en/doc/harmonyos-references-V13/js-apis-arkui-attributeupdater-V13)、[导航显示生命周期](https://developer.huawei.com/consumer/en/doc/harmonyos-guides/arkts-navigation-navdestination)、[属性复用](https://developer.huawei.com/consumer/cn/doc/doccenter-dev-faq/faqs-arkui-271)。设备验证结果与未验收项见 VALIDATION / ROADMAP。
+
+带参数的 BuilderParam 内容传入显式 @Builder 方法绑定，禁止把创建组件的代码放进未转换的带参数匿名回调；编译成功也必须通过真机导航检查。
+
+## 2026-10-07 · 结构、阅读页与响应式补齐
+
+公共能力归 common、复用 UI 归 component、一级/详情/辅助页归 pages/main|detail|more；ElvaCos 数据与领域层不混入页面。外观/操作模式由 PreferenceSettings 的 @StorageLink 读取，SettingsPanel 的原有绑定保留。额外设置 Builder 显式声明并绑定，避免匿名回调未被 ArkUI 转换造成运行崩溃。
+
+布局依据实际内容区域 onAreaChange，不按设备型号或物理屏幕宽度判断；分栏同时要求宽 ≥ 840vp、高 ≥ 600vp，短横屏回到整体滚动。其他页保持伸缩宽度和内容上限，照片网格根据容器宽度计算列数，参考图继续采用水平滚动；新阅读/统计页限制到 840vp。保留系统字体缩放、标题栏/操作栏安全区和键鼠轴事件工具，真实多设备验收独立跟踪。
+
+花费分类使用 ArkUI 原生 ProgressType.Linear 横条配金额/占比，点击筛选明细。沿用 Theme.accent/tint/surface/ink/muted 与 base/dark 同名资源，不引入业务硬编码色或另一套动画。分类、记录编辑、删除、计划选择与清除筛选均有中文读屏标签；类别提供 BUTTON 角色、选中状态和操作说明，纯装饰进度条不重复播报。滑块保留原生读屏操作，档位标签可独立激活。
+
+AppLog 与隐私政策使用已有 DetailDestination HdsNavDestination、返回反馈和入场工具。privacy.html 的可见正文投影为可复制的原生文本，原文件是唯一正文来源。版本与构建号均从 constants 提供：1.0.0-beta.1 / 10000001。

@@ -1,6 +1,6 @@
 import { Driver, ON, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, it, expect } from '@ohos/hypium';
-import { AccountService } from '../../../main/ets/services/account/AccountService';
+import { AccountService } from '../../../main/ets/common/AccountService';
 
 /** Explicit opt-in integration suite; never included in the regular regression runner. */
 export default function accountIntegrationTest(): void {

@@ -1,6 +1,7 @@
+import { SCHEMA_VERSION } from '../../common/constants';
 import { common } from '@kit.AbilityKit';
 import { relationalStore } from '@kit.ArkData';
-import { SCHEMA, SCHEMA_VERSION, MIGRATION_2, MIGRATION_3 } from './Schema';
+import { baseSchema, migration2, migration3 } from './Schema';
 
 // Use the store's writer connection: createTransaction() uses a separate
 // connection whose PRAGMA foreign_keys setting is not inherited.
@@ -26,15 +27,15 @@ export class Database {
         store.beginTransaction();
         try {
           const version = store.version;
-          if (version < 1) { for (const sql of SCHEMA) { await store.executeSql(sql); } }
-          if (version < 2) { for (const sql of MIGRATION_2) { await store.executeSql(sql); } }
-          if (version < 3) { for (const sql of MIGRATION_3) { await store.executeSql(sql); } }
+          if (version < 1) { for (const sql of baseSchema()) { await store.executeSql(sql); } }
+          if (version < 2) { for (const sql of migration2()) { await store.executeSql(sql); } }
+          if (version < 3) { for (const sql of migration3()) { await store.executeSql(sql); } }
           await store.executeSql('PRAGMA user_version = 3');
           store.commit();
         } catch (error) { store.rollBack(); throw error as Error; }
       }
       this.store = store;
-    } catch (error) { store.close(); throw error as Error; }
+    } catch (error) { await store.close(); throw error as Error; }
   }
   getStore(): relationalStore.RdbStore {
     if (!this.store) { throw new Error('数据库尚未初始化'); }
@@ -50,5 +51,9 @@ export class Database {
     catch (error) { store.rollBack(); throw error as Error; }
     finally { this.inTransaction = false; }
   }
-  close(): void { if (this.store) { this.store.close(); this.store = undefined; } }
+  async close(): Promise<void> {
+    const store = this.store;
+    this.store = undefined;
+    if (store) { await store.close(); }
+  }
 }

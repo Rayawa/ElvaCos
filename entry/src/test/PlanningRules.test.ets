@@ -3,7 +3,7 @@ import { describe, it, expect } from '@ohos/hypium';
 import { CosEvent } from '../main/ets/model/Entities';
 import { calendarDays, eventsOnDate, checkSchedule, reminderTime } from '../main/ets/model/Schedule';
 import { makePreparation, preparationKeys } from '../main/ets/model/Preparation';
-import { EventSaveCoordinator } from '../main/ets/services/EventSaveCoordinator';
+import { EventSaveCoordinator } from '../main/ets/common/EventSaveCoordinator';
 
 export default function planningRulesTest(): void {
   describe('PlanningRules', () => {

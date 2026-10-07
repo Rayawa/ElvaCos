@@ -27,6 +27,14 @@
     {
       "name": "account_login_reason",
       "value": "用于在你主动点击登录时展示华为账号登录界面。"
+    },
+    {
+      "name": "app_display_name_en",
+      "value": "Elva Cos"
+    },
+    {
+      "name": "app_icon_label",
+      "value": "绮秀应用图标"
     }
   ]
 }

@@ -1,3 +1,22 @@
+import {
+  LAYOUT_CONTENT_TOP,
+  LAYOUT_DETAIL_TOP,
+  LAYOUT_DETAIL_TOP_WITH_SEGMENT,
+  LAYOUT_CONTENT_BOTTOM,
+  LAYOUT_HOME_CONTENT_BOTTOM,
+  LAYOUT_TOOLBAR_BOTTOM_RESERVATION,
+  LAYOUT_SECTION_SPACING,
+  LAYOUT_SECTION_CONTENT_GAP,
+  LAYOUT_SECTION_TITLE_PADDING,
+  LAYOUT_CARD_RADIUS,
+  LAYOUT_PAGE_PADDING,
+  LAYOUT_WIDE_BREAKPOINT,
+  LAYOUT_CONTENT_MAX_WIDTH,
+  LAYOUT_WIDE_OVERVIEW_TOP,
+  LAYOUT_WIDE_SCROLL_TOP,
+  LAYOUT_MAIN_TABS_WIDTH,
+  LAYOUT_TITLE_SEGMENT_WIDTH,
+} from './constants';
 /**
  * 全应用唯一的视觉令牌入口。
  *
@@ -5,22 +24,9 @@
  * 主题是一份 @ObservedV2 单例：颜色值来自 Dashboard 同名资源，深浅色由「应用外观」
  * （天蓝=浅色 / 雾蓝=深色 / 跟随系统）决定的 ColorMode 解析，切换后即时刷新。
  */
-/**
- * 应用外观三档（设置页顺序）：天蓝 = 浅色，跟随系统，雾蓝 = 深色。
- * 三档只切换应用的深浅色模式，颜色资源仍然是 Dashboard 那一套同名资源。
- */
-export const APPEARANCE_LIGHT: string = 'sky';
-export const APPEARANCE_DARK: string = 'mist';
-export const APPEARANCE_SYSTEM: string = 'system';
-export const APPEARANCE_VALUES: string[] = [APPEARANCE_LIGHT, APPEARANCE_SYSTEM, APPEARANCE_DARK];
-export const APPEARANCE_LABELS: string[] = ['天蓝', '跟随系统', '雾蓝'];
-
-/** 单手操作三档：左手、智感握持、右手。 */
-export const HAND_VALUES: string[] = ['left', 'auto', 'right'];
-export const HAND_LABELS: string[] = ['左手', '智感握持', '右手'];
-
 @ObservedV2
 class ThemeTokens {
+  @Trace transparent: Resource = $r('app.color.transparent');
   @Trace bg: Resource = $r('app.color.background');
   @Trace surface: Resource = $r('app.color.v3_surface');
   @Trace ink: Resource = $r('app.color.v3_text_primary');
@@ -36,32 +42,26 @@ class ThemeTokens {
   @Trace danger: Resource = $r('app.color.v3_accent_red');
   @Trace segmentedSelected: Resource = $r('app.color.segmented_color_selected');
 
-  readonly contentTop: number = 100;
+  readonly contentTop: number = LAYOUT_CONTENT_TOP;
   /** 二级页面与一级页面共用同一套标题栏几何，顶部留白一致（与 Dashboard AppDetailPage 对照确认）。 */
-  readonly detailTop: number = 100;
+  readonly detailTop: number = LAYOUT_DETAIL_TOP;
   /** 标题栏内还有分段按钮时，分段会向下溢出标题栏，内容再多留一点。 */
-  readonly detailTopWithSegment: number = 112;
-  readonly contentBottom: number = 110;
-  readonly homeContentBottom: number = 96;
-  readonly toolbarBottomReservation: number = 96;
-  readonly sectionSpacing: number = 14;
-  readonly sectionContentGap: number = 8;
-  readonly sectionTitlePadding: number = 4;
-  readonly cardRadius: number = 16;
-  readonly pagePadding: number = 14;
-  readonly wideBreakpoint: number = 840;
-  readonly contentMaxWidth: number = 1440;
-  readonly wideOverviewTop: number = 80;
-  readonly wideScrollTop: number = 110;
+  readonly detailTopWithSegment: number = LAYOUT_DETAIL_TOP_WITH_SEGMENT;
+  readonly contentBottom: number = LAYOUT_CONTENT_BOTTOM;
+  readonly homeContentBottom: number = LAYOUT_HOME_CONTENT_BOTTOM;
+  readonly toolbarBottomReservation: number = LAYOUT_TOOLBAR_BOTTOM_RESERVATION;
+  readonly sectionSpacing: number = LAYOUT_SECTION_SPACING;
+  readonly sectionContentGap: number = LAYOUT_SECTION_CONTENT_GAP;
+  readonly sectionTitlePadding: number = LAYOUT_SECTION_TITLE_PADDING;
+  readonly cardRadius: number = LAYOUT_CARD_RADIUS;
+  readonly pagePadding: number = LAYOUT_PAGE_PADDING;
+  readonly wideBreakpoint: number = LAYOUT_WIDE_BREAKPOINT;
+  readonly contentMaxWidth: number = LAYOUT_CONTENT_MAX_WIDTH;
+  readonly wideOverviewTop: number = LAYOUT_WIDE_OVERVIEW_TOP;
+  readonly wideScrollTop: number = LAYOUT_WIDE_SCROLL_TOP;
   /** Dashboard 四项底栏为 250vp；五个业务入口沿用相同的单项密度。 */
-  readonly mainTabsWidth: number = 250 * 5 / 4;
-  readonly titleSegmentWidth: Length = '50%';
+  readonly mainTabsWidth: number = LAYOUT_MAIN_TABS_WIDTH;
+  readonly titleSegmentWidth: Length = LAYOUT_TITLE_SEGMENT_WIDTH;
 }
 
 export const Theme: ThemeTokens = new ThemeTokens();
-
-export function today(): string {
-  const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-export function daysUntil(date: string): number { return Math.ceil((new Date(date + 'T00:00:00').getTime() - new Date(today() + 'T00:00:00').getTime()) / 86400000); }
-export function formatTime(time: number): string { const d = new Date(time); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; }

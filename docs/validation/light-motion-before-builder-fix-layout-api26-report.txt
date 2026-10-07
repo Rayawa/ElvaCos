@@ -1,0 +1,128 @@
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=35990
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=8036
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=24405
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=22612
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=81958
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=sharedPressFeedbackKeepsClicksAndSliderDraggingFunctional
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=sharedPressFeedbackKeepsClicksAndSliderDraggingFunctional
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=13176
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=cachedDestinationAndEverySheetOpenReplayEntrance
+OHOS_REPORT_STATUS_CODE: 1
+
+TestFinished-ResultCode: -1
+TestFinished-ResultMsg: App died
+user test finished.

@@ -1,4 +1,4 @@
-import { AppState } from '../main/ets/common/AppState';
+import { AppState } from '../main/ets/model/ApplicationState';
 import { EditDraft } from '../main/ets/model/EditDraft';
 import { describe, it, expect } from '@ohos/hypium';
 import { requiredName, moneyToCents, validDate, projectProgress, checklistProgress, nextPlan, photoStage } from '../main/ets/model/Rules';

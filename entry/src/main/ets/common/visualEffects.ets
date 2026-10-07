@@ -1,11 +1,9 @@
+import { STORAGE_KEY_VISUAL_EFFECTS } from './constants';
 import { hdsEffect } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { uiEffect } from '@kit.ArkGraphics2D';
 import { Theme } from './Theme';
-import {
-    DEFAULT_LIGHT_FIELD_LEVEL,
-    STORAGE_KEY_LIGHT_FIELD_LEVEL,
-} from './constants';
+import { DEFAULT_LIGHT_FIELD_LEVEL, STORAGE_KEY_LIGHT_FIELD_LEVEL } from './constants';
 
 const LIGHT_FIELD_LEVEL_DIM = 0;
 const LIGHT_FIELD_LEVEL_BRIGHT = 1;
@@ -47,7 +45,7 @@ export function pressVisualEffect(
     intensity: number = 6,
     height: number = 110,
 ): VisualEffect {
-    if (AppStorage.get<boolean>('visualEffectsEnabled') === false) { return new hdsEffect.HdsEffectBuilder().buildEffect(); }
+    if (AppStorage.get<boolean>(STORAGE_KEY_VISUAL_EFFECTS) === false) { return new hdsEffect.HdsEffectBuilder().buildEffect(); }
     const level = getLightFieldLevel();
     const resolvedIntensity = level === LIGHT_FIELD_LEVEL_DIM ? intensity * DIM_INTENSITY_RATIO :
         level === LIGHT_FIELD_LEVEL_HIGH ? intensity * HIGH_INTENSITY_RATIO : intensity;
@@ -79,7 +77,7 @@ export function pressVisualEffect(
  */
 export function pressLightFieldFilter(pressed: boolean): uiEffect.Filter {
     const filter = uiEffect.createFilter();
-    if (AppStorage.get<boolean>('visualEffectsEnabled') === false || !pressed || getLightFieldLevel() !== LIGHT_FIELD_LEVEL_HIGH || !isHdrLightFieldSupported()) {
+    if (AppStorage.get<boolean>(STORAGE_KEY_VISUAL_EFFECTS) === false || !pressed || getLightFieldLevel() !== LIGHT_FIELD_LEVEL_HIGH || !isHdrLightFieldSupported()) {
         return filter;
     }
 
@@ -88,7 +86,7 @@ export function pressLightFieldFilter(pressed: boolean): uiEffect.Filter {
     } catch (error) {
         if (!hdrFailureLogged) {
             hdrFailureLogged = true;
-            console.warn('[Dashboard][common/visualEffects][WARN]',
+            console.warn('[ElvaCos][common/visualEffects][WARN]',
                 `点光源 HDR 启用失败，已保持普通光场: ${JSON.stringify(error)}`);
         }
         return filter;

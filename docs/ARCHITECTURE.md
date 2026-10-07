@@ -35,17 +35,19 @@ RDB 保存结构化元数据，Preferences 仅保存主题、触觉、单手偏�
 ## 目录与责任
 
 entry/src/main/ets/
-- pages/Index：生命周期及导航组装
-- components/：复用的卡片、空状态、表单字段、照片网格
-- features/home、cos、project、asset、event、photo、settings：功能 UI
-- model/：实体、领域规则和表单类型
-- data/database/：schema、迁移、连接和事务
+- ability/entry、backup：Stage 入口、后台与销毁清理、系统备份
+- pages/Dashboard：五个 Tab 的 HdsNavigation/NavPathStack、覆盖详情、启动与维护调度
+- pages/main/：五个一级业务页面
+- pages/detail/：角色、计划、装备、活动、照片、参考图详情
+- pages/more/：SettingsPage、ExpenseSummaryPage、AppLogPage、LocalHtmlPage
+- component/：复用的 HDS 导航/卡片/设置、表单字段、照片网格与活动日历
+- common/：appState 公共存储边界、constants 公共常量、types、主题/日期/反馈、偏好和系统能力
+- model/：ApplicationState、实体、领域规则、ProjectRoute 与 EditDraft
+- data/database/：schema、递增迁移、连接和事务
 - data/repository/：结构化持久化、关系查询与 MetadataBackupRepository 的版本化元数据/恢复事务
-- data/media/：导入、缩略图、原文件清理
-- services/：能力检查、分享、触觉、握姿、文档选择器备份入口、设置；不直接访问 RDB
-- common/：设计 token、日期、错误处理
+- data/media/：选中媒体导入、缩略图、原文件清理
 
-首页与设置共享 `components/DashboardSplitLayout`：在 Theme.wideBreakpoint（840vp）起复用 Dashboard 的固定概览 / 独立滚动分栏，4:6 权重和 1440vp 最大宽度。页面仅提供业务 builder 与各自 Scroller，不维护另一套导航、颜色或反馈。首页在较窄窗口恢复单列，主路由仍为 Stack；内容分栏不代表覆盖式详情已经实现大屏双栏。
+首页与设置共享 `component/DashboardSplitLayout`：在实际内容宽度达到 Theme.wideBreakpoint（840vp）且高度至少 600vp 时复用 Dashboard 的固定概览 / 独立滚动分栏，4:6 权重和 1440vp 最大宽度。页面仅提供业务 builder 与各自 Scroller，不维护另一套导航、颜色或反馈。首页在较窄窗口恢复单列，主路由仍为 Stack；内容分栏不代表覆盖式详情已经实现大屏双栏。
 
 `common/scroll` 原样复用 Dashboard 的轴事件转发，五个主页与设置复用各自 Scroller；页面不访问输入设备服务或申请全局监听权限。首页任务用 TaskLinkCard、最近照片用 InteractiveCard 统一反馈；组件只发出原有路由动作，不持有实体仓库或业务写入方法。
 
@@ -77,8 +79,8 @@ P0 是本轮交付目标。P1/P2 在 ROADMAP 中单独管理；未经设备验�
 - 主题：`common/Theme.ets` 由静态类改为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace`，颜色值全部是 Dashboard 的同名资源。外观三档 **天蓝=浅色 / 雾蓝=深色 / 跟随系统**，实现为 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，由 `dark` 资源目录解析深浅色；`SettingsService.load/save` 负责从 Preferences 读取并应用，`EntryAbility` 不再强制 NOT_SET。业务页面不直接引用 `app.color.*`。
 - 安全区分级：内层 HdsNavigation 的标题栏 `avoidLayoutSafeArea: true`，HdsNavDestination 为 `false`（HDS 已自行避让，再开一次会把标题栏下移一个状态栏高度）。
 - 偏好：仍在单一 `app_storage`。新增 `appearance`（sky/mist/system）与 `hand` 两个 key（`getAppearance/setAppearance`、`getHand/setHand`），`hand` 同时同步旧的 `holdCheckON` / `buttonPositionRIGHT`，旧数据由 `SettingsMigration` 显式转换。华为账号只持久化 OpenID / UnionID / 展示名 / 登录时间，不保存 authorizationCode 与 idToken。
-- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `components/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Index`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
-- 华为账号：`services/account/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。
+- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `component/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Index`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
+- 华为账号：`common/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。
 
 ## 2026-10-07 · 准备与活动领域扩展
 
@@ -103,3 +105,13 @@ DeviceCalendarDraft 是纯领域映射，DeviceCalendarService 仅负责 Calenda
 系统日历与应用代理提醒独立；日历默认提前 30 分钟，可在系统页修改，应用代理提醒仍需明确选择。应用保存、日历确认和后续系统管理的边界在界面注明。
 
 AccountService 先核对模块 client_id 配置，再发送带随机 state 的请求并验证响应一致性。AppState 的 accountBusy 与通用写入 busy 分开，Preferences 写入/清除成功才改变界面身份。没有真实项目与凭据时不构造云存储请求或假同步成功状态。
+
+## 2026-10-07 · Dashboard 工程结构重构
+
+目录与状态边界以 Dashboard 为参考，独立保留 ElvaCos 的 model/data 层。common/appState 是 Ability 与根页面共享状态的唯一入口，通过 AppStorageV2.connect 保存 @ObservedV2 AppState；Dashboard 使用 V1 公有存储，本工程不把 V2 领域对象直接塞入 V1。页面显式注入 @Require @Param state，局部筛选、弹层、Scroller 与 NavPathStack 不持久化。Preferences 的磁盘 key 和迁移保持不变；PreferenceSettings 与 SettingsPanel 使用 @StorageLink，明确 Builder 桥接到 V2 控件，保存经原有持久化方法。
+
+EntryAbility 先读取一次偏好并应用 ColorMode，再加载 pages/Dashboard。根页面 onPageShow 延后一轮事件循环加载 RDB；成功后延时执行媒体孤立文件收集和代理提醒核对。失败通过 loading/error 和重试入口报告；硬件/提醒失败不取消已保存的业务数据。onPageHide/aboutToDisappear 取消排队 Timer 并停止握姿，异步完成后检查可见性/请求代次。dispose 等待初始化、业务操作和偏好保存，再等待 RdbStore.close 的 Promise 完成后释放上下文。DetailDestination 与 Sheet 的显示生命周期继续复用已有动效工具。
+
+AppLogPage 从 constants 的 APP_LOG 读取版本说明；LocalHtmlPage 从 rawfile/privacy.html 读取 UTF-8 正文，过滤源文件隐藏模板和脚本，用原生 Text/Scroll 阅读，不维护第二份正文，不执行脚本或加载网络内容。读取支持 loading/error/retry，离开后取消排队任务并忽略过期结果。阅读与统计内容宽度上限 840vp，普通列表/详情上限 1440vp；短横屏首页/设置改为单列整体滚动。
+
+ExpenseSummary 使用原生 Linear Progress 构成横向分类条形图，分为最小金额单位，占比基于当前计划范围的总花费，零总额返回 0；点击分类筛选明细，再次点击或取消筛选恢复全部，切换计划清除旧分类。Theme 同名资源提供深浅色，图形与金额/占比文字共同呈现，读屏播报类别/金额/占比/选中状态。保留备份、RDB 迁移和媒体所有权逻辑；本轮关系结构不变。

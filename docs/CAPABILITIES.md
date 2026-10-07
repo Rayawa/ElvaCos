@@ -69,3 +69,26 @@ Calendar Kit：getCalendarManager since 10，editEvent since 12，syscap SystemC
 官方依据：[Calendar Kit 概述](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V14/calendarmanager-overview-V14)，本机 SDK `@ohos.calendarManager.d.ts`。SDK 核对 since/syscap/无权限；直接 API 文档抓取失败，未以缺失网页宣称系统投递验收通过。
 
 账号接入检查和配置步骤见 [HUAWEI_ACCOUNT_SETUP.md](HUAWEI_ACCOUNT_SETUP.md)。
+
+## 2026-10-07 · 结构重构、原生阅读与统计
+
+官方文档负责用法，本机 Release SDK 26.0.0.105 对照 since/syscap/permission，最低 API 23、目标 API 26：
+
+| 接口 | SDK 标注 | 本轮使用与权限 |
+|---|---|---|
+| RdbStore.close | since 12；DistributedDataManager.RelationalStore.Core | Promise 关闭连接和结果集，销毁/重开/隔离库清理均等待完成；无新增权限 |
+| AppStorageV2.connect | since 12；ArkUI.Full；Stage | common/appState 连接单一 @ObservedV2 实例，检查 undefined；无新增权限 |
+| ResourceManager.getRawFileContent（Promise） | since 9；Global.ResourceManager | 读取已打包 privacy.html；无新增权限 |
+| util.TextDecoder.decodeToString | since 12；Utils.Lang | UTF-8 解码；无新增权限 |
+| Progress（Linear/value/total） | since 7；ArkUI.Full | 分类金额占比横条，宽度 100%、Theme 前景/背景；无新增权限 |
+| accessibilityRole / accessibilitySelected | since 18 / 13；ArkUI.Full；Stage | 交互分类、设置档位和记录的角色/选中状态；无新增权限 |
+
+已阅读[华为多设备响应式布局最佳实践整章](https://developer.huawei.com/consumer/cn/doc/doccenter-multi-device/bpta-multi-device-responsive-layout)，包含概述、断点、栅格/布局、窗口变化及相关示例，未仅查看用户指定锚点。落地采用实际内容宽高、伸缩宽度、最大内容宽度、短横屏回到整体滚动、保留字体缩放；窄/手机/宽屏/短横屏画布检查只是组件布局验证，不替代真实平板、折叠及多窗安全区验收。
+
+已阅读[无障碍通用属性整页](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/arkts-universal-attributes-accessibility)，补齐中文文本、描述、交互角色与选中状态。保留 Slider 原生无障碍动作，不用父级分组隐藏其操作；图表进度条作为装饰不重复播报，分类容器播报金额与占比。系统读屏人工验收仍列待办。
+
+公共状态采用 Dashboard 的集中访问范式并适配已有 V2 领域对象，参考[华为状态管理 V2 与 MVVM](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V14/arkts-mvvm-v2-V14)与[AppStorageV2](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-new-appstoragev2)。设置仍使用 Dashboard 的 V1 Preferences/AppStorage/@StorageLink 通道，桥接组件显式声明 Builder；不混用 V1 装饰器观察 V2 对象。
+
+图表方案对照 Dashboard 的自绘图表、ArkUI 原生 Progress 与[华为 Canvas 说明](https://developer.huawei.com/consumer/cn/doc/doccenter-atomic-service/faqs-canvas-api-problem)。本轮只有金额分类比较，选择原生 Linear Progress + 金额/占比文字 + 点击筛选，减少画布尺寸/重绘/命中测试维护；未引入需要 WebView 的图表库或业务依赖。[Progress 官方指南](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/arkts-common-components-progress-indicator)已通过浏览器阅读完整正文，核对 value/total/type、宽高自适应和动态更新；SDK progress.d.ts 核对版本与无权限要求。金额按整数分汇总，零总额返回 0，分类按金额排序，计划切换重置分类。未来确有饼图/趋势交互需求时再评估 Canvas 方案，当前不创建空图表页。
+
+本轮新增颜色仅为 base/dark 同值 transparent（#00000000），替代组件中的透明色字面量；分段背景及其异常回退也通过 Theme 资源，不维护硬编码 RGBA 配色。

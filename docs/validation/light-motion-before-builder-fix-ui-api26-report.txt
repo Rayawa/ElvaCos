@@ -1,0 +1,14 @@
+OHOS_REPORT_STATUS: class=HdsShell
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=11
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=tabsSecondarySegmentsAndTitleMenusWork
+OHOS_REPORT_STATUS_CODE: 1
+
+TestFinished-ResultCode: -1
+TestFinished-ResultMsg: App died
+user test finished.

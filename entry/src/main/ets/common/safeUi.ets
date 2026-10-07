@@ -13,6 +13,6 @@ export function showToastSafely(
     try {
         prompt.showToast({ message, duration });
     } catch (error) {
-        console.error('[Dashboard][common/safeUi][ERROR]', `[safeUi][${scope}] Toast 显示失败: ${JSON.stringify(error)}`);
+        console.error('[ElvaCos][common/safeUi][ERROR]', `[safeUi][${scope}] Toast 显示失败: ${JSON.stringify(error)}`);
     }
 }

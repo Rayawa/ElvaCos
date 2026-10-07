@@ -48,6 +48,6 @@ TASK_INSTALLED=1
 install_hap "$TASK_CLONE/entry/build/default/outputs/default/entry-default-signed.hap"
 install_hap "$TASK_CLONE/entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap"
 run_hdc shell aa force-stop top.rayawa.elvacos
-run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonySettingsLayoutTestRunner -s timeout 210000 > "$TASK_REPORT"
+run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonySettingsLayoutTestRunner -s timeout 270000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
-rg 'Tests run: 5, Failure: 0, Error: 0, Pass: 5, Ignore: 0' "$TASK_REPORT"
+rg 'Tests run: 9, Failure: 0, Error: 0, Pass: 9, Ignore: 0' "$TASK_REPORT"

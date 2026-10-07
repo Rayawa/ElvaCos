@@ -1,4 +1,15 @@
-import { Asset, AssetStatus, ChecklistItem, CosProject, CosEvent, PhotoAsset, PhotoStatus, ProjectStatus, ProjectAsset, ProjectProgress } from './Entities';
+import {
+  Asset,
+  AssetStatus,
+  ChecklistItem,
+  CosProject,
+  CosEvent,
+  PhotoAsset,
+  PhotoStatus,
+  ProjectStatus,
+  ProjectAsset,
+  ProjectProgress,
+} from './Entities';
 
 export function requiredName(value: string): string {
   const name = value.trim();

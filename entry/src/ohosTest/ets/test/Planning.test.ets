@@ -7,7 +7,7 @@ import { image } from '@kit.ImageKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { TestContext } from '../testability/TestContext';
 import { Database } from '../../../main/ets/data/database/Database';
-import { SCHEMA, MIGRATION_2 } from '../../../main/ets/data/database/Schema';
+import { baseSchema, migration2 } from '../../../main/ets/data/database/Schema';
 import { CosEventRepository, CosProjectRepository } from '../../../main/ets/data/repository/Repositories';
 import { PlanningRepository } from '../../../main/ets/data/repository/PlanningRepository';
 import { MetadataBackupRepository } from '../../../main/ets/data/repository/MetadataBackupRepository';
@@ -26,24 +26,24 @@ export default function planningTest(): void {
     const project = new CosProject(); project.characterId = role.id; project.name = 'Planning project'; project.budgetCents = 20000;
     let context: common.Context;
     beforeAll(async () => { if (!TestContext.value) { throw new Error('Test context unavailable'); } context = TestContext.value; await db.open(context); await projects.save(project, '', role, makePreparation(project.id, preparationKeys(2))); });
-    afterAll(async () => { db.close(); await relationalStore.deleteRdbStore(context, name); });
+    afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('nativeV2MigrationKeepsIndependentPreparationAndLegacyActivity', 0, async () => {
       const oldName = 'verification-v2-' + newId() + '.db'; const upgraded = new Database(oldName);
       const legacy = await relationalStore.getRdbStore(context, { name: oldName, securityLevel: relationalStore.SecurityLevel.S3, encrypt: true });
       try {
-        for (const sql of SCHEMA.concat(MIGRATION_2)) { await legacy.executeSql(sql); }
+        for (const sql of baseSchema().concat(migration2())) { await legacy.executeSql(sql); }
         await legacy.executeSql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Legacy',1,1)");
         await legacy.executeSql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('p','c','Legacy','Preparing',1,1)");
         await legacy.executeSql("INSERT INTO preparation_categories VALUES('g','p','Wig',0)");
         await legacy.executeSql("INSERT INTO preparation_tasks(id,project_id,category_id,label,done) VALUES('t','p','g','Styling',1)");
         await legacy.executeSql("INSERT INTO events(id,name,date,status,created_at) VALUES('e','Legacy Expo','2026-10-07','Planned',1)");
         await legacy.executeSql('PRAGMA user_version=2');
-      } finally { legacy.close(); }
+      } finally { await legacy.close(); }
       try {
         await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(3);
         const tasks = await upgraded.getStore().querySql("SELECT done FROM preparation_tasks WHERE id='t'"); try { tasks.goToFirstRow(); expect(tasks.getLong(0)).assertEqual(1); } finally { tasks.close(); }
         const restored = (await new CosEventRepository(upgraded).list())[0]; expect(restored.dateMode).assertEqual('single'); expect(restored.reminderId).assertEqual(-1); expect(restored.date).assertEqual('2026-10-07');
-      } finally { upgraded.close(); await relationalStore.deleteRdbStore(context, oldName); }
+      } finally { await upgraded.close(); await relationalStore.deleteRdbStore(context, oldName); }
     });
     it('teamAndActualExpensesPersistIndependentlyOfAssetPrices', 0, async () => {
       const member = new TeamMember(); member.projectId = project.id; member.name = '摄影 A'; member.notes = '已确认下午档期'; await repo.saveTeam(member);
@@ -57,7 +57,7 @@ export default function planningTest(): void {
     it('pendingAndMultidaySchedulesPersistAndReopen', 0, async () => {
       const pending = new CosEvent(); pending.name = '待定拍摄'; pending.dateMode = 'pending'; pending.eventType = '拍摄'; await events.save(pending);
       const multiple = new CosEvent(); multiple.name = '多天漫展'; multiple.dateMode = 'multiple'; multiple.date = '2026-10-10'; multiple.endDate = '2026-10-12'; multiple.timeMode = 'range'; multiple.startTime = '10:00'; multiple.endTime = '18:00'; await events.save(multiple);
-      db.close(); await db.open(context);
+      await db.close(); await db.open(context);
       expect((await events.list()).find((e) => e.id === pending.id)?.date).assertEqual('');
       expect((await events.list()).find((e) => e.id === multiple.id)?.endDate).assertEqual('2026-10-12');
     });

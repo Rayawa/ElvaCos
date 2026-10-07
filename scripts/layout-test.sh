@@ -13,10 +13,15 @@ run_hdc() {
     "$TASK_HDC" "$@"
   fi
 }
+install_hap() {
+  TASK_INSTALL_OUTPUT=$(run_hdc install "$1")
+  echo "$TASK_INSTALL_OUTPUT"
+  echo "$TASK_INSTALL_OUTPUT" | rg 'install bundle successfully' >/dev/null
+}
 ./scripts/build.sh
 ./scripts/build.sh assembleHap ohosTest
-run_hdc install entry/build/default/outputs/default/entry-default-signed.hap
-run_hdc install entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap
+install_hap entry/build/default/outputs/default/entry-default-signed.hap
+install_hap entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap
 run_hdc shell aa force-stop top.rayawa.elvacos
 TASK_REPORT=$(mktemp)
 trap 'rm -f "$TASK_REPORT"' EXIT

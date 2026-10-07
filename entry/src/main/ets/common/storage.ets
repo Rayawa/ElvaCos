@@ -1,41 +1,39 @@
+import { STORAGE_KEY_VISUAL_EFFECTS } from './constants';
 // 统一存储入口：全 app 唯一的偏好数据通道
 // - 磁盘：单一 preferences 文件 app_storage（引擎仍是 DiskStorage）
 // - 兼容：首次访问时一次性迁移旧文件（profile / settings / myAppSettings），用户名等旧数据全部保留
 // - 内存：持久化 key 的 setter 同步写入 AppStorage，@StorageLink 消费方无需再手动双写
-// - 瞬态 key（winWidth、pageUrl、nativeRefreshTick 等）不属于本模块，只活在 AppStorage 里
+// - 应用瞬态状态由 common/appState 管理，不写入 Preferences
 import { common } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { migrateElvaPreferences, migrateUxPreferences } from './SettingsMigration';
 import getDiskStorageInstance, { DiskStorageInstance } from './DiskStorage';
 import {
-    APP_VERSION,
-    DEFAULT_APPEARANCE,
-    DEFAULT_BUTTON_RIGHT,
-    DEFAULT_HAND,
-    DEFAULT_HOLD_CHECK_ENABLED,
-    DEFAULT_IMMERSIVE_MATERIAL_LEVEL,
-    DEFAULT_LIGHT_FIELD_LEVEL,
-    DEFAULT_VIBRATION_LEVEL,
-    LEGACY_APP_SETTINGS_FILE_NAME,
-    LEGACY_PROFILE_FILE_NAME,
-    LEGACY_SETTINGS_FILE_NAME,
-    STORAGE_FILE_NAME,
-    STORAGE_KEY_ACCOUNT_NAME,
-    STORAGE_KEY_ACCOUNT_OPEN_ID,
-    STORAGE_KEY_ACCOUNT_SIGNED_AT,
-    STORAGE_KEY_ACCOUNT_UNION_ID,
-    STORAGE_KEY_APPEARANCE,
-    STORAGE_KEY_BUTTON_RIGHT,
-    STORAGE_KEY_FIRST_LAUNCH,
-    STORAGE_KEY_HAND,
-    STORAGE_KEY_HOLD_CHECK,
-    STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL,
-    STORAGE_KEY_LIGHT_FIELD_LEVEL,
-    STORAGE_KEY_LEGACY_MIGRATED,
-    STORAGE_KEY_NOTICE_VERSION,
-    STORAGE_KEY_SEARCH_HISTORY,
-    STORAGE_KEY_USERNAME,
-    STORAGE_KEY_VIBRATION_LEVEL,
+  DEFAULT_APPEARANCE,
+  DEFAULT_BUTTON_RIGHT,
+  DEFAULT_HAND,
+  DEFAULT_HOLD_CHECK_ENABLED,
+  DEFAULT_IMMERSIVE_MATERIAL_LEVEL,
+  DEFAULT_LIGHT_FIELD_LEVEL,
+  DEFAULT_VIBRATION_LEVEL,
+  LEGACY_APP_SETTINGS_FILE_NAME,
+  LEGACY_PROFILE_FILE_NAME,
+  LEGACY_SETTINGS_FILE_NAME,
+  STORAGE_FILE_NAME,
+  STORAGE_KEY_ACCOUNT_NAME,
+  STORAGE_KEY_ACCOUNT_OPEN_ID,
+  STORAGE_KEY_ACCOUNT_SIGNED_AT,
+  STORAGE_KEY_ACCOUNT_UNION_ID,
+  STORAGE_KEY_APPEARANCE,
+  STORAGE_KEY_BUTTON_RIGHT,
+  STORAGE_KEY_FIRST_LAUNCH,
+  STORAGE_KEY_HAND,
+  STORAGE_KEY_HOLD_CHECK,
+  STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL,
+  STORAGE_KEY_LIGHT_FIELD_LEVEL,
+  STORAGE_KEY_LEGACY_MIGRATED,
+  STORAGE_KEY_USERNAME,
+  STORAGE_KEY_VIBRATION_LEVEL,
 } from './constants';
 
 // ===== 偏好 key（唯一事实来源，同时是对应的 AppStorage key 名）=====
@@ -43,14 +41,12 @@ const STORE_NAME = STORAGE_FILE_NAME;
 const KEY_MIGRATED = STORAGE_KEY_LEGACY_MIGRATED;
 const KEY_USERNAME = STORAGE_KEY_USERNAME;
 const KEY_FIRST_LAUNCH = STORAGE_KEY_FIRST_LAUNCH;
-const KEY_NOTICE_VERSION = STORAGE_KEY_NOTICE_VERSION;
 const KEY_VIBRATION_LEVEL = STORAGE_KEY_VIBRATION_LEVEL;
 const KEY_LIGHT_FIELD_LEVEL = STORAGE_KEY_LIGHT_FIELD_LEVEL;
 const LEGACY_KEY_VIBRATION_ENABLED = 'vibrationON';
 const KEY_HOLD_CHECK = STORAGE_KEY_HOLD_CHECK;
 const KEY_BUTTON_RIGHT = STORAGE_KEY_BUTTON_RIGHT;
 const KEY_IMMERSIVE_MATERIAL_LEVEL = STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL;
-const KEY_SEARCH_HISTORY = STORAGE_KEY_SEARCH_HISTORY;
 const KEY_APPEARANCE = STORAGE_KEY_APPEARANCE;
 const KEY_HAND = STORAGE_KEY_HAND;
 const KEY_ACCOUNT_OPEN_ID = STORAGE_KEY_ACCOUNT_OPEN_ID;
@@ -151,7 +147,7 @@ async function migrateLegacyData(ctx?: common.Context): Promise<void> {
     const legacy = getDiskStorageInstance('settings', ctx);
     if (legacy) { await migrateElvaPreferences(target, legacy); }
     await target.set(KEY_MIGRATED, true);
-    console.info('[Dashboard][common/storage][INFO]', `[storage] 旧数据迁移完成: ${copied.length > 0 ? copied.join(', ') : '全新安装，无需迁移'}`);
+    console.info('[ElvaCos][common/storage][INFO]', `[storage] 旧数据迁移完成: ${copied.length > 0 ? copied.join(', ') : '全新安装，无需迁移'}`);
 }
 
 async function copyLegacyKey(target: DiskStorageInstance, legacyFile: string, key: string, ctx?: common.Context, targetKey: string = key): Promise<boolean> {
@@ -163,35 +159,9 @@ async function copyLegacyKey(target: DiskStorageInstance, legacyFile: string, ke
             return true;
         }
     } catch (error) {
-        console.warn('[Dashboard][common/storage][WARN]', `[storage] 跳过旧文件 ${legacyFile} 的 ${key}: ${JSON.stringify(error)}`);
+        console.warn('[ElvaCos][common/storage][WARN]', `[storage] 跳过旧文件 ${legacyFile} 的 ${key}: ${JSON.stringify(error)}`);
     }
     return false;
-}
-
-// ===== 初始化（幂等；也可以完全不调用，首次读写会自动初始化并迁移）=====
-export function initializeSettings(ctx?: common.Context): void {
-    ensureReady(ctx).catch(() => {
-    });
-}
-
-// 兼容旧 profile.ets 的初始化入口
-export function initialize(ctx?: common.Context): void {
-    ensureReady(ctx).catch(() => {
-    });
-}
-
-// ===== 首启标志（原 myAppSettings 文件 / isFirstLaunch）=====
-export async function getFirstLaunch(): Promise<boolean> {
-    const s = await ensureReady();
-    const firstLaunch = (await s.get(KEY_FIRST_LAUNCH, true)) as boolean;
-    const acceptedVersion = (await s.get(KEY_NOTICE_VERSION, '')) as string;
-    return firstLaunch || acceptedVersion !== APP_VERSION;
-}
-
-export async function setFirstLaunch(first: boolean): Promise<void> {
-    const s = await ensureReady();
-    await s.set(KEY_FIRST_LAUNCH, first);
-    await s.set(KEY_NOTICE_VERSION, first ? '' : APP_VERSION);
 }
 
 // ===== 用户名（原 profile 文件 / username）=====
@@ -208,7 +178,7 @@ export function getDeviceName(): string {
         }
         return "我的设备";
     } catch (error) {
-        console.error('[Dashboard][common/storage][ERROR]', "Failed to get device name:", error);
+        console.error('[ElvaCos][common/storage][ERROR]', "Failed to get device name:", error);
         return "我的设备";
     }
 }
@@ -233,15 +203,6 @@ export async function setUsername(username?: string): Promise<void> {
     }
     await s.set(KEY_USERNAME, username);
     AppStorage.setOrCreate(KEY_USERNAME, username);
-}
-
-export async function clearUsername(): Promise<void> {
-    await setUsername(undefined);
-}
-
-export async function hasUsername(): Promise<boolean> {
-    const username = await getUsername();
-    return username !== getDeviceName() && username.trim().length > 0;
 }
 
 // ===== 设置项（原 settings 文件）=====
@@ -328,7 +289,7 @@ export async function setImmersiveMaterialLevel(level: number): Promise<void> {
     await s.set(KEY_IMMERSIVE_MATERIAL_LEVEL, normalized);
     await s.set('effects', normalized !== 2);
     AppStorage.setOrCreate(KEY_IMMERSIVE_MATERIAL_LEVEL, normalized);
-    AppStorage.setOrCreate('visualEffectsEnabled', normalized !== 2);
+    AppStorage.setOrCreate(STORAGE_KEY_VISUAL_EFFECTS, normalized !== 2);
 }
 
 // ===== 应用外观（天蓝 / 雾蓝 / 跟随系统）=====
@@ -414,66 +375,6 @@ export async function getAllSettings(): Promise<AppSettings> {
     };
 }
 
-export async function updateSettings(settings: Partial<AppSettings>): Promise<void> {
-    if (settings.vibrationLevel !== undefined) {
-        await setVibrationLevel(settings.vibrationLevel);
-    }
-    if (settings.lightFieldLevel !== undefined) {
-        await setLightFieldLevel(settings.lightFieldLevel);
-    }
-    if (settings.holdCheckON !== undefined) {
-        await setHoldCheckEnabled(settings.holdCheckON);
-    }
-    if (settings.buttonPositionRIGHT !== undefined) {
-        await setButtonPosition(settings.buttonPositionRIGHT);
-    }
-    if (settings.immersiveMaterialLevel !== undefined) {
-        await setImmersiveMaterialLevel(settings.immersiveMaterialLevel);
-    }
-    if (settings.appearance !== undefined) {
-        await setAppearance(settings.appearance);
-    }
-    if (settings.hand !== undefined) {
-        await setHand(settings.hand);
-    }
-}
-
-// ===== 搜索历史 =====
-// Preferences 只接受基础值类型，因此以 JSON 字符串保存；读取时同时做结构和数量约束。
-export async function getSearchHistory(): Promise<string[]> {
-    const s = await ensureReady();
-    const raw = (await s.get(KEY_SEARCH_HISTORY, '[]')) as string;
-    try {
-        const parsed = JSON.parse(raw) as string[];
-        return parsed.filter((item: string) => typeof item === 'string' && item.trim().length > 0).slice(0, 10);
-    } catch (error) {
-        console.warn('[Dashboard][common/storage][WARN]', `搜索历史损坏，已忽略: ${JSON.stringify(error)}`);
-        return [];
-    }
-}
-
-export async function setSearchHistory(history: string[]): Promise<void> {
-    const normalized: string[] = [];
-    for (const item of history) {
-        const value = item.trim();
-        if (value.length > 0 && normalized.indexOf(value) < 0) {
-            normalized.push(value);
-        }
-    }
-    const s = await ensureReady();
-    await s.set(KEY_SEARCH_HISTORY, JSON.stringify(normalized.slice(0, 10)));
-}
-
-export async function clearSearchHistory(): Promise<void> {
-    const s = await ensureReady();
-    await s.remove(KEY_SEARCH_HISTORY);
-}
-
-// 恢复出厂设置（只重置设置项，不动用户名和首启标志）
-export async function resetAllSettings(): Promise<void> {
-    await updateSettings(DEFAULT_SETTINGS);
-}
-
 // ===== AppStorage 水合（EntryAbility 启动时调用一次，UI 绑定前填入磁盘真值）=====
 export async function loadPersistedState(ctx?: common.Context): Promise<void> {
     try {
@@ -487,22 +388,12 @@ export async function loadPersistedState(ctx?: common.Context): Promise<void> {
         AppStorage.setOrCreate(KEY_HOLD_CHECK, settings.holdCheckON);
         AppStorage.setOrCreate(KEY_BUTTON_RIGHT, settings.buttonPositionRIGHT);
         AppStorage.setOrCreate(KEY_IMMERSIVE_MATERIAL_LEVEL, settings.immersiveMaterialLevel);
-        AppStorage.setOrCreate('visualEffectsEnabled', settings.immersiveMaterialLevel !== 2);
+        AppStorage.setOrCreate(STORAGE_KEY_VISUAL_EFFECTS, settings.immersiveMaterialLevel !== 2);
         AppStorage.setOrCreate(KEY_USERNAME, username);
         AppStorage.setOrCreate(KEY_APPEARANCE, settings.appearance);
         AppStorage.setOrCreate(KEY_HAND, settings.hand);
     } catch (error) {
-        console.error('[Dashboard][common/storage][ERROR]', `[storage] AppStorage 水合失败: ${JSON.stringify(error)}`);
+        console.error('[ElvaCos][common/storage][ERROR]', `[storage] AppStorage 水合失败: ${JSON.stringify(error)}`);
+        throw error as Error;
     }
-}
-
-// Business-specific preferences use the same disk/cache/runtime channel.
-export async function getAppPreference(key: string, fallback: string | boolean): Promise<string | boolean> {
-    const s = await ensureReady();
-    return await s.get(key, fallback) as string | boolean;
-}
-export async function setAppPreference(key: string, value: string | boolean): Promise<void> {
-    const s = await ensureReady();
-    await s.set(key, value);
-    AppStorage.setOrCreate(key === 'effects' ? 'visualEffectsEnabled' : key, value);
 }

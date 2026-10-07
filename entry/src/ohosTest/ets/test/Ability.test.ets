@@ -7,7 +7,7 @@ import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { Database } from '../../../main/ets/data/database/Database';
 import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, PhotoAssetRepository, RelationRepository, ChecklistItemRepository } from '../../../main/ets/data/repository/Repositories';
 import { Character, CharacterVariant, CosProject, Asset, PhotoAsset, PhotoStatus, newId } from '../../../main/ets/model/Entities';
-import { BackupService } from '../../../main/ets/services/BackupService';
+import { BackupService } from '../../../main/ets/common/BackupService';
 import { MediaRepository } from '../../../main/ets/data/media/MediaRepository';
 import getDiskStorageInstance from '../../../main/ets/common/DiskStorage';
 import { migrateElvaPreferences, migrateUxPreferences } from '../../../main/ets/common/SettingsMigration';
@@ -32,7 +32,7 @@ export default function abilityTest(): void {
     const asset = new Asset(); asset.name = 'Verification Wig';
     let context: common.Context;
     beforeAll(async () => { if (!TestContext.value) { throw new Error('TestAbility context unavailable'); } context = TestContext.value; await db.open(context); });
-    afterAll(async () => { db.close(); await relationalStore.deleteRdbStore(context, name); });
+    afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('migrationAndCrudWorkOnNativeRdb', 0, async () => {
       expect(db.getStore().version).assertEqual(3);
       await characters.save(character); await variants.save(variant); await projects.save(project); await assets.save(asset);
@@ -47,7 +47,7 @@ export default function abilityTest(): void {
       let rejected = false; try { await characters.remove(character.id); } catch (error) { rejected = true; }
       expect(rejected).assertTrue(); expect((await characters.list()).length).assertEqual(1);
     });
-    it('encryptedDataPersistsAfterReopening', 0, async () => { db.close(); await db.open(context); expect((await projects.list())[0].name).assertEqual(project.name); });
+    it('encryptedDataPersistsAfterReopening', 0, async () => { await db.close(); await db.open(context); expect((await projects.list())[0].name).assertEqual(project.name); });
 
     it('portableMetadataRestoresAndRejectsFutureVersions', 0, async () => {
       const backup = new BackupService(db, context);

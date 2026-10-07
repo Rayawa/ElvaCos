@@ -9,7 +9,7 @@ class DiskStorage {
     // 本地存储实例
     private _preference: preferences.Preferences | null = null;
     // 常量定义
-    private preference_name: string = "user_data";
+    private preference_name: string;
     // 内存缓存，用于快速访问
     // 存储上下文引用
     private _context: common.Context | undefined = undefined;
@@ -19,12 +19,12 @@ class DiskStorage {
     constructor(preference_name: string, context?: common.Context) {
         this.preference_name = preference_name;
         // Stage 模型下 globalThis 不再可靠，context 必须由调用方显式提供
-        // （正常流程中第一个调用方是 EntryAbility.onCreate 的 loadPersistedState(this.context)）
+        // （正常流程中第一个调用方是 EntryAbility.onWindowStageCreate 的 loadPersistedState(this.context)）
         if (!context) {
             throw new Error("DiskStorage: Context is required for first-time initialization");
         }
         this._context = context;
-        console.info('[Dashboard][common/DiskStorage][INFO]', "DiskStorage: Instance created");
+        console.info('[ElvaCos][common/DiskStorage][INFO]', "DiskStorage: Instance created");
     }
 
     // 初始化存储
@@ -51,7 +51,7 @@ class DiskStorage {
                 throw new Error("DiskStorage: Cannot initialize without context");
             }
 
-            console.info('[Dashboard][common/DiskStorage][INFO]',
+            console.info('[ElvaCos][common/DiskStorage][INFO]',
                 "DiskStorage: Initializing with context type:",
                 this._context.constructor.name,
             );
@@ -61,10 +61,10 @@ class DiskStorage {
                 this._context,
                 this.preference_name,
             );
-            console.info('[Dashboard][common/DiskStorage][INFO]', "DiskStorage: Preferences initialized successfully");
+            console.info('[ElvaCos][common/DiskStorage][INFO]', "DiskStorage: Preferences initialized successfully");
         } catch (error) {
             const err: BusinessError = error as BusinessError;
-            console.error('[Dashboard][common/DiskStorage][ERROR]',
+            console.error('[ElvaCos][common/DiskStorage][ERROR]',
                 `DiskStorage: Failed to initialize: code=${err.code}, message=${err.message}`,
             );
             throw new Error(`Initialization failed: ${err.message}`);
@@ -153,7 +153,7 @@ class DiskStorage {
                     await preferences.removePreferencesFromCache(this._context, this.preference_name);
                 }
             } catch (error) {
-                console.warn('[Dashboard][common/DiskStorage][WARN]', "DiskStorage: Failed to remove preferences from cache:", error);
+                console.warn('[ElvaCos][common/DiskStorage][WARN]', "DiskStorage: Failed to remove preferences from cache:", error);
             }
         }
 
@@ -162,7 +162,7 @@ class DiskStorage {
         this._context = undefined;
         instances.delete(this.preference_name);
 
-        console.info('[Dashboard][common/DiskStorage][INFO]', "DiskStorage: Destroyed");
+        console.info('[ElvaCos][common/DiskStorage][INFO]', "DiskStorage: Destroyed");
     }
 }
 
@@ -174,15 +174,6 @@ export default function getDiskStorageInstance(instance_name: string, context?: 
     const instance = new DiskStorage(instance_name, context);
     instances.set(instance_name, instance);
     return instance;
-}
-
-export async function clearAll(instance_name: string, context: common.Context): Promise<void> {
-    try {
-        await preferences.deletePreferences(context, instance_name);
-        console.info('[Dashboard][common/DiskStorage][INFO]', "DiskStorage: All data cleared");
-    } catch (error) {
-        console.error('[Dashboard][common/DiskStorage][ERROR]', "DiskStorage: Failed to clear all data:", error);
-    }
 }
 
 export type DiskStorageInstance = DiskStorage;

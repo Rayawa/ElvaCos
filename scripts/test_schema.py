@@ -7,8 +7,8 @@ import unittest
 
 SOURCE = Path('entry/src/main/ets/data/database/Schema.ets').read_text()
 SQL = re.findall(r'`([^`]+)`', SOURCE)
-V1 = re.findall(r'`([^`]+)`', SOURCE.split('export const MIGRATION_2')[0])
-V2 = re.findall(r'`([^`]+)`', SOURCE.split('export const MIGRATION_2')[1].split('export const MIGRATION_3')[0])
+V1 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_2')[0])
+V2 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_2')[1].split('const MIGRATION_3')[0])
 
 class RelationalModelTest(unittest.TestCase):
     def setUp(self):

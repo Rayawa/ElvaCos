@@ -59,6 +59,10 @@
     {
       "name": "v3_chart_grid",
       "value": "#FFD8E0EB"
+    },
+    {
+      "name": "transparent",
+      "value": "#00000000"
     }
   ]
 }
