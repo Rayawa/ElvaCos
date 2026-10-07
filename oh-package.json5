@@ -1,6 +1,6 @@
 {
   "modelVersion": "26.0.0",
-  "description": "Please describe the basic information.",
+  "description": "绮秀 / ElvaCos — HarmonyOS 离线优先的 Coser 个人管理应用",
   "dependencies": {
   },
   "devDependencies": {

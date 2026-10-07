@@ -14,15 +14,18 @@ export class MediaRepository {
   private mediaRoot: string;
   constructor(context: common.Context, testRoot?: string) {
     this.context = context;
-    if (testRoot && (!testRoot.startsWith(context.filesDir + '/verification-') || testRoot.slice(context.filesDir.length + 1).includes('/'))) { 
-    throw new Error('Invalid verification media path'); }
+    if (testRoot && (!testRoot.startsWith(context.filesDir + '/verification-') || testRoot.slice(context.filesDir.length + 1).includes('/'))) {
+      throw new Error('Invalid verification media path');
+    }
     this.mediaRoot = testRoot || context.filesDir + '/media';
   }
-  async exists(media: ManagedMedia): Promise<boolean> { 
-  return !!media.localPath && !!media.thumbnailPath && await fs.access(media.localPath) && await fs.access(media.thumbnailPath); }
+  async exists(media: ManagedMedia): Promise<boolean> {
+    return !!media.localPath && !!media.thumbnailPath && await fs.access(media.localPath) && await fs.access(media.thumbnailPath);
+  }
   private cacheRoot(testRoot?: string): string {
-    if (testRoot && (!testRoot.startsWith(this.context.cacheDir + '/verification-') || testRoot.slice(this.context.cacheDir.length + 1).includes('/'))) { 
-    throw new Error('Invalid verification cache path'); }
+    if (testRoot && (!testRoot.startsWith(this.context.cacheDir + '/verification-') || testRoot.slice(this.context.cacheDir.length + 1).includes('/'))) {
+      throw new Error('Invalid verification cache path');
+    }
     return testRoot || this.context.cacheDir;
   }
   async cacheSize(testRoot?: string): Promise<number> {
@@ -82,18 +85,38 @@ export class MediaRepository {
   }
   async importReference(uri: string, projectId: string, characterId: string): Promise<ReferenceImage> {
     const media = await this.import(uri, projectId);
-    const r = new ReferenceImage(); 
-  r.id = media.id; 
-  r.projectId = projectId; 
-  r.characterId = characterId; 
-  r.sourceUri = media.sourceUri; 
-  r.localPath = media.localPath; 
-  r.thumbnailPath = media.thumbnailPath; 
-  return r;
+    const r = new ReferenceImage();
+    r.id = media.id;
+    r.projectId = projectId;
+    r.characterId = characterId;
+    r.sourceUri = media.sourceUri;
+    r.localPath = media.localPath;
+    r.thumbnailPath = media.thumbnailPath;
+    return r;
+  }
+  /** Packaged demo images become ordinary managed files, with one pair per record. */
+  async importBundled(key: string, id: string): Promise<ManagedMedia> {
+    if (!/^[a-z]+$/.test(key) || !/^demo-v1-[a-z0-9-]+$/.test(id)) {
+      throw new Error('示例图片资源无效');
+    }
+    if (!(await fs.access(this.mediaRoot))) { await fs.mkdir(this.mediaRoot, true); }
+    const media: ManagedMedia = {
+      localPath: this.mediaRoot + '/' + id + '.jpg',
+      thumbnailPath: this.mediaRoot + '/' + id + '-thumb.jpg'
+    };
+    try {
+      for (const thumbnail of [false, true]) {
+        const content = await this.context.resourceManager.getRawFileContent('demo/images/' + key + (thumbnail ? '-thumb' : '') + '.jpg');
+        const file = await fs.open(thumbnail ? media.thumbnailPath : media.localPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+        try { await fs.write(file.fd, content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength)); }
+        finally { await fs.close(file); }
+      }
+      return media;
+    } catch (error) { await this.remove(media); throw error as Error; }
   }
   async remove(photo: ManagedMedia): Promise<void> {
     for (const path of [photo.localPath, photo.thumbnailPath]) {
-      if (path.startsWith(this.mediaRoot + '/')) { try { await fs.unlink(path); } catch (error) {} }
+      if (path.startsWith(this.mediaRoot + '/')) { try { await fs.unlink(path); } catch (error) { } }
     }
   }
   async collect(photos: PhotoAsset[], references: ReferenceImage[] = []): Promise<void> {

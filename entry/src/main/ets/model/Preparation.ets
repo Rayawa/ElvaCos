@@ -39,16 +39,16 @@ export function makePreparation(projectId: string, keys: string[]): PreparationB
   for (const template of PREPARATION_TEMPLATES) {
     const chosen = template.tasks.filter((task: TaskTemplate) => keys.includes(task.key));
     if (chosen.length === 0) { continue; }
-    const category = new PreparationCategory(); 
-    category.projectId = projectId; 
-    category.name = template.name; 
+    const category = new PreparationCategory();
+    category.projectId = projectId;
+    category.name = template.name;
     category.sortOrder = bundle.categories.length;
     bundle.categories.push(category);
     for (let i = 0; i < chosen.length; i++) {
-      const task = new PreparationTask(); 
-      task.projectId = projectId; 
-      task.categoryId = category.id; 
-      task.label = chosen[i].label; 
+      const task = new PreparationTask();
+      task.projectId = projectId;
+      task.categoryId = category.id;
+      task.label = chosen[i].label;
       task.sortOrder = i;
       bundle.tasks.push(task);
     }

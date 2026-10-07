@@ -25,15 +25,17 @@ export class PreparationRepository {
     while (true) {
       const rows = await this.db.getStore().querySql('SELECT * FROM preparation_categories ORDER BY sort_order,id LIMIT 500 OFFSET ?', [offset]);
       let count = 0;
-      try { while (rows.goToNextRow()) {
-        const item = new PreparationCategory(); 
-        item.id = text(rows, 'id'); 
-        item.projectId = text(rows, 'project_id'); 
-        item.name = text(rows, 'name'); 
-        item.sortOrder = number(rows, 'sort_order'); 
-        items.push(item); 
-        count++;
-      } } finally { rows.close(); }
+      try {
+        while (rows.goToNextRow()) {
+          const item = new PreparationCategory();
+          item.id = text(rows, 'id');
+          item.projectId = text(rows, 'project_id');
+          item.name = text(rows, 'name');
+          item.sortOrder = number(rows, 'sort_order');
+          items.push(item);
+          count++;
+        }
+      } finally { rows.close(); }
       if (count < 500) { break; } offset += count;
     }
     return items;
@@ -44,19 +46,21 @@ export class PreparationRepository {
     while (true) {
       const rows = await this.db.getStore().querySql('SELECT * FROM preparation_tasks ORDER BY sort_order,id LIMIT 500 OFFSET ?', [offset]);
       let count = 0;
-      try { while (rows.goToNextRow()) {
-        const item = new PreparationTask(); 
-        item.id = text(rows, 'id'); 
-        item.projectId = text(rows, 'project_id'); 
-        item.categoryId = text(rows, 'category_id'); 
-        item.label = text(rows, 'label'); 
-        item.done = number(rows, 'done') === 1; 
-        item.dueDate = text(rows, 'due_date'); 
-        item.notes = text(rows, 'notes'); 
-        item.sortOrder = number(rows, 'sort_order'); 
-        items.push(item); 
-        count++;
-      } } finally { rows.close(); }
+      try {
+        while (rows.goToNextRow()) {
+          const item = new PreparationTask();
+          item.id = text(rows, 'id');
+          item.projectId = text(rows, 'project_id');
+          item.categoryId = text(rows, 'category_id');
+          item.label = text(rows, 'label');
+          item.done = number(rows, 'done') === 1;
+          item.dueDate = text(rows, 'due_date');
+          item.notes = text(rows, 'notes');
+          item.sortOrder = number(rows, 'sort_order');
+          items.push(item);
+          count++;
+        }
+      } finally { rows.close(); }
       if (count < 500) { break; } offset += count;
     }
     return items;
@@ -84,6 +88,7 @@ export class PreparationRepository {
     });
   }
   async removeTask(id: string): Promise<void> { await this.db.getStore().executeSql('DELETE FROM preparation_tasks WHERE id=?', [id]); }
-  async removeCategory(id: string): Promise<void> { 
-  await this.db.getStore().executeSql('DELETE FROM preparation_categories WHERE id=?', [id]); }
+  async removeCategory(id: string): Promise<void> {
+    await this.db.getStore().executeSql('DELETE FROM preparation_categories WHERE id=?', [id]);
+  }
 }

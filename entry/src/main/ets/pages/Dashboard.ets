@@ -1,7 +1,8 @@
 import { AppLogPage } from './more/AppLogPage';
+import { DevPage } from './more/DevPage';
 import { LocalHtmlPage } from './more/LocalHtmlPage';
 import { getApplicationState } from '../common/appState';
-import { MAIN_PAGE_TITLES } from '../common/constants';
+import { DEVELOPER_PAGE_TITLE, MAIN_PAGE_TITLES, SETTINGS_ENTRANCE_KEY } from '../common/constants';
 import { PressFeedback } from '../common/pressFeedback';
 import { DetailDestination } from '../component/DetailDestination';
 import { StaggerEntrance, MainEntranceSession } from '../common/motion';
@@ -49,7 +50,7 @@ import { EmptyState } from '../component/Surfaces';
 
 @Entry
 @ComponentV2
-struct Dashboard {
+  struct Dashboard {
   @Local sheetEntrance: StaggerEntrance = new StaggerEntrance();
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Local state: AppState = getApplicationState();
@@ -122,6 +123,11 @@ struct Dashboard {
     }
   }
 
+  /** 开发者选项入口：设置页连点版本号五次，按需求不振动。 */
+  private openDeveloper(): void {
+    this.state.suspend();
+    this.detailStack.pushPathByName('developer', 'developer');
+  }
   private edit(kind: string, id: string = '', parent: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
     this.state.error = '';
@@ -265,18 +271,20 @@ struct Dashboard {
   }
 
   @Builder destinationBody(kind: string, param: Object, entrance: StaggerEntrance) {
-    if (kind === 'appLog') {
-      AppLogPage({ entrance: entrance })
-    } else if (kind === 'privacy') {
+    if (kind === 'privacy') {
       LocalHtmlPage({ entrance: entrance })
     } else if (kind === 'settings') {
       SettingsPage({
         open: (kind: string, id: string): void => this.open(kind, id),
         entrance: entrance,
+        entranceSession: this.mainEntranceSession,
         state: this.state,
         bottomInset: Theme.contentBottom,
-        destructive: (k: string): void => { this.destructive(k); }
+        destructive: (k: string): void => { this.destructive(k); },
+        openDeveloper: (): void => { this.openDeveloper(); }
       })
+    } else if (kind === 'developer') {
+      DevPage({ entrance: entrance, state: this.state })
     } else {
       HdsActionTabs({
         items: this.detailTools(kind, param), effects: this.state.settings.effects,
@@ -288,28 +296,38 @@ struct Dashboard {
   }
 
   @Builder destination(kind: string, param: Object) {
-    DetailDestination({
-      titleOptions: SystemCapability.titleBar(
-        kind === 'project' ? '' : this.destinationTitle(kind, param as string),
-        this.state.settings.effects,
-        this.state.settings.materialLevel,
-        kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
-        [], false,
-        (): void => { this.closeDetail(); },
-      ),
-      back: (): void => { this.closeDetail(); },
-      hidden: (): void => {
-        if (kind === 'project') { (param as ProjectRoute).outing = false; }
-        this.state.suspend();
-      },
-      content: this.destinationBody.bind(this, kind, param),
-    })
+    if (kind === 'appLog') {
+      AppLogPage({
+        effects: this.state.settings.effects,
+        materialLevel: this.state.settings.materialLevel,
+        back: (): void => { this.closeDetail(); },
+      })
+    } else {
+      DetailDestination({
+        entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
+        entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
+        titleOptions: SystemCapability.titleBar(
+          kind === 'project' ? '' : this.destinationTitle(kind, param as string),
+          this.state.settings.effects,
+          this.state.settings.materialLevel,
+          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
+          [], false,
+          (): void => { this.closeDetail(); },
+        ),
+        back: (): void => { this.closeDetail(); },
+        hidden: (): void => {
+          if (kind === 'project') { (param as ProjectRoute).outing = false; }
+          this.state.suspend();
+        },
+        content: this.destinationBody.bind(this, kind, param),
+      })
+    }
   }
 
   private destinationTitle(kind: string, id: string): string {
-    if (kind === 'appLog') { return '更新日志'; }
     if (kind === 'privacy') { return '隐私政策'; }
     if (kind === 'settings') { return '设置'; }
+    if (kind === 'developer') { return DEVELOPER_PAGE_TITLE; }
     if (kind === 'reference') { return '准备参考图'; }
     if (kind === 'expenseStats') { return '花费统计'; }
     if (kind === 'character') { return this.state.characterName(id); }
@@ -326,8 +344,9 @@ struct Dashboard {
     const r = this.state.references.find((r: ReferenceImage) => r.id === id); if (!r) { return; }
     const characterId = r.characterId || this.state.projects.find((p: CosProject) => p.id === r.projectId)?.characterId || '';
     const character = this.state.characters.find((c: Character) => c.id === characterId);
-    if (character?.cover && character.cover !== r.thumbnailPath && !(await confirm(this.getUIContext(), '替换角色封面？', '使用此参考图作为角色封面，原有图片保留。', '替换'))) { 
-    return; }
+    if (character?.cover && character.cover !== r.thumbnailPath && !(await confirm(this.getUIContext(), '替换角色封面？', '使用此参考图作为角色封面，原有图片保留。', '替换'))) {
+      return;
+    }
     await this.state.referenceCover(r);
   }
   private async setCover(photo: PhotoAsset): Promise<void> {
@@ -348,34 +367,51 @@ struct Dashboard {
       }).opacity(this.sheetEntrance.step >= 1 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 1 ? 0 : 20 })
       List({ space: 10 }) {
         ForEach(this.state.projects, (p: CosProject) => {
-          ListItem() { Button(p.name)
+          ListItem() {
+            Button(p.name)
             .accessibilityText('选择照片所属计划 ' + p.name)
             .width('100%')
             .constraintSize({ minHeight: 56 })
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)
             .onClick(() => { HapticService.confirm(this.state.settings.haptic); this.importOpen = false; this.state.importPhotos(p.id); })
-            .attributeModifier(this.feedback.control('import-project:' + p.id, true)) }
+            .visualEffect(this.feedback.effect('import-project:' + p.id, true))
+            .compositingFilter(this.feedback.filter('import-project:' + p.id, true))
+            .attributeModifier(this.feedback.control('import-project:' + p.id, true))
+          }
         }, (p: CosProject) => p.id)
       }.layoutWeight(1).width('100%').opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
     }.padding(24).height('100%').width('100%').backgroundColor(Theme.surface)
   }
 
   private rootTools(index: number): ToolbarItem[] {
-    if (index === 1) { 
-    return [{ value: this.cosProjects ? '新建计划' : '添加角色', icon: Icons.add, action: () => this.edit(this.cosProjects ? 'project' : 'character') }]; }
+    if (index === 1) {
+      return [{ value: this.cosProjects ? '新建计划' : '添加角色', icon: Icons.add, action: () => this.edit(this.cosProjects ? 'project' : 'character') }];
+    }
     if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: () => this.edit('event') }]; }
-    if (index === 3) { 
-    return [{ value: this.libraryPhotos ? '导入照片' : '添加装备', icon: this.libraryPhotos ? Icons.importPhoto : Icons.add, action: () => { 
-      if (this.libraryPhotos) { 
-        this.chooseImport(); } else { 
-        this.edit('asset'); } } }]; }
+    if (index === 3) {
+      return [{
+        value: this.libraryPhotos ? '导入照片' : '添加装备', icon: this.libraryPhotos ? Icons.importPhoto : Icons.add, action: () => {
+          if (this.libraryPhotos) {
+            this.chooseImport();
+          } else {
+            this.edit('asset');
+          }
+        }
+      }];
+    }
     return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }, { value: '添加活动', icon: Icons.event, action: () => this.edit('event') }, { value: '导入照片', icon: Icons.importPhoto, action: () => this.chooseImport() }];
   }
   private rootMenus(index: number): HdsNavigationMenuItemOptions[] {
-    if (index === 4) { 
-    return [{ content: { label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy, action: (): void => { 
-      this.open('settings', 'settings'); } } }]; }
+    if (index === 4) {
+      return [{
+        content: {
+          label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy, action: (): void => {
+            this.open('settings', 'settings');
+          }
+        }
+      }];
+    }
     return this.rootTools(index).map((item: ToolbarItem): HdsNavigationMenuItemOptions => {
       return { content: { label: item.value, icon: item.icon as Resource, isEnabled: this.state.ready && !this.state.busy, action: item.action, componentId: 'root-action-' + item.value } };
     });
@@ -397,47 +433,69 @@ struct Dashboard {
   private detailTools(kind: string, param: Object): ToolbarItem[] {
     const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
     if (kind === 'settings') { return []; }
+    if (kind === 'developer') { return []; }
     if (kind === 'expenseStats') { return [{ value: '记一笔', icon: Icons.add, action: () => this.edit('expense') }]; }
-    if (kind === 'reference') { return [
-      { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },
-      { value: '编辑说明', icon: Icons.edit, action: () => this.edit('reference', id) },
-      { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
-    ]; }
+    if (kind === 'reference') {
+      return [
+        { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },
+        { value: '编辑说明', icon: Icons.edit, action: () => this.edit('reference', id) },
+        { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
+      ];
+    }
     if (kind === 'project') {
       const route = param as ProjectRoute;
       if (route.section === 2) { return [{ value: '导入照片', icon: Icons.importPhoto, action: () => this.state.importPhotos(id) }]; }
       if (route.section === 1) {
         return [{ value: '添加物品', icon: Icons.add, action: () => this.edit('checklist', '', id) },
-          { value: '常用物品', icon: Icons.check, action: () => this.state.generateChecklist(id) },
-          { value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: () => { 
-        route.outing = !route.outing; 
-        if (route.outing) { 
-          this.state.resume(); } else { 
-          this.state.suspend(); } } }];
+        { value: '常用物品', icon: Icons.check, action: () => this.state.generateChecklist(id) },
+        {
+          value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: () => {
+            route.outing = !route.outing;
+            if (route.outing) {
+              this.state.resume();
+            } else {
+              this.state.suspend();
+            }
+          }
+        }];
       }
       return [{ value: '准备任务', icon: Icons.add, action: () => { route.sheetKind = 0; route.preparing = true; } },
-        { value: '从衣柜', icon: Icons.library, action: () => { route.sheetKind = 1; route.linking = true; } },
-        { value: '编辑', icon: Icons.edit, action: () => this.edit('project', id) },
-        { value: '分享', icon: Icons.share, action: () => this.state.shareProject(id) },
-        { value: '删除计划', icon: Icons.remove, action: () => this.remove('project', id) }];
+      { value: '从衣柜', icon: Icons.library, action: () => { route.sheetKind = 1; route.linking = true; } },
+      { value: '编辑', icon: Icons.edit, action: () => this.edit('project', id) },
+      { value: '分享', icon: Icons.share, action: () => this.state.shareProject(id) },
+      { value: '删除计划', icon: Icons.remove, action: () => this.remove('project', id) }];
     }
-    if (kind === 'character') { 
-    return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }]; }
-    if (kind === 'event') { 
-    return [{ value: '设备日历', icon: Icons.event, action: () => { 
-      const event = this.state.events.find((event: CosEvent) => event.id === id); 
-      if (event) { 
-        this.state.addEventToCalendar(event); } } }, { value: '新建计划', icon: Icons.add, action: () => this.edit('eventProject', '', id) }, { value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }]; }
-    if (kind === 'asset') { 
-    return [{ value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }]; }
-    return [{ value: '选中照片', icon: Icons.check, action: () => { 
-    const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); 
-    if (photo) { 
-      this.state.setPhotoStatus(photo, PhotoStatus.SELECTED); } 
-  } }, { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => { 
-    const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); 
-    if (photo) { 
-      this.setCover(photo); } } }, { value: '删除', icon: Icons.remove, action: () => this.remove('photo', id) }];
+    if (kind === 'character') {
+      return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }];
+    }
+    if (kind === 'event') {
+      return [{
+        value: '设备日历', icon: Icons.event, action: () => {
+          const event = this.state.events.find((event: CosEvent) => event.id === id);
+          if (event) {
+            this.state.addEventToCalendar(event);
+          }
+        }
+      }, { value: '新建计划', icon: Icons.add, action: () => this.edit('eventProject', '', id) }, { value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }];
+    }
+    if (kind === 'asset') {
+      return [{ value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }];
+    }
+    return [{
+      value: '选中照片', icon: Icons.check, action: () => {
+        const photo = this.state.photos.find((p: PhotoAsset) => p.id === id);
+        if (photo) {
+          this.state.setPhotoStatus(photo, PhotoStatus.SELECTED);
+        }
+      }
+    }, {
+      value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => {
+        const photo = this.state.photos.find((p: PhotoAsset) => p.id === id);
+        if (photo) {
+          this.setCover(photo);
+        }
+      }
+    }, { value: '删除', icon: Icons.remove, action: () => this.remove('photo', id) }];
   }
 
   private segmentLabels(index: number): string[] {
@@ -488,8 +546,9 @@ struct Dashboard {
     if (message) { showToastSafely(this.getUIContext().getPromptAction(), message, 2000, 'Application'); }
   }
   @Builder loadingOverlay() {
-    if (this.state.busy) { 
-    LoadingProgress().width(40).height(40).color(Theme.accent).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中') }
+    if (this.state.busy) {
+      LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中')
+    }
   }
 
   @Builder mainNavigation(index: number) {
@@ -502,7 +561,8 @@ struct Dashboard {
               message: '请重试加载本地数据。',
               button: '重试',
               action: (): void => { this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext); }
-            }).margin({ top: Theme.contentTop, left: Theme.pagePadding, right: Theme.pagePadding }) }
+            }).margin({ top: Theme.contentTop, left: Theme.pagePadding, right: Theme.pagePadding })
+          }
         }
         else if (index === 0) {
           HomePage({
@@ -632,6 +692,7 @@ struct Dashboard {
   }
 
   build() {
+    WithTheme({ theme: Theme.nativeTheme }) {
     HdsNavigation(this.detailStack) {
       this.mainTabs()
     }.mode(NavigationMode.Stack).hideTitleBar(true).hideToolBar(true)
@@ -643,8 +704,10 @@ struct Dashboard {
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), appSheetOptions((): void => { 
-    this.importOpen = false; 
-    this.formOpen = false; }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), appSheetOptions((): void => {
+        this.importOpen = false;
+        this.formOpen = false;
+      }, this.sheetEntrance, this.getUIContext()))
+    }
   }
 }

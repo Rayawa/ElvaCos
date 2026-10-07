@@ -42,7 +42,7 @@ export struct SheetHeader {
         this.close();
       })
       .accessibilityText('关闭')
-      .accessibilityLevel('yes').attributeModifier(this.feedback.control('stack-1', true))
+      .accessibilityLevel('yes').visualEffect(this.feedback.effect('stack-1', true)).compositingFilter(this.feedback.filter('stack-1', true)).attributeModifier(this.feedback.control('stack-1', true))
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)

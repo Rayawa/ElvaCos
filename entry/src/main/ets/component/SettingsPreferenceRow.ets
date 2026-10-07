@@ -1,4 +1,3 @@
-import { PressFeedback } from '../common/pressFeedback';
 import { HdsListItemCard, IconSize, PrefixIcon } from '@kit.UIDesignKit';
 import { Theme } from '../common/Theme';
 import { Icons } from '../common/Icons';
@@ -6,7 +5,6 @@ import { LIST_ITEM_PREFIX_MARGIN, LIST_ITEM_SUFFIX_MARGIN } from '../common/cons
 
 @ComponentV2
 export struct SettingsPreferenceRow {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
   @Param icon: Resource = Icons.help;
   @Local contentWidth: number = 0;
@@ -30,7 +28,6 @@ export struct SettingsPreferenceRow {
       cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
       cardSuffixMargin: LIST_ITEM_SUFFIX_MARGIN,
       accessibilityOptions: { accessibilityText: this.label },
-    }).onAreaChange((_, area: Area): void => { 
-    this.contentWidth = Number(area.width); }).attributeModifier(this.feedback.control('hdslistitemcard-1'))
+    }).onAreaChange((_, area: Area): void => { this.contentWidth = Number(area.width); })
   }
 }

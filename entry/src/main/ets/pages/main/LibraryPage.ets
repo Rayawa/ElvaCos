@@ -50,6 +50,8 @@ export struct LibraryPage {
         .backgroundColor(Theme.tint)
         .textAlign(TextAlign.Center)
         .borderRadius(16)
+        .visualEffect(this.feedback.effect('asset-type:' + a.id))
+        .compositingFilter(this.feedback.filter('asset-type:' + a.id))
         .attributeModifier(this.feedback.control('asset-type:' + a.id))
       Column({ space: 7 }) { Text(a.name)
         .fontSize(19)
@@ -67,6 +69,8 @@ export struct LibraryPage {
       .value(this.state.projects.find((p: CosProject) => p.id === this.projectId)?.name || '全部计划')
       .onSelect((i: number) => { vibration.dotVibration(); this.projectId = i === 0 ? '' : this.state.projects[i - 1].id; })
       .accessibilityText('照片所属计划筛选')
+      .visualEffect(this.feedback.effect('select-1'))
+      .compositingFilter(this.feedback.filter('select-1'))
       .attributeModifier(this.feedback.control('select-1'))
   }
   build() {

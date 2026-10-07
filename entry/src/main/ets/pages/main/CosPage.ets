@@ -59,6 +59,8 @@ export struct CosPage {
         .backgroundColor(Theme.tint)
         .borderRadius(14)
         .accessibilityLevel('no')
+        .visualEffect(this.feedback.effect('character-placeholder:' + character.id))
+        .compositingFilter(this.feedback.filter('character-placeholder:' + character.id))
         .attributeModifier(this.feedback.control('character-placeholder:' + character.id)) }
       Column({ space: 6 }) {
         Text(character.name + (character.favorite ? ' ★' : '')).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
@@ -91,9 +93,10 @@ export struct CosPage {
               .value(['进行中', '已完成', '日期待定', '全部'][this.statusFilter])
               .onSelect((index: number) => { vibration.dotVibration(); this.statusFilter = index; })
               .accessibilityText('计划状态筛选')
+              .visualEffect(this.feedback.effect('select-1'))
+              .compositingFilter(this.feedback.filter('select-1'))
               .attributeModifier(this.feedback.control('select-1'))
-            ForEach(this.plans(), (p: CosProject) => { 
-              ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
+            ForEach(this.plans(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
             if (this.plans().length === 0) { EmptyState({
                 title: '没有符合条件的计划',
                 message: '切换筛选，或新建一份 Cos 计划。',

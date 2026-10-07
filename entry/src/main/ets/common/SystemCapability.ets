@@ -58,7 +58,7 @@ export class SystemCapability {
   static tabs(enabled: boolean, level: number = 1): HdsTabsFloatingStyle {
     return {
       barBottomMargin: 28,
-      lightColor: Theme.accent,
+      lightColor: Theme.brand,
       gradientMask: { maskColor: Theme.transparent, maskHeight: 92 },
       systemMaterialEffect: {
         materialType: enabled ? hdsMaterial.MaterialType.ADAPTIVE : hdsMaterial.MaterialType.NONE,

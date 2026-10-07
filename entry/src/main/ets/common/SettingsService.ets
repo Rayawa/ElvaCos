@@ -1,11 +1,14 @@
 import { APPEARANCE_DARK, APPEARANCE_LIGHT } from './constants';
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { AppSettings } from '../model/Entities';
+import { Theme } from './Theme';
+import { normalizeThemeColor } from './ThemePalettes';
 
 import {
   getAllSettings,
   getUsername,
   setAppearance,
+  setThemeColor,
   setHand,
   setVibrationLevel,
   setLightFieldLevel,
@@ -23,6 +26,7 @@ export class SettingsService {
     const settings = new AppSettings();
     settings.username = await getUsername();
     settings.appearance = persisted.appearance;
+    settings.themeColor = persisted.themeColor;
     settings.hand = persisted.hand;
     settings.grip = persisted.hand === 'auto';
     settings.haptic = persisted.vibrationLevel !== 0;
@@ -31,12 +35,14 @@ export class SettingsService {
     settings.materialLevel = persisted.immersiveMaterialLevel;
     settings.effects = settings.materialLevel !== 2;
     this.applyAppearance(context, settings.appearance);
+    Theme.applyPalette(settings.themeColor);
     return settings;
   }
 
   async save(context: common.UIAbilityContext, settings: AppSettings, previous: AppSettings): Promise<void> {
     settings.effects = settings.materialLevel !== 2;
     settings.grip = settings.hand === 'auto';
+    settings.themeColor = normalizeThemeColor(settings.themeColor);
     if (settings.haptic !== previous.haptic || settings.hapticLevel !== previous.hapticLevel) {
       await setVibrationLevel(settings.haptic ? settings.hapticLevel : 0);
     }
@@ -44,12 +50,13 @@ export class SettingsService {
     if (settings.materialLevel !== previous.materialLevel) { await setImmersiveMaterialLevel(settings.materialLevel); }
     if (settings.hand !== previous.hand) { await setHand(settings.hand); }
     if (settings.appearance !== previous.appearance) { await setAppearance(settings.appearance); }
+    if (settings.themeColor !== previous.themeColor) { await setThemeColor(settings.themeColor); }
     this.applyAppearance(context, settings.appearance);
+    if (settings.themeColor !== Theme.paletteId) { Theme.applyPalette(settings.themeColor); }
   }
 
   /**
-   * 应用外观即深浅色模式：天蓝 → 浅色，雾蓝 → 深色，跟随系统 → 交给系统。
-   * 颜色资源仍是 Dashboard 的同名资源，只由 ColorMode 决定走 base 还是 dark。
+   * 应用外观只控制深浅色模式；各组配色均由 ColorMode 决定走 base 还是 dark。
    */
   private applyAppearance(context: common.UIAbilityContext, appearance: string): void {
     if (appearance === this.appliedAppearance) { return; }

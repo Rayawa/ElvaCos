@@ -7,9 +7,11 @@ import { STORAGE_KEY_VISUAL_EFFECTS } from './constants';
 import { common } from '@kit.AbilityKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { migrateElvaPreferences, migrateUxPreferences } from './SettingsMigration';
+import { normalizeThemeColor } from './ThemePalettes';
 import getDiskStorageInstance, { DiskStorageInstance } from './DiskStorage';
 import {
   DEFAULT_APPEARANCE,
+  DEFAULT_THEME_COLOR,
   DEFAULT_BUTTON_RIGHT,
   DEFAULT_HAND,
   DEFAULT_HOLD_CHECK_ENABLED,
@@ -25,6 +27,7 @@ import {
   STORAGE_KEY_ACCOUNT_SIGNED_AT,
   STORAGE_KEY_ACCOUNT_UNION_ID,
   STORAGE_KEY_APPEARANCE,
+  STORAGE_KEY_THEME_COLOR,
   STORAGE_KEY_BUTTON_RIGHT,
   STORAGE_KEY_FIRST_LAUNCH,
   STORAGE_KEY_HAND,
@@ -48,6 +51,7 @@ const KEY_HOLD_CHECK = STORAGE_KEY_HOLD_CHECK;
 const KEY_BUTTON_RIGHT = STORAGE_KEY_BUTTON_RIGHT;
 const KEY_IMMERSIVE_MATERIAL_LEVEL = STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL;
 const KEY_APPEARANCE = STORAGE_KEY_APPEARANCE;
+const KEY_THEME_COLOR = STORAGE_KEY_THEME_COLOR;
 const KEY_HAND = STORAGE_KEY_HAND;
 const KEY_ACCOUNT_OPEN_ID = STORAGE_KEY_ACCOUNT_OPEN_ID;
 const KEY_ACCOUNT_UNION_ID = STORAGE_KEY_ACCOUNT_UNION_ID;
@@ -61,6 +65,7 @@ export interface AppSettings {
     buttonPositionRIGHT: boolean;
     immersiveMaterialLevel: number;
     appearance: string;
+    themeColor: string;
     hand: string;
 }
 
@@ -80,6 +85,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     buttonPositionRIGHT: DEFAULT_BUTTON_RIGHT,
     immersiveMaterialLevel: DEFAULT_IMMERSIVE_MATERIAL_LEVEL,
     appearance: DEFAULT_APPEARANCE,
+    themeColor: DEFAULT_THEME_COLOR,
     hand: DEFAULT_HAND
 };
 
@@ -292,7 +298,7 @@ export async function setImmersiveMaterialLevel(level: number): Promise<void> {
     AppStorage.setOrCreate(STORAGE_KEY_VISUAL_EFFECTS, normalized !== 2);
 }
 
-// ===== 应用外观（天蓝 / 雾蓝 / 跟随系统）=====
+// ===== 应用外观（浅色 / 深色 / 跟随系统，保留 sky / mist 旧值）=====
 export async function getAppearance(): Promise<string> {
     const s = await ensureReady();
     const stored = (await s.get(KEY_APPEARANCE, DEFAULT_APPEARANCE)) as string;
@@ -304,6 +310,19 @@ export async function setAppearance(mode: string): Promise<void> {
     const s = await ensureReady();
     await s.set(KEY_APPEARANCE, normalized);
     AppStorage.setOrCreate(KEY_APPEARANCE, normalized);
+}
+
+// 新增独立 key，缺省蓝色；不迁移或改写已有 appearance 选择。
+export async function getThemeColor(): Promise<string> {
+    const s = await ensureReady();
+    return normalizeThemeColor(await s.get(KEY_THEME_COLOR, DEFAULT_THEME_COLOR) as string);
+}
+
+export async function setThemeColor(value: string): Promise<void> {
+    const normalized = normalizeThemeColor(value);
+    const s = await ensureReady();
+    await s.set(KEY_THEME_COLOR, normalized);
+    AppStorage.setOrCreate(KEY_THEME_COLOR, normalized);
 }
 
 // ===== 单手操作（left / auto / right）=====
@@ -363,6 +382,7 @@ export async function getAllSettings(): Promise<AppSettings> {
     const buttonPositionPromise = getButtonPosition();
     const immersiveMaterialPromise = getImmersiveMaterialLevel();
     const appearancePromise = getAppearance();
+    const themeColorPromise = getThemeColor();
     const handPromise = getHand();
     return {
         vibrationLevel: await vibrationLevelPromise,
@@ -371,6 +391,7 @@ export async function getAllSettings(): Promise<AppSettings> {
         buttonPositionRIGHT: await buttonPositionPromise,
         immersiveMaterialLevel: await immersiveMaterialPromise,
         appearance: await appearancePromise,
+        themeColor: await themeColorPromise,
         hand: await handPromise,
     };
 }
@@ -391,6 +412,7 @@ export async function loadPersistedState(ctx?: common.Context): Promise<void> {
         AppStorage.setOrCreate(STORAGE_KEY_VISUAL_EFFECTS, settings.immersiveMaterialLevel !== 2);
         AppStorage.setOrCreate(KEY_USERNAME, username);
         AppStorage.setOrCreate(KEY_APPEARANCE, settings.appearance);
+        AppStorage.setOrCreate(KEY_THEME_COLOR, settings.themeColor);
         AppStorage.setOrCreate(KEY_HAND, settings.hand);
     } catch (error) {
         console.error('[ElvaCos][common/storage][ERROR]', `[storage] AppStorage 水合失败: ${JSON.stringify(error)}`);

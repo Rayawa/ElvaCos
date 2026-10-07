@@ -23,6 +23,8 @@ export struct ReferenceGallery {
           .fontColor(Theme.accent)
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.add(); })
+          .visualEffect(this.feedback.effect('button-1'))
+          .compositingFilter(this.feedback.filter('button-1'))
           .attributeModifier(this.feedback.control('button-1'))
       }.width('100%')
       if (this.images.length === 0) { Text('添加角色设定、妆容或姿势参考，准备时随时查看。').fontSize(13).fontColor(Theme.muted) }
@@ -42,6 +44,8 @@ export struct ReferenceGallery {
               .backgroundColor(Theme.transparent)
               .onClick((): void => { vibration.dotVibration(); this.open(r.id); })
               .accessibilityText(r.caption || '打开准备参考图')
+              .visualEffect(this.feedback.effect('button-2' + ":" + r.id))
+              .compositingFilter(this.feedback.filter('button-2' + ":" + r.id))
               .attributeModifier(this.feedback.control('button-2' + ":" + r.id))
           }, (r: ReferenceImage) => r.id)
         }.alignItems(VerticalAlign.Top)

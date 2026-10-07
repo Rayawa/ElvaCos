@@ -3,9 +3,10 @@ import { Database, WriteTransaction } from '../database/Database';
 import { TeamMember, Expense, ReferenceImage } from '../../model/Planning';
 import { requiredName, validDate } from '../../model/Rules';
 
-function text(row: relationalStore.ResultSet, key: string): string { 
-  const i = row.getColumnIndex(key); 
-  return row.isColumnNull(i) ? '' : row.getString(i); }
+function text(row: relationalStore.ResultSet, key: string): string {
+  const i = row.getColumnIndex(key);
+  return row.isColumnNull(i) ? '' : row.getString(i);
+}
 function number(row: relationalStore.ResultSet, key: string): number { return row.getLong(row.getColumnIndex(key)); }
 
 export class PlanningRepository {
@@ -14,66 +15,72 @@ export class PlanningRepository {
   async team(): Promise<TeamMember[]> {
     const items: TeamMember[] = []; let offset = 0;
     while (true) {
-      const rows = await this.db.getStore().querySql('SELECT * FROM team_members ORDER BY role,name,id LIMIT 500 OFFSET ?', [offset]); 
-    let count = 0;
-      try { 
-      while (rows.goToNextRow()) { 
-        const m = new TeamMember(); 
-        m.id = text(rows, 'id'); 
-        m.projectId = text(rows, 'project_id'); 
-        m.role = text(rows, 'role'); 
-        m.name = text(rows, 'name'); 
-        m.notes = text(rows, 'notes'); 
-        items.push(m); 
-        count++; 
-      } } finally { 
-      rows.close(); }
+      const rows = await this.db.getStore().querySql('SELECT * FROM team_members ORDER BY role,name,id LIMIT 500 OFFSET ?', [offset]);
+      let count = 0;
+      try {
+        while (rows.goToNextRow()) {
+          const m = new TeamMember();
+          m.id = text(rows, 'id');
+          m.projectId = text(rows, 'project_id');
+          m.role = text(rows, 'role');
+          m.name = text(rows, 'name');
+          m.notes = text(rows, 'notes');
+          items.push(m);
+          count++;
+        }
+      } finally {
+        rows.close();
+      }
       if (count < 500) { break; } offset += count;
     } return items;
   }
   async expenses(): Promise<Expense[]> {
     const items: Expense[] = []; let offset = 0;
     while (true) {
-      const rows = await this.db.getStore().querySql('SELECT * FROM expenses ORDER BY date DESC,created_at DESC,id LIMIT 500 OFFSET ?', [offset]); 
-    let count = 0;
-      try { 
-      while (rows.goToNextRow()) { 
-        const e = new Expense(); 
-        e.id = text(rows, 'id'); 
-        e.projectId = text(rows, 'project_id'); 
-        e.name = text(rows, 'name'); 
-        e.category = text(rows, 'category'); 
-        e.amountCents = number(rows, 'amount_cents'); 
-        e.date = text(rows, 'date'); 
-        e.notes = text(rows, 'notes'); 
-        e.createdAt = number(rows, 'created_at'); 
-        items.push(e); 
-        count++; 
-      } } finally { 
-      rows.close(); }
+      const rows = await this.db.getStore().querySql('SELECT * FROM expenses ORDER BY date DESC,created_at DESC,id LIMIT 500 OFFSET ?', [offset]);
+      let count = 0;
+      try {
+        while (rows.goToNextRow()) {
+          const e = new Expense();
+          e.id = text(rows, 'id');
+          e.projectId = text(rows, 'project_id');
+          e.name = text(rows, 'name');
+          e.category = text(rows, 'category');
+          e.amountCents = number(rows, 'amount_cents');
+          e.date = text(rows, 'date');
+          e.notes = text(rows, 'notes');
+          e.createdAt = number(rows, 'created_at');
+          items.push(e);
+          count++;
+        }
+      } finally {
+        rows.close();
+      }
       if (count < 500) { break; } offset += count;
     } return items;
   }
   async references(): Promise<ReferenceImage[]> {
     const items: ReferenceImage[] = []; let offset = 0;
     while (true) {
-      const rows = await this.db.getStore().querySql('SELECT * FROM reference_images ORDER BY created_at DESC,id LIMIT 500 OFFSET ?', [offset]); 
-    let count = 0;
-      try { 
-      while (rows.goToNextRow()) { 
-        const r = new ReferenceImage(); 
-        r.id = text(rows, 'id'); 
-        r.projectId = text(rows, 'project_id'); 
-        r.characterId = text(rows, 'character_id'); 
-        r.sourceUri = text(rows, 'source_uri'); 
-        r.localPath = text(rows, 'local_path'); 
-        r.thumbnailPath = text(rows, 'thumbnail_path'); 
-        r.caption = text(rows, 'caption'); 
-        r.createdAt = number(rows, 'created_at'); 
-        items.push(r); 
-        count++; 
-      } } finally { 
-      rows.close(); }
+      const rows = await this.db.getStore().querySql('SELECT * FROM reference_images ORDER BY created_at DESC,id LIMIT 500 OFFSET ?', [offset]);
+      let count = 0;
+      try {
+        while (rows.goToNextRow()) {
+          const r = new ReferenceImage();
+          r.id = text(rows, 'id');
+          r.projectId = text(rows, 'project_id');
+          r.characterId = text(rows, 'character_id');
+          r.sourceUri = text(rows, 'source_uri');
+          r.localPath = text(rows, 'local_path');
+          r.thumbnailPath = text(rows, 'thumbnail_path');
+          r.caption = text(rows, 'caption');
+          r.createdAt = number(rows, 'created_at');
+          items.push(r);
+          count++;
+        }
+      } finally {
+        rows.close();
+      }
       if (count < 500) { break; } offset += count;
     } return items;
   }

@@ -53,6 +53,13 @@ export default function uiShellTest(): void {
       const tabs = await driver.findComponents(ON.type('Column').text('首页').inWindow(bundle));
       return tabs[tabs.length - 1].getBounds();
     };
+    const settingsItem = async (text: string): Promise<void> => {
+      const scroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
+      if (!scroll) { throw new Error('Missing settings scroll container'); }
+      await scroll.scrollSearch(ON.text(text).inWindow(bundle));
+      await driver.delayMs(350);
+      await present(text);
+    };
     const detailActions = async (): Promise<void> => {
       expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(1);
       expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
@@ -118,12 +125,12 @@ export default function uiShellTest(): void {
       expect(segmentAfter.top).assertEqual(segmentBefore.top);
       expect((await tabBounds()).top).assertEqual(before.top);
       expect(before.bottom < windowBounds.bottom).assertTrue();
-      await tap('我的'); await tap('设置'); await present('用户名'); await driver.delayMs(1000);
+      await tap('我的'); await tap('设置'); await settingsItem('用户名'); await driver.delayMs(1000);
       expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-top.png');
       const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
-      await scrollBody(); await present('材质等级');
-      await scrollBody(); await scrollBody();
+      await settingsItem('材质等级');
+      await settingsScroll.scrollToBottom(1000); await driver.delayMs(350);
       const footer = await driver.findComponent(ON.text('版本 1.0.0-beta.1').inWindow(bundle));
       expect((await footer.getBounds()).bottom < windowBounds.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-bottom.png');
@@ -242,9 +249,9 @@ export default function uiShellTest(): void {
       await driver.delayMs(400); await present('新建计划');
     });
     it('settingsUseAlignedHandChoicesAndRealHelpSheets' , 0, async () => {
-      await tap('我的'); await tap('作品'); await tap('设置'); await present('用户名');
+      await tap('我的'); await tap('作品'); await tap('设置'); await settingsItem('云同步');
       await tap('说明'); await present('云空间与同步'); await present('导出元数据备份'); await tap('sheet-close');
-      await scrollBody(); await present('材质等级');
+      await settingsItem('用户名'); await settingsItem('材质等级'); await settingsItem('右手');
       await driver.delayMs(700);
       expect(((await driver.findComponents(ON.text('操作偏好').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await present('跟随系统'); await present('左手'); await present('智感握持'); await present('右手');
@@ -256,9 +263,13 @@ export default function uiShellTest(): void {
       expect(((await driver.findComponents(ON.type('Select').inWindow(bundle)))?.length || 0)).assertEqual(0);
       expect(((await driver.findComponents(ON.type('Toggle').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-preferences.png');
-      await scrollBody(); await scrollBody(); await present('使用说明'); await tap('使用说明');
+      await settingsItem('使用说明'); await tap('使用说明');
       await present('准备一次 Cos'); await tap('sheet-close'); await present('隐私政策');
-      await tap('更新日志'); await present('1.0.0-beta.1'); await present('app-log-scroll'); await back();
+      await tap('更新日志'); await present('1.0.0-beta.1'); await present('app-log-scroll');
+      await present('app-log-filter-rc'); await present('app-log-filter-release');
+      await tap('app-log-filter-beta'); await present('暂无符合条件的日志');
+      await tap('app-log-filter-beta'); await present('1.0.0-beta.1');
+      await back();
       await tap('隐私政策'); await present('关于绮秀与隐私的声明'); await present('privacy-scroll');
       await back(); await back(); await driver.delayMs(350); await present('作品集');
     });

@@ -55,14 +55,13 @@ export function pressVisualEffect(
         level === LIGHT_FIELD_LEVEL_DIM ? DIM_BLOOM : BRIGHT_BLOOM;
 
     return new hdsEffect.HdsEffectBuilder()
-        .pressShadow(pressed ? hdsEffect.PressShadowType.BLEND_GRADIENT : hdsEffect.PressShadowType.NONE)
         .pointLight({
             sourceType: !pressed ? hdsEffect.PointLightSourceType.NONE :
                 level === LIGHT_FIELD_LEVEL_DIM ? hdsEffect.PointLightSourceType.SOFT :
                     hdsEffect.PointLightSourceType.BRIGHT,
             illuminatedType,
             options: {
-                color: Theme.accent,
+                color: Theme.brand,
                 intensity: resolvedIntensity,
                 height: resolvedHeight,
                 bloom: resolvedBloom,

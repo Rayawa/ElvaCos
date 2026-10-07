@@ -22,12 +22,8 @@ export struct CharacterDetail {
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   aboutToAppear(): void { if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
   aboutToDisappear(): void { if (!this.entrance.managed) { this.entrance.reset(); } }
-  private async favorite(): Promise<void> { 
-  const c = JSON.parse(JSON.stringify(this.character)) as Character; 
-  c.favorite = !c.favorite; 
-  await this.state.saveCharacter(c); }
-  private variants(): CharacterVariant[] { 
-  return this.state.variants.filter((v: CharacterVariant) => v.characterId === this.character.id); }
+  private async favorite(): Promise<void> { const c = JSON.parse(JSON.stringify(this.character)) as Character; c.favorite = !c.favorite; await this.state.saveCharacter(c); }
+  private variants(): CharacterVariant[] { return this.state.variants.filter((v: CharacterVariant) => v.characterId === this.character.id); }
   private projects(): CosProject[] { return this.state.projects.filter((p: CosProject) => p.characterId === this.character.id); }
   build() {
     Scroll() {
@@ -61,6 +57,8 @@ export struct CharacterDetail {
               .fontColor(Theme.accent)
               .onClick((): void => { vibration.dotVibration(); this.favorite(); })
               .accessibilityText(this.character.favorite ? '取消收藏 ' + this.character.name : '收藏 ' + this.character.name)
+                .visualEffect(this.feedback.effect('button-1'))
+                .compositingFilter(this.feedback.filter('button-1'))
                 .attributeModifier(this.feedback.control('button-1'))
           }.width('100%').alignItems(VerticalAlign.Center)
           if (this.character.description) { Text(this.character.description).fontSize(14).fontColor(Theme.muted) }
@@ -88,19 +86,22 @@ export struct CharacterDetail {
                 .fontColor(Theme.accent)
                 .onClick((): void => { vibration.dotVibration(); this.edit('variant', v.id, this.character.id); })
                 .accessibilityText('编辑版本 ' + v.name)
+                .visualEffect(this.feedback.effect('button-3' + ":" + v.id))
+                .compositingFilter(this.feedback.filter('button-3' + ":" + v.id))
                 .attributeModifier(this.feedback.control('button-3' + ":" + v.id))
               Button('−')
                 .backgroundColor(Theme.bg)
                 .fontColor(Theme.muted)
                 .onClick((): void => { vibration.dotVibration(); this.remove('variant', v.id); })
                 .accessibilityText('删除版本 ' + v.name)
+                .visualEffect(this.feedback.effect('button-4' + ":" + v.id))
+                .compositingFilter(this.feedback.filter('button-4' + ":" + v.id))
                 .attributeModifier(this.feedback.control('button-4' + ":" + v.id))
             }.
-          width('100%').padding(16).backgroundColor(Theme.surface).borderRadius(18).attributeModifier(this.feedback.control('row-2' + ":" + v.id, true))
+          width('100%').padding(16).backgroundColor(Theme.surface).borderRadius(18).visualEffect(this.feedback.effect('row-2' + ":" + v.id, true)).compositingFilter(this.feedback.filter('row-2' + ":" + v.id, true)).attributeModifier(this.feedback.control('row-2' + ":" + v.id, true))
           }, (v: CharacterVariant) => v.id)
           SectionHeading({ title: '登场计划', trailing: this.projects().length + ' 份' })
-          ForEach(this.projects(), (p: CosProject) => { 
-          ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
+          ForEach(this.projects(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
           if (this.projects().length === 0) { EmptyState({ title: '从喜欢到登场', message: '为这个角色创建一份计划，把准备过程留存下来。' }) }
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })

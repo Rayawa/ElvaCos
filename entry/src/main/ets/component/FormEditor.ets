@@ -74,9 +74,7 @@ export struct FormEditor {
               placeholder: this.nameHint(),
               change: (v: string) => { this.draft.name = v; }
             }) }
-          if (this.draft.kind === 'character') { 
-          Field({ label: '所属作品', value: this.draft.work, change: (v: string) => { 
-            this.draft.work = v; } }) }
+          if (this.draft.kind === 'character') { Field({ label: '所属作品', value: this.draft.work, change: (v: string) => { this.draft.work = v; } }) }
           if (this.draft.kind === 'project') {
             Text('这次想出谁？ *').fontColor(Theme.muted).fontSize(13)
             Select((this.draft.id ? new Array<SelectOption>() : new Array<SelectOption>({ value: '＋ 创建新角色' }))
@@ -86,14 +84,9 @@ export struct FormEditor {
                 vibration.dotVibration();
                 const previous = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId);
                 const automatic = !this.draft.name || this.draft.name === previous + ' · Cos 计划';
-                this.draft.newCharacter = !this.draft.id && index === 0; 
-            this.draft.characterId = this.draft.newCharacter ? '' : this.state.characters[index - (this.draft.id ? 0 : 1)].id; 
-            this.draft.variantId = '';
-                if (automatic && !this.draft.id) { 
-              const role = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId); 
-              this.draft.name = role ? role + ' · Cos 计划' : ''; 
-            }
-              }).accessibilityText('计划角色').attributeModifier(this.feedback.control('select-1'))
+                this.draft.newCharacter = !this.draft.id && index === 0; this.draft.characterId = this.draft.newCharacter ? '' : this.state.characters[index - (this.draft.id ? 0 : 1)].id; this.draft.variantId = '';
+                if (automatic && !this.draft.id) { const role = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId); this.draft.name = role ? role + ' · Cos 计划' : ''; }
+              }).accessibilityText('计划角色').visualEffect(this.feedback.effect('select-1')).compositingFilter(this.feedback.filter('select-1')).attributeModifier(this.feedback.control('select-1'))
             if (this.draft.newCharacter) {
               Field({ label: '角色名称 *', value: this.draft.characterName, placeholder: '例如：初音未来', change: (v: string) => {
                 const automatic = !this.draft.name || this.draft.name === this.draft.characterName + ' · Cos 计划';
@@ -119,6 +112,8 @@ export struct FormEditor {
                 .backgroundColor(Theme.tint)
                 .fontColor(Theme.accent)
                 .onClick((): void => { vibration.dotVibration(); this.draft.preparationExpanded = !this.draft.preparationExpanded; })
+                  .visualEffect(this.feedback.effect('button-2'))
+                  .compositingFilter(this.feedback.filter('button-2'))
                   .attributeModifier(this.feedback.control('button-2'))
               if (this.draft.preparationExpanded) { PreparationTemplatePicker({
                   keys: this.draft.preparationKeys,
@@ -131,6 +126,8 @@ export struct FormEditor {
               .backgroundColor(Theme.tint)
               .fontColor(Theme.accent)
               .onClick(() => { vibration.dotVibration(); this.draft.advanced = !this.draft.advanced; })
+              .visualEffect(this.feedback.effect('button-3'))
+              .compositingFilter(this.feedback.filter('button-3'))
               .attributeModifier(this.feedback.control('button-3'))
             if (this.draft.advanced) {
             Text('角色版本').fontColor(Theme.muted).fontSize(13)
@@ -138,25 +135,25 @@ export struct FormEditor {
               .concat(this.state.variants.filter((v: CharacterVariant) => v.characterId === this.draft.characterId)
               .map((v: CharacterVariant): SelectOption => { return { value: v.name }; })))
               .value(this.state.variants.find((v: CharacterVariant) => v.id === this.draft.variantId)?.name || '不指定版本')
-              .onSelect((index: number) => { 
-              vibration.dotVibration(); 
-              this.draft.variantId = index === 0 ? '' : this.state.variants.filter((v: CharacterVariant) => v.characterId === this.draft.characterId)[index - 1].id; 
-            })
+              .onSelect((index: number) => { vibration.dotVibration(); this.draft.variantId = index === 0 ? '' : this.state.variants.filter((v: CharacterVariant) => v.characterId === this.draft.characterId)[index - 1].id; })
                 .accessibilityText('角色版本')
+                .visualEffect(this.feedback.effect('select-4'))
+                .compositingFilter(this.feedback.filter('select-4'))
                 .attributeModifier(this.feedback.control('select-4'))
             Text('关联活动').fontColor(Theme.muted).fontSize(13)
-            Select(new Array<SelectOption>({ value: '不关联活动' }).concat(this.state.events.map((e: CosEvent): SelectOption => { 
-              return { value: e.name }; })))
+            Select(new Array<SelectOption>({ value: '不关联活动' }).concat(this.state.events.map((e: CosEvent): SelectOption => { return { value: e.name }; })))
               .value(this.state.events.find((e: CosEvent) => e.id === this.draft.eventId)?.name || '不关联活动')
-              .onSelect((index: number) => { 
-              vibration.dotVibration(); 
-              this.draft.eventId = index === 0 ? '' : this.state.events[index - 1].id; })
+              .onSelect((index: number) => { vibration.dotVibration(); this.draft.eventId = index === 0 ? '' : this.state.events[index - 1].id; })
                 .accessibilityText('关联活动')
+                .visualEffect(this.feedback.effect('select-5'))
+                .compositingFilter(this.feedback.filter('select-5'))
                 .attributeModifier(this.feedback.control('select-5'))
             Select(PROJECT_LABELS.map((label: string): SelectOption => { return { value: label }; }))
               .value(PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.draft.status as ProjectStatus)])
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.status = PROJECT_STATUSES[index]; })
                 .accessibilityText('计划状态')
+                .visualEffect(this.feedback.effect('select-6'))
+                .compositingFilter(this.feedback.filter('select-6'))
                 .attributeModifier(this.feedback.control('select-6'))
             Field({ label: '预计预算（元）', value: this.draft.money, change: (v: string) => { this.draft.money = v; } })
             }
@@ -169,11 +166,15 @@ export struct FormEditor {
               .value(ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.draft.type as AssetType)])
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.type = ASSET_TYPES[index]; })
                 .accessibilityText('装备类型')
+                .visualEffect(this.feedback.effect('select-7'))
+                .compositingFilter(this.feedback.filter('select-7'))
                 .attributeModifier(this.feedback.control('select-7'))
             Select(ASSET_STATUS_LABELS.map((label: string): SelectOption => { return { value: label }; }))
               .value(ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.draft.status as AssetStatus)])
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.status = ASSET_STATUSES[index]; })
                 .accessibilityText('装备状态')
+                .visualEffect(this.feedback.effect('select-8'))
+                .compositingFilter(this.feedback.filter('select-8'))
                 .attributeModifier(this.feedback.control('select-8'))
             Field({ label: '存放位置', value: this.draft.location, change: (v: string) => { this.draft.location = v; } })
             Field({ label: '品牌 / 店铺', value: this.draft.brand, change: (v: string) => { this.draft.brand = v; } })
@@ -191,25 +192,16 @@ export struct FormEditor {
               .value(this.draft.type)
               .onSelect((i: number): void => { vibration.dotVibration(); this.draft.type = EVENT_TYPES[i]; })
               .accessibilityText('活动类型')
+              .visualEffect(this.feedback.effect('select-9'))
+              .compositingFilter(this.feedback.filter('select-9'))
               .attributeModifier(this.feedback.control('select-9'))
             Select(DATE_MODE_LABELS.map((label: string): SelectOption => { return { value: label }; }))
               .value(DATE_MODE_LABELS[DATE_MODES.indexOf(this.draft.dateMode)])
               .onSelect((i: number): void => {
                 vibration.dotVibration(); this.draft.dateMode = DATE_MODES[i];
-                if (i === 0) { 
-              this.draft.date = ''; 
-              this.draft.endDate = ''; 
-              this.draft.timeMode = 'none'; 
-              this.draft.startTime = ''; 
-              this.draft.endTime = ''; 
-              this.draft.reminderMinutes = -1; 
-              this.draft.deviceCalendar = false; 
-            }
-                else { 
-              if (!this.draft.date) { 
-                this.draft.date = today(); } 
-              this.draft.endDate = i === 2 ? this.draft.endDate || this.draft.date : ''; }
-              }).id('event-date-mode').accessibilityText('活动日期模式').attributeModifier(this.feedback.control('select-10'))
+                if (i === 0) { this.draft.date = ''; this.draft.endDate = ''; this.draft.timeMode = 'none'; this.draft.startTime = ''; this.draft.endTime = ''; this.draft.reminderMinutes = -1; this.draft.deviceCalendar = false; }
+                else { if (!this.draft.date) { this.draft.date = today(); } this.draft.endDate = i === 2 ? this.draft.endDate || this.draft.date : ''; }
+              }).id('event-date-mode').accessibilityText('活动日期模式').visualEffect(this.feedback.effect('select-10')).compositingFilter(this.feedback.filter('select-10')).attributeModifier(this.feedback.control('select-10'))
             if (this.draft.dateMode !== 'pending') {
               DateField({
                 label: this.draft.dateMode === 'multiple' ? '开始日期 *' : '日期 *',
@@ -223,16 +215,10 @@ export struct FormEditor {
                 }) }
               Select(TIME_MODE_LABELS.map((label: string): SelectOption => { return { value: label }; }))
                 .value(TIME_MODE_LABELS[TIME_MODES.indexOf(this.draft.timeMode)])
-                .onSelect((i: number): void => { 
-              vibration.dotVibration(); 
-              this.draft.timeMode = TIME_MODES[i]; 
-              if (i === 0) { 
-                this.draft.startTime = ''; 
-                this.draft.endTime = ''; } else { 
-                this.draft.startTime = this.draft.startTime || '09:00'; 
-                this.draft.endTime = i === 2 ? this.draft.endTime || '18:00' : ''; } 
-            })
+                .onSelect((i: number): void => { vibration.dotVibration(); this.draft.timeMode = TIME_MODES[i]; if (i === 0) { this.draft.startTime = ''; this.draft.endTime = ''; } else { this.draft.startTime = this.draft.startTime || '09:00'; this.draft.endTime = i === 2 ? this.draft.endTime || '18:00' : ''; } })
                   .accessibilityText('活动时间模式')
+                  .visualEffect(this.feedback.effect('select-11'))
+                  .compositingFilter(this.feedback.filter('select-11'))
                   .attributeModifier(this.feedback.control('select-11'))
               if (this.draft.timeMode !== 'none') { DateField({
                   label: '开始时间 *',
@@ -252,6 +238,8 @@ export struct FormEditor {
                   .onChange((value: boolean): void => { vibration.dotVibration(); this.draft.deviceCalendar = value; })
                   .id('event-device-calendar')
                   .accessibilityText('保存后打开设备日历确认页')
+                  .visualEffect(this.feedback.effect('toggle-12'))
+                  .compositingFilter(this.feedback.filter('toggle-12'))
                   .attributeModifier(this.feedback.control('toggle-12'))
               }.width('100%')
               if (this.draft.deviceCalendar) { Text('保存活动后打开系统确认页；日历提醒默认提前 30 分钟，可修改。取消不影响应用内记录。').fontSize(12).fontColor(Theme.muted) }
@@ -260,6 +248,8 @@ export struct FormEditor {
                 .value(['不提醒', '开始时', '提前 30 分钟', '提前 1 小时', '提前 1 天'][[-1, 0, 30, 60, 1440].indexOf(this.draft.reminderMinutes)])
                 .onSelect((i: number): void => { vibration.dotVibration(); this.draft.reminderMinutes = [-1, 0, 30, 60, 1440][i]; })
                   .accessibilityText('活动提醒')
+                  .visualEffect(this.feedback.effect('select-13'))
+                  .compositingFilter(this.feedback.filter('select-13'))
                   .attributeModifier(this.feedback.control('select-13'))
               if (this.draft.reminderMinutes >= 0) { Text('保存时申请通知授权；未标记时间的活动按当天 09:00 提醒。').fontSize(12).fontColor(Theme.muted) }
             }
@@ -275,12 +265,16 @@ export struct FormEditor {
               .value(this.draft.status === 'Wishlist' ? '想去' : this.draft.status === 'Attended' ? '已参加' : '计划参加')
               .onSelect((i: number) => { vibration.dotVibration(); this.draft.status = ['Wishlist','Planned','Attended'][i]; })
                 .accessibilityText('活动参与状态')
+                .visualEffect(this.feedback.effect('select-14'))
+                .compositingFilter(this.feedback.filter('select-14'))
                 .attributeModifier(this.feedback.control('select-14'))
             Row() { Text('已购票')
               .fontColor(Theme.ink)
               .layoutWeight(1); Toggle({ type: ToggleType.Switch, isOn: this.draft.ticket })
               .onChange((v: boolean) => { vibration.dotVibration(); this.draft.ticket = v; })
               .accessibilityText('已购票')
+              .visualEffect(this.feedback.effect('toggle-15'))
+              .compositingFilter(this.feedback.filter('toggle-15'))
               .attributeModifier(this.feedback.control('toggle-15')) }.width('100%')
           }
           if (this.draft.kind === 'team') {
@@ -288,6 +282,8 @@ export struct FormEditor {
             Select(TEAM_ROLES.map((role: string): SelectOption => { return { value: role }; })).value(this.draft.type)
               .onSelect((index: number): void => { vibration.dotVibration(); this.draft.type = TEAM_ROLES[index]; })
                 .accessibilityText('团队分工')
+                .visualEffect(this.feedback.effect('select-16'))
+                .compositingFilter(this.feedback.filter('select-16'))
                 .attributeModifier(this.feedback.control('select-16'))
             Field({
               label: '分工（可自定义） *',
@@ -299,15 +295,18 @@ export struct FormEditor {
           }
           if (this.draft.kind === 'expense') {
             Text('所属计划 *').fontSize(13).fontColor(Theme.muted)
-            Select(this.state.projects.map((p: CosProject): SelectOption => { 
-            return { value: p.name }; })).value(this.state.projectName(this.draft.parentId))
+            Select(this.state.projects.map((p: CosProject): SelectOption => { return { value: p.name }; })).value(this.state.projectName(this.draft.parentId))
               .onSelect((index: number): void => { vibration.dotVibration(); this.draft.parentId = this.state.projects[index].id; })
                 .enabled(!this.draft.id)
                 .accessibilityText('花费计划')
+                .visualEffect(this.feedback.effect('select-17'))
+                .compositingFilter(this.feedback.filter('select-17'))
                 .attributeModifier(this.feedback.control('select-17'))
             Select(EXPENSE_CATEGORIES.map((category: string): SelectOption => { return { value: category }; })).value(this.draft.type)
               .onSelect((index: number): void => { vibration.dotVibration(); this.draft.type = EXPENSE_CATEGORIES[index]; })
                 .accessibilityText('花费分类')
+                .visualEffect(this.feedback.effect('select-18'))
+                .compositingFilter(this.feedback.filter('select-18'))
                 .attributeModifier(this.feedback.control('select-18'))
             Field({
               label: '实际花费（元） *',
@@ -322,11 +321,10 @@ export struct FormEditor {
             Select(this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.draft.parentId)
               .map((c: PreparationCategory): SelectOption => { return { value: c.name }; }))
               .value(this.state.preparationCategories.find((c: PreparationCategory) => c.id === this.draft.categoryId)?.name || '请选择分类')
-              .onSelect((index: number): void => { 
-            vibration.dotVibration(); 
-            this.draft.categoryId = this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.draft.parentId)[index].id; 
-          })
+              .onSelect((index: number): void => { vibration.dotVibration(); this.draft.categoryId = this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.draft.parentId)[index].id; })
                 .accessibilityText('任务分类')
+                .visualEffect(this.feedback.effect('select-19'))
+                .compositingFilter(this.feedback.filter('select-19'))
                 .attributeModifier(this.feedback.control('select-19'))
             DateField({
               label: '截止日期（可选）',
@@ -335,8 +333,7 @@ export struct FormEditor {
               change: (v: string): void => { this.draft.date = v; }
             })
           }
-          if (this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { 
-          Field({
+          if (this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { Field({
               label: this.draft.kind === 'reference' ? '图片说明' : '备注',
               value: this.draft.notes,
               multiline: true,
@@ -348,10 +345,12 @@ export struct FormEditor {
         .accessibilityText(this.state.busy ? '正在保存' : this.draft.kind === 'project' && !this.draft.id ? '创建计划并开始准备' : '保存表单')
         .width('100%')
         .constraintSize({ minHeight: 52 })
-        .backgroundColor(Theme.accent)
+        .backgroundColor(Theme.brand)
         .fontColor(Theme.onAccent)
         .enabled(!this.state.busy)
         .onClick(() => { vibration.dotVibration(); this.save(); })
+        .visualEffect(this.feedback.effect('button-20'))
+        .compositingFilter(this.feedback.filter('button-20'))
         .attributeModifier(this.feedback.control('button-20'))
         .opacity(this.entrance.step >= 3 ? 1 : 0)
         .translate({ y: this.entrance.step >= 3 ? 0 : 20 })

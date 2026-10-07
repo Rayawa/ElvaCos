@@ -1,5 +1,4 @@
 import { STORAGE_KEY_VIBRATION_LEVEL, STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL, STORAGE_KEY_USERNAME } from '../common/constants';
-import { PressFeedback } from '../common/pressFeedback';
 import { Icons } from '../common/Icons';
 import { Theme } from '../common/Theme';
 import { vibration } from '../common/vibration';
@@ -14,7 +13,6 @@ import { LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN, LIST_ITEM_PREFIX_MARGIN, LIST_ITEM
 
 @Component
 struct UsernameEditor {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
     @Prop @Watch('onInitialUsernameChanged') initialUsername: string = '';
     @Prop narrow: boolean = false;
     onCommit?: (value: string) => void;
@@ -79,13 +77,13 @@ struct UsernameEditor {
                     .onSubmit((): void => this.commitDraft())
                     .accessibilityText(
                         `用户名输入框，当前用户名为${this.draftUsername || getDeviceName()}`
-                    ).attributeModifier(this.feedback.control('textinput-1'))
+                    )
 
                 Image(Icons.help)
                     .height(22)
                     .width(22)
                     .objectFit(ImageFit.Contain)
-                    .clickEffect({ level: ClickEffectLevel.LIGHT, scale: 0.9 })
+
                     .onClick((): void => {
                         if (this.vibrationLevel > 0) vibration.dotVibration();
                         this.showHelp = !this.showHelp;
@@ -96,7 +94,7 @@ struct UsernameEditor {
                             if (!event.isVisible) this.showHelp = false;
                         },
                     })
-                    .accessibilityText('查看用户名说明').attributeModifier(this.feedback.control('image-2'))
+                    .accessibilityText('查看用户名说明')
             }
             .width(this.narrow ? '100%' : 204)
             .margin({ top: this.narrow ? 4 : 0 })
@@ -110,7 +108,6 @@ struct UsernameEditor {
 
 @Component
 export struct SettingsPanel {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
     @BuilderParam additionalSettings: () => void = this.emptySettings;
     @Builder private emptySettings() {}
     onSettingsChanged?: () => void;
@@ -326,7 +323,7 @@ export struct SettingsPanel {
             this.contentWidth = Number(newValue.width);
         })
         .accessibilityGroup(true)
-        .accessibilityText('应用设置').attributeModifier(this.feedback.control('column-3', true))
+        .accessibilityText('应用设置')
     }
 
     private isNarrowSettings(): boolean {
@@ -364,7 +361,7 @@ export struct SettingsPanel {
                 accessibilityText:
                 `振动强度设置`,
             },
-        }).attributeModifier(this.feedback.control('hdslistitemcard-4'))
+        })
     }
 
     @Builder
@@ -389,7 +386,7 @@ export struct SettingsPanel {
                     style: SliderStyle.InSet,
                 })
                     .width(190)
-                    .selectedColor(Theme.accent)
+                    .selectedColor(Theme.brand)
                     .trackColor(Theme.tint)
                     .blockBorderColor(Theme.surface)
                     .showSteps(true)
@@ -401,8 +398,7 @@ export struct SettingsPanel {
                             mode === SliderChangeMode.End) {
                             vibration.dotVibration();
 
-                            setVibrationLevel(nextLevel).then((): void => { 
-            if (this.onSettingsChanged) this.onSettingsChanged(); }).catch((error: Error) => {
+                            setVibrationLevel(nextLevel).then((): void => { if (this.onSettingsChanged) this.onSettingsChanged(); }).catch((error: Error) => {
                                 console.error(
                                     '[ElvaCos][component/SettingsPanel][ERROR]',
                                     `保存振动强度失败: ${error.message}`
@@ -413,7 +409,7 @@ export struct SettingsPanel {
                     })
                     .accessibilityText(
                         `振动强度，当前${this.vibrationLevelName()}，共三档`
-                    ).attributeModifier(this.feedback.control('slider-5'))
+                    )
 
                 Row() {
                     this.vibrationLevelLabel('关闭', 0)
@@ -488,7 +484,7 @@ export struct SettingsPanel {
                 accessibilityText:
                 `材质等级设置`,
             },
-        }).attributeModifier(this.feedback.control('hdslistitemcard-8'))
+        })
     }
 
     @Builder
@@ -513,7 +509,7 @@ export struct SettingsPanel {
                     style: SliderStyle.InSet,
                 })
                     .width(190)
-                    .selectedColor(Theme.accent)
+                    .selectedColor(Theme.brand)
                     .trackColor(Theme.tint)
                     .blockBorderColor(Theme.surface)
                     .showSteps(true)
@@ -541,7 +537,7 @@ export struct SettingsPanel {
                     })
                     .accessibilityText(
                         `材质等级，当前${this.materialLevelName()}，共三档`
-                    ).attributeModifier(this.feedback.control('slider-9'))
+                    )
 
                 Row() {
                     this.materialLevelLabel('流畅', 2)
@@ -608,7 +604,7 @@ export struct SettingsPanel {
                 accessibilityText:
                 `用户名设置，当前${this.username || getDeviceName()}`,
             },
-        }).attributeModifier(this.feedback.control('hdslistitemcard-10'))
+        })
     }
 
     @Builder
@@ -643,7 +639,7 @@ export struct SettingsPanel {
                 accessibilityText:
                 `清除缓存，当前缓存文件总大小：${this.cacheSize}`,
             },
-        }).attributeModifier(this.feedback.control('hdslistitemcard-11'))
+        })
     }
 
     @Builder
@@ -670,10 +666,7 @@ export struct SettingsPanel {
                     .width(24)
                     .objectFit(ImageFit.Contain)
                     .accessibilityText('查看清除缓存说明')
-                    .clickEffect({
-                        level: ClickEffectLevel.LIGHT,
-                        scale: 0.9
-                    })
+
                     .onClick(() => {
                         if (this.vibrationLevel > 0) {
                             vibration.dotVibration();
@@ -691,7 +684,7 @@ export struct SettingsPanel {
                                 this.handlePopupTrash = false;
                             }
                         }
-                    }).attributeModifier(this.feedback.control('image-12'))
+                    })
             }
         }
         .width('100%')

@@ -49,6 +49,8 @@ export struct AssetDetail {
             .backgroundColor(Theme.surface)
             .borderRadius(Theme.cardRadius)
             .alignItems(HorizontalAlign.Start)
+            .visualEffect(this.feedback.effect('column-1', true))
+            .compositingFilter(this.feedback.filter('column-1', true))
             .attributeModifier(this.feedback.control('column-1', true))
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 1 ? 1 : 0).translate({ y: this.entrance.step >= 1 ? 0 : 20 })
@@ -63,7 +65,7 @@ export struct AssetDetail {
             }
             .width('100%').backgroundColor(Theme.tint).constraintSize({ minHeight: 52 })
             .onClick((): void => { vibration.dotVibration(); this.open('project', p.id); })
-            .accessibilityText('打开计划 ' + p.name).attributeModifier(this.feedback.control('button-2' + ":" + p.id))
+            .accessibilityText('打开计划 ' + p.name).visualEffect(this.feedback.effect('button-2' + ":" + p.id)).compositingFilter(this.feedback.filter('button-2' + ":" + p.id)).attributeModifier(this.feedback.control('button-2' + ":" + p.id))
           }, (p: CosProject) => p.id)
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })

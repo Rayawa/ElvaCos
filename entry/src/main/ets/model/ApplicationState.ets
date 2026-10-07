@@ -1,4 +1,6 @@
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../common/constants';
+import BuildProfile from 'BuildProfile';
+import { DemoDataRepository } from '../data/repository/DemoDataRepository';
 import { DeviceCalendarService } from '../common/DeviceCalendarService';
 import { EventSaveCoordinator } from '../common/EventSaveCoordinator';
 import { EventReminderService } from '../common/EventReminderService';
@@ -48,6 +50,7 @@ import { clearStoredAccount, getStoredAccount, setStoredAccount, StoredAccount }
 
 export interface SettingsSelection {
   appearance?: string;
+  themeColor?: string;
   hand?: string;
 }
 
@@ -130,6 +133,13 @@ export class AppState {
       await this.db.open(context);
       await this.loadPreferences(context);
       this.account = this.toAccount(await getStoredAccount());
+      if (BuildProfile.DEBUG && this.media) {
+        try {
+          if (await new DemoDataRepository(this.db, context, this.media).load(true)) {
+            this.reportNotice('已载入原神与绝区零示例数据，可直接编辑和调试');
+          }
+        } catch (error) { this.reportNotice('示例数据载入未完成，可在开发者选项中重试'); }
+      }
       await this.refresh();
       this.ready = true;
     }, false);
@@ -219,9 +229,9 @@ export class AppState {
     }
   }
   async refresh(): Promise<void> {
-    this.team = await this.planningRepo.team(); 
-  this.expenses = await this.planningRepo.expenses(); 
-  this.references = await this.planningRepo.references();
+    this.team = await this.planningRepo.team();
+    this.expenses = await this.planningRepo.expenses();
+    this.references = await this.planningRepo.references();
     this.characters = await this.characterRepo.list(); this.variants = await this.variantRepo.list();
     this.projects = await this.projectRepo.list(); this.assets = await this.assetRepo.list();
     this.preparationCategories = await this.preparationRepo.categories(); this.preparationTasks = await this.preparationRepo.tasks();
@@ -239,23 +249,28 @@ export class AppState {
   private async runOperation(action: () => Promise<void>, refresh: boolean): Promise<boolean> {
     this.busy = true; this.error = ''; this.notice = '';
     try { await action(); if (refresh) { await this.refresh(); } return true; }
-    catch (error) { const code = (error as BusinessError).code;
+    catch (error) {
+      const code = (error as BusinessError).code;
       this.reportError(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error)
-        .message || '操作失败，请重试'); return false; }
+        .message || '操作失败，请重试'); return false;
+    }
     finally { this.busy = false; }
   }
   async saveCharacter(item: Character): Promise<boolean> {
-    return this.perform(async () => { 
-    item.name = requiredName(item.name); 
-    item.updatedAt = Date.now(); 
-    await this.characterRepo.save(item); });
+    return this.perform(async () => {
+      item.name = requiredName(item.name);
+      item.updatedAt = Date.now();
+      await this.characterRepo.save(item);
+    });
   }
   async saveVariant(item: CharacterVariant): Promise<boolean> {
-    return this.perform(async () => { 
-    item.name = requiredName(item.name); 
-    if (!item.characterId) { 
-      throw new Error('请先选择角色'); } 
-    await this.variantRepo.save(item); });
+    return this.perform(async () => {
+      item.name = requiredName(item.name);
+      if (!item.characterId) {
+        throw new Error('请先选择角色');
+      }
+      await this.variantRepo.save(item);
+    });
   }
   async saveProject(item: CosProject, character?: Character, preparation?: PreparationBundle): Promise<boolean> {
     return this.perform(async () => {
@@ -266,15 +281,17 @@ export class AppState {
       item.updatedAt = Date.now();
       const text = !old ? '开始了「' + item.name + '」' : old.status !== item.status ? item.name + ' → ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(item.status)] : '';
       await this.projectRepo.save(item, text, character, preparation);
-      if (item.status === ProjectStatus.READY || item.status === ProjectStatus.COMPLETED) { 
-      await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel); }
+      if (item.status === ProjectStatus.READY || item.status === ProjectStatus.COMPLETED) {
+        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+      }
     });
   }
   async saveAsset(item: Asset, projectId: string = ''): Promise<boolean> {
-    return this.perform(async () => { 
-    item.name = requiredName(item.name); 
-    item.purchaseUrl = safeUrl(item.purchaseUrl); 
-    await this.assetRepo.save(item, projectId); });
+    return this.perform(async () => {
+      item.name = requiredName(item.name);
+      item.purchaseUrl = safeUrl(item.purchaseUrl);
+      await this.assetRepo.save(item, projectId);
+    });
   }
   async openReminderSettings(): Promise<boolean> {
     return this.perform(async () => { if (this.context) { await this.reminder.settings(this.context); } }, false);
@@ -303,9 +320,11 @@ export class AppState {
   }
   async saveTeam(item: TeamMember): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveTeam(item); }); }
   async saveExpense(item: Expense): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveExpense(item); }); }
-  async saveReference(item: ReferenceImage): Promise<boolean> { 
-  return this.perform(async () => { 
-    await this.planningRepo.saveReference(item); }); }
+  async saveReference(item: ReferenceImage): Promise<boolean> {
+    return this.perform(async () => {
+      await this.planningRepo.saveReference(item);
+    });
+  }
   async importReferences(projectId: string = '', characterId: string = ''): Promise<boolean> {
     return this.perform(async () => {
       if (!this.media || (!projectId && !characterId) || (projectId && characterId)) { throw new Error('请选择参考图所属计划或角色'); }
@@ -339,26 +358,28 @@ export class AppState {
     return this.perform(async () => { await this.preparationRepo.saveTask(item); });
   }
   async togglePreparation(item: PreparationTask): Promise<boolean> {
-    return this.perform(async () => { 
-    await this.preparationRepo.setDone(item.id, !item.done); 
-    if (!item.done) { 
-      await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel); } 
-  });
+    return this.perform(async () => {
+      await this.preparationRepo.setDone(item.id, !item.done);
+      if (!item.done) {
+        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+      }
+    });
   }
   async addPreparationTemplate(projectId: string, keys: string[]): Promise<boolean> {
-    return this.perform(async () => { 
-    await this.preparationRepo.addTemplate(makePreparation(projectId, keys)); 
-    this.reportNotice('已补入所选模板任务，原有进度保留'); });
+    return this.perform(async () => {
+      await this.preparationRepo.addTemplate(makePreparation(projectId, keys));
+      this.reportNotice('已补入所选模板任务，原有进度保留');
+    });
   }
   preparationPercent(projectId: string): number { return preparationProgress(projectId, this.preparationTasks).percent; }
   async addChecklist(projectId: string, label: string): Promise<boolean> {
-    return this.perform(async () => { 
-    const item = new ChecklistItem(); 
-    item.projectId = projectId; 
-    item.label = requiredName(label); 
-    item.sortOrder = this.checklist.length; 
-    await this.checklistRepo.save(item); 
-  });
+    return this.perform(async () => {
+      const item = new ChecklistItem();
+      item.projectId = projectId;
+      item.label = requiredName(label);
+      item.sortOrder = this.checklist.length;
+      await this.checklistRepo.save(item);
+    });
   }
   async toggleChecklist(item: ChecklistItem): Promise<boolean> {
     return this.perform(async () => {
@@ -376,13 +397,13 @@ export class AppState {
     return this.perform(async () => {
       for (const asset of this.projectAssets(projectId)) { await this.relations.link(projectId, asset); }
       for (const label of ['手机', '充电宝', '补妆', '门票', '身份证件', '发网']) {
-        if (!this.checklist.some((c: ChecklistItem) => c.projectId === projectId && c.label === label)) { 
-        const item = new ChecklistItem(); 
-        item.projectId = projectId; 
-        item.label = label; 
-        item.sortOrder = 10; 
-        await this.checklistRepo.save(item); 
-      }
+        if (!this.checklist.some((c: ChecklistItem) => c.projectId === projectId && c.label === label)) {
+          const item = new ChecklistItem();
+          item.projectId = projectId;
+          item.label = label;
+          item.sortOrder = 10;
+          await this.checklistRepo.save(item);
+        }
       }
     });
   }
@@ -395,41 +416,50 @@ export class AppState {
       } else if (kind === 'project') {
         const photos = this.photos.filter((p: PhotoAsset) => p.projectId === id);
         const refs = this.references.filter((r: ReferenceImage) => r.projectId === id);
-        await this.projectRepo.remove(id); 
-      for (const r of refs) { 
-        await this.media?.remove(r); } 
-      for (const photo of photos) { 
-        await this.media?.remove(photo); }
+        await this.projectRepo.remove(id);
+        for (const r of refs) {
+          await this.media?.remove(r);
+        }
+        for (const photo of photos) {
+          await this.media?.remove(photo);
+        }
       } else if (kind === 'asset') { await this.assetRepo.remove(id); }
-      else if (kind === 'event') { 
-      const old = this.events.find((e: CosEvent) => e.id === id); 
-      await this.eventRepo.remove(id); 
-      if (old) { 
-        try { 
-          await this.reminder.cancel(old.reminderId); } catch (error) { 
-          this.reportNotice('活动已删除，提醒取消失败，重新打开应用后会再次清理'); } } 
-    }
-      else if (kind === 'variant') { 
-      if (this.projects.some((p: CosProject) => p.variantId === id)) { 
-        throw new Error('请先在计划中取消此版本关联'); } 
-      await this.variantRepo.remove(id); }
+      else if (kind === 'event') {
+        const old = this.events.find((e: CosEvent) => e.id === id);
+        await this.eventRepo.remove(id);
+        if (old) {
+          try {
+            await this.reminder.cancel(old.reminderId);
+          } catch (error) {
+            this.reportNotice('活动已删除，提醒取消失败，重新打开应用后会再次清理');
+          }
+        }
+      }
+      else if (kind === 'variant') {
+        if (this.projects.some((p: CosProject) => p.variantId === id)) {
+          throw new Error('请先在计划中取消此版本关联');
+        }
+        await this.variantRepo.remove(id);
+      }
       else if (kind === 'team') { await this.planningRepo.removeTeam(id); }
       else if (kind === 'expense') { await this.planningRepo.removeExpense(id); }
-      else if (kind === 'reference') { 
-      const r = this.references.find((r: ReferenceImage) => r.id === id); 
-      if (r) { 
-        await this.planningRepo.removeReference(r); 
-        await this.media?.remove(r); } 
-    }
+      else if (kind === 'reference') {
+        const r = this.references.find((r: ReferenceImage) => r.id === id);
+        if (r) {
+          await this.planningRepo.removeReference(r);
+          await this.media?.remove(r);
+        }
+      }
       else if (kind === 'preparation') { await this.preparationRepo.removeTask(id); }
       else if (kind === 'category') { await this.preparationRepo.removeCategory(id); }
       else if (kind === 'checklist') { await this.checklistRepo.remove(id); }
-      else if (kind === 'photo') { 
-      const photo = this.photos.find((p: PhotoAsset) => p.id === id); 
-      await this.photoRepo.remove(id); 
-      if (photo) { 
-        await this.media?.remove(photo); } 
-    }
+      else if (kind === 'photo') {
+        const photo = this.photos.find((p: PhotoAsset) => p.id === id);
+        await this.photoRepo.remove(id);
+        if (photo) {
+          await this.media?.remove(photo);
+        }
+      }
     });
   }
   async importPhotos(projectId: string): Promise<boolean> {
@@ -442,11 +472,12 @@ export class AppState {
         let imported: PhotoAsset | undefined;
         try {
           imported = await this.media.import(uri, projectId);
-          if (existing) { 
-          imported.id = existing.id; 
-          imported.status = existing.status; 
-          imported.caption = existing.caption; 
-          await this.photoRepo.save(imported); }
+          if (existing) {
+            imported.id = existing.id;
+            imported.status = existing.status;
+            imported.caption = existing.caption;
+            await this.photoRepo.save(imported);
+          }
           else { await this.relations.addPhoto(imported); }
           count++;
         } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
@@ -455,13 +486,14 @@ export class AppState {
     });
   }
   async setPhotoStatus(photo: PhotoAsset, status: PhotoStatus): Promise<boolean> {
-    return this.perform(async () => { 
-    const copy = JSON.parse(JSON.stringify(photo)) as PhotoAsset; 
-    copy.status = status; 
-    await this.photoRepo.save(copy); 
-    if (status === PhotoStatus.SELECTED) { 
-      await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel); } 
-  });
+    return this.perform(async () => {
+      const copy = JSON.parse(JSON.stringify(photo)) as PhotoAsset;
+      copy.status = status;
+      await this.photoRepo.save(copy);
+      if (status === PhotoStatus.SELECTED) {
+        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+      }
+    });
   }
   async setPhotoStatuses(ids: string[], status: PhotoStatus): Promise<boolean> {
     return this.perform(async () => {
@@ -488,15 +520,17 @@ export class AppState {
       catch (error) { this.reportError((error as Error).message || '保存设置失败，请重试'); return false; }
       finally { this.pendingSettings--; this.settingsBusy = this.pendingSettings > 0; }
     });
-    this.settingsQueue = result.then((): void => {});
+    this.settingsQueue = result.then((): void => { });
     return result;
   }
   async updateSettings(changes: SettingsSelection): Promise<boolean> {
     if (!this.context) { return false; }
-    return this.enqueueSettings(async () => { if (this.context) {
+    return this.enqueueSettings(async () => {
+      if (this.context) {
         // 在队列执行时合并，避免一行的旧快照覆盖另一行刚保存的选择。
         const settings = JSON.parse(JSON.stringify(this.settings)) as AppSettings;
         if (changes.appearance !== undefined) { settings.appearance = changes.appearance; }
+        if (changes.themeColor !== undefined) { settings.themeColor = changes.themeColor; }
         if (changes.hand !== undefined) { settings.hand = changes.hand; settings.grip = settings.hand === 'auto'; }
         if (settings.grip && !this.settings.grip) {
           try { await this.grip.authorize(this.context); }
@@ -504,26 +538,41 @@ export class AppState {
         }
         await this.preference.save(this.context, settings, this.settings); this.settings = settings;
         if (!settings.grip) { this.grip.stop(); this.sensedHand = 'auto'; }
-      } });
+      }
+    });
   }
   suspend(): void { this.grip.stop(); this.sensedHand = 'auto'; }
   async resume(): Promise<void> {
-    if (this.settings.grip && this.context) { 
-    try { 
-      await this.grip.start(this.context, (hand: string) => { 
-        this.sensedHand = hand; }); } catch (error) { 
-      this.sensedHand = 'auto'; } }
+    if (this.settings.grip && this.context) {
+      try {
+        await this.grip.start(this.context, (hand: string) => {
+          this.sensedHand = hand;
+        });
+      } catch (error) {
+        this.sensedHand = 'auto';
+      }
+    }
   }
   async shareProject(id: string): Promise<boolean> {
-    return this.perform(async () => { 
-    const p = this.projects.find((item: CosProject) => item.id === id); 
-    if (p && this.context) { 
-      await ShareService.project(this.context, ShareService.object(p, this.characters.find((c: Character) => c.id === p.characterId), this.events.find((e: CosEvent) => e.id === p.eventId))); } 
-  }, false);
+    return this.perform(async () => {
+      const p = this.projects.find((item: CosProject) => item.id === id);
+      if (p && this.context) {
+        await ShareService.project(this.context, ShareService.object(p, this.characters.find((c: Character) => c.id === p.characterId), this.events.find((e: CosEvent) => e.id === p.eventId)));
+      }
+    }, false);
   }
   async exportData(): Promise<boolean> {
-    return this.perform(async () => { if (this.context && await new BackupService(this.db, this.context)
-      .export()) { this.reportNotice('元数据已导出。原照片请使用系统备份另行保护。'); } }, false);
+    return this.perform(async () => {
+      if (this.context && await new BackupService(this.db, this.context)
+        .export()) { this.reportNotice('元数据已导出。原照片请使用系统备份另行保护。'); }
+    }, false);
+  }
+  async loadDemoData(): Promise<boolean> {
+    return this.perform(async (): Promise<void> => {
+      if (!this.ready || !this.context || !this.media) { throw new Error('应用尚未就绪'); }
+      const loaded = await new DemoDataRepository(this.db, this.context, this.media).load();
+      this.reportNotice(loaded ? '已添加原神与绝区零示例数据' : '示例数据已存在，可直接编辑；清空数据后可重新载入');
+    });
   }
   async restoreData(): Promise<boolean> {
     let restored = false;
@@ -538,18 +587,23 @@ export class AppState {
   }
   private async cancelEventReminders(): Promise<boolean> {
     let canceled = true;
-    for (const event of this.events) { 
-    try { 
-      await this.reminder.cancel(event.reminderId); } catch (error) { 
-      canceled = false; 
-      this.reportNotice('提醒清理未完成，重新打开应用后会重试'); } }
+    for (const event of this.events) {
+      try {
+        await this.reminder.cancel(event.reminderId);
+      } catch (error) {
+        canceled = false;
+        this.reportNotice('提醒清理未完成，重新打开应用后会重试');
+      }
+    }
     return canceled;
   }
   async clearData(): Promise<boolean> {
     return this.perform(async () => { await this.relations.clear(); await this.cancelEventReminders(); await this.media?.collect([]); });
   }
-  projectAssets(id: string): Asset[] { const ids = this.links.filter((p: ProjectAsset) => p.projectId === id)
-    .map((p: ProjectAsset) => p.assetId); return this.assets.filter((a: Asset) => ids.includes(a.id)); }
+  projectAssets(id: string): Asset[] {
+    const ids = this.links.filter((p: ProjectAsset) => p.projectId === id)
+      .map((p: ProjectAsset) => p.assetId); return this.assets.filter((a: Asset) => ids.includes(a.id));
+  }
   characterName(id: string): string { return this.characters.find((c: Character) => c.id === id)?.name || '未关联角色'; }
   projectName(id: string): string { return this.projects.find((p: CosProject) => p.id === id)?.name || '未关联计划'; }
   progress(id: string): number { return projectProgress(id, this.links, this.assets).percent; }

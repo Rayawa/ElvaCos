@@ -63,6 +63,22 @@
     {
       "name": "transparent",
       "value": "#00000000"
+    },
+    {
+      "name": "v3_accent_orange",
+      "value": "#FFB54708"
+    },
+    {
+      "name": "v3_accent_cyan",
+      "value": "#FF007D8A"
+    },
+    {
+      "name": "v3_accent_green",
+      "value": "#FF00875A"
+    },
+    {
+      "name": "v3_accent_purple",
+      "value": "#FF7048E8"
     }
   ]
 }

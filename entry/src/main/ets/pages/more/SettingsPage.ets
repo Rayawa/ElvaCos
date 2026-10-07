@@ -1,8 +1,8 @@
-import { MIN_SPLIT_HEIGHT } from '../../common/constants';
+import { DEVELOPER_ENTRANCE_TAPS, DEVELOPER_ENTRANCE_WINDOW_MS, MIN_SPLIT_HEIGHT, SETTINGS_ENTRANCE_KEY } from '../../common/constants';
 import { PreferenceSettings } from '../../component/PreferenceSettings';
 import { SettingsSelection } from '../../model/ApplicationState';
 import { PressFeedback } from '../../common/pressFeedback';
-import { StaggerEntrance } from '../../common/motion';
+import { MainEntranceSession, StaggerEntrance } from '../../common/motion';
 import { vibration } from '../../common/vibration';
 import { scrollByAxis } from '../../common/scroll';
 import { DashboardSplitLayout } from '../../component/DashboardSplitLayout';
@@ -14,7 +14,7 @@ import { SettingsActionRow } from '../../component/SettingsActionRow';
 import { Icons } from '../../common/Icons';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
-import { APP_AUTHOR, APP_COPYRIGHT, APP_NAME_EN, APP_SITE, APP_VERSION, APP_BUILD_NUMBER } from '../../common/constants';
+import { APP_AUTHOR, APP_COPYRIGHT, APP_NAME_EN, APP_SITE, APP_VERSION } from '../../common/constants';
 
 @ComponentV2
 export struct SettingsPage {
@@ -28,10 +28,38 @@ export struct SettingsPage {
   @Local contentHeight: number = 0;
   private pageScroller: Scroller = new Scroller();
   @Param entrance: StaggerEntrance = new StaggerEntrance();
-  aboutToAppear(): void { if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
-  aboutToDisappear(): void { if (!this.entrance.managed) { this.entrance.reset(); } }
+  @Param entranceSession: MainEntranceSession = new MainEntranceSession();
+
+  aboutToAppear(): void {
+    if (this.entrance.managed) { return; }
+    if (this.entranceSession.claim(SETTINGS_ENTRANCE_KEY)) {
+      this.entrance.play(this.getUIContext());
+    } else {
+      this.entrance.finish(4);
+    }
+  }
+
+  aboutToDisappear(): void {
+    if (this.versionTapTimer >= 0) { clearTimeout(this.versionTapTimer); this.versionTapTimer = -1; }
+    if (!this.entrance.managed) { this.entrance.finish(4); }
+  }
   @Event open: (kind: string, id: string) => void = () => {};
   @Event destructive: (kind: string) => void = () => {};
+  @Event openDeveloper: () => void = () => {};
+  private versionTaps: number = 0;
+  private versionTapTimer: number = -1;
+
+  /** 版本号连点进入开发者选项：只计数不振动，超时或点满后重新开始。 */
+  private tapVersion(): void {
+    if (this.versionTapTimer >= 0) { clearTimeout(this.versionTapTimer); this.versionTapTimer = -1; }
+    this.versionTaps++;
+    if (this.versionTaps >= DEVELOPER_ENTRANCE_TAPS) {
+      this.versionTaps = 0;
+      this.openDeveloper();
+      return;
+    }
+    this.versionTapTimer = setTimeout((): void => { this.versionTapTimer = -1; this.versionTaps = 0; }, DEVELOPER_ENTRANCE_WINDOW_MS);
+  }
 
   private toggleAccount(): void {
     if (this.state.busy) { return; }
@@ -67,10 +95,12 @@ export struct SettingsPage {
             Button('导出元数据备份')
               .accessibilityText('导出元数据备份')
               .width('100%')
-              .backgroundColor(Theme.accent)
+              .backgroundColor(Theme.brand)
               .fontColor(Theme.onAccent)
               .enabled(!this.state.busy)
               .onClick((): void => { vibration.dotVibration(); this.state.exportData(); })
+              .visualEffect(this.feedback.effect('button-1'))
+              .compositingFilter(this.feedback.filter('button-1'))
               .attributeModifier(this.feedback.control('button-1'))
             Text('设备日历').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
             Text('添加活动到设备日历时，在系统确认页选择日历账户与提醒。日历是否同步由系统日历和云空间设置决定，应用内计划与照片不会随之同步。').fontSize(14).fontColor(Theme.muted)
@@ -79,13 +109,12 @@ export struct SettingsPage {
             Text('新建计划时选择已有角色，或一起创建角色。准备页添加本次装备，打包页逐件确认装包，照片页支持导入、筛选与批量选片。新增和编辑都在弹出的表单中完成。').fontSize(14).fontColor(Theme.muted)
             Text('操作模式').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
             Text('左手和右手固定出门清单确认按钮的位置。选择智感握持时申请感知权限，仅在出门模式检测；拒绝权限会保留原设置，设备不支持时可选择手动布局。').fontSize(14).fontColor(Theme.muted)
-            Text('应用外观与材质等级').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-            Text('应用外观三档：天蓝为浅色、雾蓝为深色、跟随系统由系统设置决定，切换后全应用立即生效。材质等级为流畅时关闭原生材质、光场和按压增强。').fontSize(14).fontColor(Theme.muted)
+            Text('主题配色、应用外观与材质等级').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+            Text('主题配色可选蓝、绿、粉、橙、红，每组都包含浅色和深色。应用外观可选浅色、深色或跟随系统，切换后立即生效并记住选择。材质等级为流畅时关闭原生材质、光场和按压增强。').fontSize(14).fontColor(Theme.muted)
 
           }
         }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 24 })
-      }.
-    layoutWeight(1).width('100%').align(Alignment.Top).opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
+      }.layoutWeight(1).width('100%').align(Alignment.Top).opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
     }.padding(24).width('100%').height('100%').backgroundColor(Theme.surface)
   }
 
@@ -96,7 +125,6 @@ export struct SettingsPage {
         .fontSize(12)
         .fontColor(Theme.muted)
         .accessibilityText(`版本${APP_VERSION}`)
-      Text(`构建号 ${APP_BUILD_NUMBER}`).fontSize(12).fontColor(Theme.muted).accessibilityText(`构建号 ${APP_BUILD_NUMBER}`)
       Text(APP_AUTHOR)
         .fontSize(12)
         .fontColor(Theme.muted)
@@ -115,8 +143,10 @@ export struct SettingsPage {
     }
     .width('100%')
     .padding({ top: 14 })
+    // 连点版本号进开发者选项；这里不发声也不振动，避免暴露入口。
+    .onClick((): void => { this.tapVersion(); })
     .accessibilityGroup(true)
-    .accessibilityText(`版本 ${APP_VERSION}，构建号 ${APP_BUILD_NUMBER}，版权所有 2026，备案域名 rayawa 点 top`)
+    .accessibilityText(`版本 ${APP_VERSION}，版权所有 2026，备案域名 rayawa 点 top`)
   }
 
   @Builder
@@ -177,7 +207,6 @@ export struct SettingsPage {
         .borderRadius(16)
         .shadow({ radius: 8, color: Theme.shadow, offsetY: 2 })
         .clip(true)
-        .attributeModifier(this.feedback.control('column-2', true))
     }.width('100%').opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
   }
 
@@ -212,7 +241,6 @@ export struct SettingsPage {
         .borderRadius(16)
         .shadow({ radius: 8, color: Theme.shadow, offsetY: 2 })
         .clip(true)
-        .attributeModifier(this.feedback.control('column-3', true))
     }.width('100%').opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
   }
 
@@ -223,7 +251,7 @@ export struct SettingsPage {
       Column() {
         SettingsActionRow({ label: '使用说明', icon: Icons.tutorial, action: (): void => { this.showHelp('usage'); } })
         this.actionDivider()
-        SettingsActionRow({ label: '更新日志', icon: Icons.tutorial, action: (): void => { this.open('appLog', 'appLog'); } })
+        SettingsActionRow({ label: '更新日志', icon: Icons.appLog, action: (): void => { this.open('appLog', 'appLog'); } })
         this.actionDivider()
         SettingsActionRow({ label: '隐私政策', icon: Icons.privacy, action: (): void => { this.open('privacy', 'privacy'); } })
       }.width('100%')
@@ -231,7 +259,6 @@ export struct SettingsPage {
         .borderRadius(16)
         .shadow({ radius: 8, color: Theme.shadow, offsetY: 2 })
         .clip(true)
-        .attributeModifier(this.feedback.control('column-4', true))
     }.width('100%').opacity(this.entrance.step >= 4 ? 1 : 0).translate({ y: this.entrance.step >= 4 ? 0 : 20 })
   }
 
@@ -307,7 +334,6 @@ export struct SettingsPage {
     }.width('100%').height('100%').alignItems(HorizontalAlign.Center)
       .onAreaChange((_, area: Area): void => { this.contentWidth = Number(area.width); this.contentHeight = Number(area.height); })
       .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.pageScroller, event); })
-      .bindSheet(this.helpOpen, this.helpSheet(), appSheetOptions((): void => { 
-    this.helpOpen = false; }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.helpOpen, this.helpSheet(), appSheetOptions((): void => { this.helpOpen = false; }, this.sheetEntrance, this.getUIContext()))
   }
 }

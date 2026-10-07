@@ -34,6 +34,8 @@ export struct ProjectCard {
           .backgroundColor(Theme.tint)
           .borderRadius(14)
           .accessibilityLevel('no')
+          .visualEffect(this.feedback.effect('character-placeholder'))
+          .compositingFilter(this.feedback.filter('character-placeholder'))
           .attributeModifier(this.feedback.control('character-placeholder'))
       }
       Column({ space: 8 }) {
@@ -61,7 +63,7 @@ export struct ProjectCard {
         .fontColor(Theme.muted) }
     }.width('100%')
     Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear })
-      .color(Theme.accent)
+      .color(Theme.brand)
       .backgroundColor(Theme.tint)
       .width('100%')
       .margin({ top: 16 })

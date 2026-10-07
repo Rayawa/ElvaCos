@@ -13,6 +13,8 @@ export struct DashboardSearch {
     Search({ value: this.value, placeholder: this.placeholder })
       .width('100%').height(48).defaultFocus(false)
       .backgroundColor(Theme.tint).border({ width: 1, color: Theme.line })
+      .visualEffect(this.feedback.effect('search'))
+      .compositingFilter(this.feedback.filter('search'))
       .attributeModifier(this.feedback.control('search'))
       .onChange((value: string): void => { this.changed(value); })
       .accessibilityText(this.label)

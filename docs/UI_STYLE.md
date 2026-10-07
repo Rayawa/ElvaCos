@@ -22,7 +22,7 @@
 
 ## 当前页面与交互
 
-主页五个 HdsTabs 各有独立 HdsNavigation / NavPathStack；外层主栈承载覆盖式详情和设置。详情显示时隐藏主页底栏，业务详情保留 HdsActionTabs 动作栏；更新日志与政策为阅读页。更新日志标题栏提供 Beta / RC / 正式版三个独立开关，复用 Dashboard 的开启/关闭图标、Toast 与触觉；包含空结果、正式版标识和卡片按压反馈，设置入口使用 app_log 图标。表单、关联选择、帮助使用 bindSheet 与 SheetHeader，删除/替换通过确认 Dialog。
+主页五个 HdsTabs 各有独立 HdsNavigation / NavPathStack；外层主栈承载覆盖式详情和设置。详情显示时隐藏主页底栏，业务详情保留 HdsActionTabs 动作栏；更新日志与政策为阅读页。设置页版本信息不再显示构建号：连点版本号五次进入开发者选项（pages/more/DevPage），示例数据载入与只读诊断信息沿用设置页的 HDS 列表行，入口点击不振动，页面仍由公共 DetailDestination 承载。更新日志标题栏提供 Beta / RC / 正式版三个独立开关，复用 Dashboard 的开启/关闭图标、Toast 与触觉；包含空结果、正式版标识和卡片按压反馈，设置入口使用 app_log 图标。表单、关联选择、帮助使用 bindSheet 与 SheetHeader，删除/替换通过确认 Dialog。
 
 标题分段使用原生 TabSegmentButtonV2，当前宽度为标题区的 50%。选中变化和重复点击分别处理，切换保留各页查询、滚动和路由上下文。页面承载多于一类内容家族时的分段设计（哪些页面分段、分段与筛选的分工）见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md) 第 3.8 节，尚未执行。
 

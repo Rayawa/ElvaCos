@@ -1,7 +1,7 @@
 {
   "app": {
     "bundleName": "top.rayawa.elvacos",
-    "vendor": "example",
+    "vendor": "Rayawa",
     "versionCode": 10000001,
     "versionName": "1.0.0-beta.1",
     "buildVersion": "10000001",

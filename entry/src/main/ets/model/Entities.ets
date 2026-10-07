@@ -147,6 +147,7 @@ export class AppSettings {
   hand: string = 'left';
   grip: boolean = false;
   /** sky=浅色，mist=深色，system=跟随系统 */ appearance: string = 'system';
+  /** 配色与深浅色独立；旧用户默认保留蓝色。 */ themeColor: string = 'blue';
 }
 /** 华为账号登录态；未登录时 signedIn 为 false，其余字段为空。 */
 export class HuaweiAccount {

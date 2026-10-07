@@ -14,3 +14,6 @@
 /build-profile.json5
 # 本机真机截图/布局 dump 与调试脚本，不入库
 /.shots
+
+# macOS Finder 元数据
+.DS_Store

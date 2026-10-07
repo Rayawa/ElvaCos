@@ -42,28 +42,28 @@ export struct HdsMiniBarButton {
       this.buttonContent()
     }
     .width('100%')
-    .height('100%')
-    .borderRadius(this.barHeight / 2)
-    .clip(true)
-    .scale({ x: this.pressed ? 0.985 : 1, y: this.pressed ? 0.985 : 1 })
-    .animation({ duration: 130, curve: curves.springMotion(0.35, 0.9) })
-    .visualEffect(pressVisualEffect(
-      this.pressed, hdsEffect.PointLightIlluminatedType.BORDER_CONTENT, 6, 96))
-    .compositingFilter(pressLightFieldFilter(this.pressed))
-    .onTouch((event: TouchEvent): void => {
-      if (event.type === TouchType.Down) {
-        this.pressed = true;
-      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.pressed = false;
-      }
-    })
-    .onClick(() => {
-      vibration.dotVibration();
-      if (this.onButtonClick) {
-        this.onButtonClick();
-      }
-    })
-    .accessibilityText(this.controlLabel)
+      .height('100%')
+      .borderRadius(this.barHeight / 2)
+      .clip(true)
+      .scale({ x: this.pressed ? 0.985 : 1, y: this.pressed ? 0.985 : 1 })
+      .animation({ duration: 130, curve: curves.springMotion(0.35, 0.9) })
+      .visualEffect(pressVisualEffect(
+        this.pressed, hdsEffect.PointLightIlluminatedType.BORDER_CONTENT, 6, 96))
+      .compositingFilter(pressLightFieldFilter(this.pressed))
+      .onTouch((event: TouchEvent): void => {
+        if (event.type === TouchType.Down) {
+          this.pressed = true;
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          this.pressed = false;
+        }
+      })
+      .onClick(() => {
+        vibration.dotVibration();
+        if (this.onButtonClick) {
+          this.onButtonClick();
+        }
+      })
+      .accessibilityText(this.controlLabel)
   }
 
   build() {
@@ -77,59 +77,59 @@ export struct HdsMiniBarButton {
               .backgroundColor(Theme.transparent)
           }
           .width(this.barWidth)
-          .height(this.barHeight - 12)
-          .barWidth(this.barWidth)
-          .barHeight(this.barHeight - 12)
-          .barOverlap(true)
-          .barPosition(BarPosition.End)
-          .backgroundColor(Theme.transparent)
-          .barFloatingStyle({
-            barWidth: {
-              smallWidth: this.barWidth,
-              mediumWidth: this.barWidth,
-              largeWidth: this.barWidth,
-            },
-            gradientMask: { maskColor: Theme.transparent },
-            barBottomMargin: 0,
-            barSideMargin: 0,
-            lightColor: Theme.accent,
-            systemMaterialEffect: {
-              materialType: this.effectsEnabled ? this.materialType : hdsMaterial.MaterialType.NONE,
-              materialLevel: this.materialLevel,
-            },
-            miniBar: {
-              miniBarBuilder: () => {
-                this.miniBarBackground()
+            .height(this.barHeight - 12)
+            .barWidth(this.barWidth)
+            .barHeight(this.barHeight - 12)
+            .barOverlap(true)
+            .barPosition(BarPosition.End)
+            .backgroundColor(Theme.transparent)
+            .barFloatingStyle({
+              barWidth: {
+                smallWidth: this.barWidth,
+                mediumWidth: this.barWidth,
+                largeWidth: this.barWidth,
               },
-              miniBarStyle: 1,
-            },
-          })
+              gradientMask: { maskColor: Theme.transparent },
+              barBottomMargin: 0,
+              barSideMargin: 0,
+              lightColor: Theme.brand,
+              systemMaterialEffect: {
+                materialType: this.effectsEnabled ? this.materialType : hdsMaterial.MaterialType.NONE,
+                materialLevel: this.materialLevel,
+              },
+              miniBar: {
+                miniBarBuilder: () => {
+                  this.miniBarBackground()
+                },
+                miniBarStyle: 1,
+              },
+            })
         }
         .width(this.barWidth)
-        .height(this.barHeight - 12)
-        .borderRadius((this.barHeight - 12) / 2)
-        .clip(true)
-        .hitTestBehavior(HitTestMode.None)
+          .height(this.barHeight - 12)
+          .borderRadius((this.barHeight - 12) / 2)
+          .clip(true)
+          .hitTestBehavior(HitTestMode.None)
         Column() {
           this.miniBarContent()
         }
         .width(this.barWidth)
-        .height(this.barHeight - 12)
-        .justifyContent(FlexAlign.Center)
-        .zIndex(1)
+          .height(this.barHeight - 12)
+          .justifyContent(FlexAlign.Center)
+          .zIndex(1)
       } else {
         Row() {
           this.miniBarContent()
         }
         .width(this.barWidth)
-        .height(this.barHeight - 12)
-        .borderRadius(this.barHeight / 2)
-        .backgroundColor(Theme.surface)
+          .height(this.barHeight - 12)
+          .borderRadius(this.barHeight / 2)
+          .backgroundColor(Theme.surface)
       }
     }
     .width(this.barWidth)
-    .height(this.barHeight)
-    .backgroundColor(Theme.transparent)
-    .accessibilityText(this.controlLabel)
+      .height(this.barHeight)
+      .backgroundColor(Theme.transparent)
+      .accessibilityText(this.controlLabel)
   }
 }

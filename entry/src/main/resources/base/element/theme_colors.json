@@ -1,0 +1,196 @@
+{
+  "color": [
+    {
+      "name": "theme_green_bg",
+      "value": "#FFF2FBF7"
+    },
+    {
+      "name": "theme_green_surface",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "theme_green_ink",
+      "value": "#FF173329"
+    },
+    {
+      "name": "theme_green_muted",
+      "value": "#FF55766B"
+    },
+    {
+      "name": "theme_green_line",
+      "value": "#C9EADB"
+    },
+    {
+      "name": "theme_green_divider",
+      "value": "#A8D7C1"
+    },
+    {
+      "name": "theme_green_groupDivider",
+      "value": "#FFCFE5DB"
+    },
+    {
+      "name": "theme_green_onAccent",
+      "value": "#FF10382A"
+    },
+    {
+      "name": "theme_green_brand",
+      "value": "#58C89B"
+    },
+    {
+      "name": "theme_green_accent",
+      "value": "#167A54"
+    },
+    {
+      "name": "theme_green_tint",
+      "value": "#FFE6F7EF"
+    },
+    {
+      "name": "theme_green_shadow",
+      "value": "#1A1B4936"
+    },
+    {
+      "name": "theme_pink_bg",
+      "value": "#FFFFF5F9"
+    },
+    {
+      "name": "theme_pink_surface",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "theme_pink_ink",
+      "value": "#FF38222C"
+    },
+    {
+      "name": "theme_pink_muted",
+      "value": "#FF82616F"
+    },
+    {
+      "name": "theme_pink_line",
+      "value": "#F5CEDD"
+    },
+    {
+      "name": "theme_pink_divider",
+      "value": "#E9B3C7"
+    },
+    {
+      "name": "theme_pink_groupDivider",
+      "value": "#FFEBD1DC"
+    },
+    {
+      "name": "theme_pink_onAccent",
+      "value": "#FF522135"
+    },
+    {
+      "name": "theme_pink_brand",
+      "value": "#F391B5"
+    },
+    {
+      "name": "theme_pink_accent",
+      "value": "#B63866"
+    },
+    {
+      "name": "theme_pink_tint",
+      "value": "#FFFDE8F0"
+    },
+    {
+      "name": "theme_pink_shadow",
+      "value": "#1A522135"
+    },
+    {
+      "name": "theme_orange_bg",
+      "value": "#FFFFF8F0"
+    },
+    {
+      "name": "theme_orange_surface",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "theme_orange_ink",
+      "value": "#FF382B21"
+    },
+    {
+      "name": "theme_orange_muted",
+      "value": "#FF826A57"
+    },
+    {
+      "name": "theme_orange_line",
+      "value": "#EED8C0"
+    },
+    {
+      "name": "theme_orange_divider",
+      "value": "#DEBE9D"
+    },
+    {
+      "name": "theme_orange_groupDivider",
+      "value": "#FFE7D7C5"
+    },
+    {
+      "name": "theme_orange_onAccent",
+      "value": "#FF4B301A"
+    },
+    {
+      "name": "theme_orange_brand",
+      "value": "#F2B16E"
+    },
+    {
+      "name": "theme_orange_accent",
+      "value": "#995310"
+    },
+    {
+      "name": "theme_orange_tint",
+      "value": "#FFFFF0DE"
+    },
+    {
+      "name": "theme_orange_shadow",
+      "value": "#1A4B301A"
+    },
+    {
+      "name": "theme_red_bg",
+      "value": "#FFFFF5F5"
+    },
+    {
+      "name": "theme_red_surface",
+      "value": "#FFFFFFFF"
+    },
+    {
+      "name": "theme_red_ink",
+      "value": "#FF382226"
+    },
+    {
+      "name": "theme_red_muted",
+      "value": "#FF856166"
+    },
+    {
+      "name": "theme_red_line",
+      "value": "#F1CDD0"
+    },
+    {
+      "name": "theme_red_divider",
+      "value": "#E2AFB5"
+    },
+    {
+      "name": "theme_red_groupDivider",
+      "value": "#FFEAD1D4"
+    },
+    {
+      "name": "theme_red_onAccent",
+      "value": "#FF4D242D"
+    },
+    {
+      "name": "theme_red_brand",
+      "value": "#EF8B96"
+    },
+    {
+      "name": "theme_red_accent",
+      "value": "#B33E50"
+    },
+    {
+      "name": "theme_red_tint",
+      "value": "#FFFFE8E9"
+    },
+    {
+      "name": "theme_red_shadow",
+      "value": "#1A4D242D"
+    }
+  ]
+}

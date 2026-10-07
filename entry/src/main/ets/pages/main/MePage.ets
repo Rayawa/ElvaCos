@@ -7,6 +7,8 @@ import { Theme } from '../../common/Theme';
 import { DiaryEntry, PhotoAsset, PhotoStatus, CosProject, ProjectStatus } from '../../model/Entities';
 import { SectionHeading, EmptyState, InteractiveCard } from '../../component/Surfaces';
 import { PhotoGrid } from '../../component/PhotoGrid';
+import { DistributionChart } from '../../component/charts/DistributionChart';
+import { photoDistribution, PhotoDistributionItem } from '../../model/Statistics';
 import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 
 @ComponentV2
@@ -22,6 +24,8 @@ export struct MePage {
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
   @Local animStep: number = 0;
+  @Computed
+  private get photoStages(): PhotoDistributionItem[] { return photoDistribution(this.state.photos); }
   private enterPlayed: boolean = false;
   private enterTimers: number[] = [];
   aboutToAppear(): void { if (this.active) { this.enter(); } }
@@ -61,7 +65,8 @@ export struct MePage {
           .fontSize(12)
           .fontColor(Theme.muted) }.layoutWeight(1)
       }.
-    padding(18).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).width('100%').attributeModifier(this.feedback.control('row-1', true))
+    padding(18).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).width('100%').visualEffect(this.feedback.effect('row-1', true)).compositingFilter(this.feedback.filter('row-1', true)).attributeModifier(this.feedback.control('row-1', true))
+      DistributionChart({ title: '照片处理分布', items: this.photoStages, paletteId: Theme.paletteId })
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   build() {
@@ -72,6 +77,7 @@ export struct MePage {
           scroller: this.scroller,
           state: this.state,
           photos: this.state.photos.filter((p: PhotoAsset) => p.status === PhotoStatus.FINAL || p.status === PhotoStatus.PUBLISHED),
+          portfolio: true,
           open: this.open,
           topInset: this.topInset,
           bottomInset: this.bottomInset,

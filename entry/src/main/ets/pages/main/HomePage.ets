@@ -47,9 +47,7 @@ export struct HomePage {
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterAnimationTimers); this.animStep = 3; }
   private current(): CosProject | undefined { return nextPlan(this.state.projects, this.state.events, today()); }
-  private packingTasks(): ChecklistItem[] { 
-  const currentId = this.current()?.id; 
-  return this.state.checklist.filter((item: ChecklistItem) => !item.done && this.state.projects.some((project: CosProject) => project.id === item.projectId && project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.ARCHIVED))
+  private packingTasks(): ChecklistItem[] { const currentId = this.current()?.id; return this.state.checklist.filter((item: ChecklistItem) => !item.done && this.state.projects.some((project: CosProject) => project.id === item.projectId && project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.ARCHIVED))
     .sort((a: ChecklistItem, b: ChecklistItem) => Number(b.projectId === currentId) - Number(a.projectId === currentId) || a.sortOrder - b.sortOrder); }
   private preparationTasks(): PreparationTask[] {
     const current = this.current()?.id || '';
@@ -57,11 +55,10 @@ export struct HomePage {
       .sort((a: PreparationTask, b: PreparationTask) => Number(b.projectId === current) - Number(a.projectId === current) || (a.dueDate || '9999')
         .localeCompare(b.dueDate || '9999') || a.sortOrder - b.sortOrder);
   }
-  private next(): CosEvent | undefined { 
-  return this.state.events.filter((e: CosEvent) => e.status === 'Planned' && e.dateMode !== 'pending' && eventEnd(e) >= today())
+  private next(): CosEvent | undefined { return this.state.events.filter((e: CosEvent) => e.status === 'Planned' && e.dateMode !== 'pending' && eventEnd(e) >= today())
     .sort((a: CosEvent, b: CosEvent) => a.date.localeCompare(b.date))[0]; }
   @Builder eventContent() {
-    Row({ space: 16 }) {
+    Row({ space: 12 }) {
       Column({ space: 3 }) { Text(String(Math.max(0, daysUntil(this.next()?.date || today()))))
         .id('home-event-countdown')
         .width('100%')
@@ -69,16 +66,18 @@ export struct HomePage {
         .minFontSize(16)
         .maxFontSize(32)
         .maxLines(1)
+        .textAlign(TextAlign.Center)
         .fontWeight(FontWeight.Lighter)
-        .fontColor(Theme.accent); Text('天后见')
+        .fontColor(Theme.accent); Text(daysUntil(this.next()?.date || today()) <= 0 ? '进行中' : '天后见')
+        .id('home-event-caption')
         .fontSize(12)
-        .fontColor(Theme.muted) }.width(64)
+        .fontColor(Theme.muted) }.width(64).alignItems(HorizontalAlign.Center)
       Column({ space: 6 }) { Text(this.next()?.name || '')
         .fontSize(17)
         .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.ink); Text(`${this.next()?.date} · ${this.next()?.city}`)
+        .fontColor(Theme.ink).width('100%').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }); Text(`${this.next()?.date} · ${this.next()?.city || '地点待定'}`)
         .fontSize(13)
-        .fontColor(Theme.muted); StatusPill({ label: this.next()?.ticketPurchased ? '门票已准备' : '记得确认门票' }) }.layoutWeight(1)
+        .fontColor(Theme.muted).width('100%').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }); StatusPill({ label: this.next()?.ticketPurchased ? '门票已准备' : '记得确认门票' }) }.layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
       Text('›').fontSize(24).fontColor(Theme.muted).accessibilityLevel('no')
     }.width('100%')
@@ -110,6 +109,8 @@ export struct HomePage {
         .backgroundColor(Theme.tint)
         .fontColor(Theme.accent)
         .onClick((): void => { vibration.dotVibration(); this.open('expenseStats', 'all'); })
+        .visualEffect(this.feedback.effect('button-1'))
+        .compositingFilter(this.feedback.filter('button-1'))
         .attributeModifier(this.feedback.control('button-1'))
       if (this.state.projects.length === 0 && this.state.characters.length === 0) {
         EmptyState({
@@ -137,13 +138,17 @@ export struct HomePage {
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)
             .onClick((): void => { vibration.dotVibration(); this.open('project', this.current()?.id || ''); })
+            .visualEffect(this.feedback.effect('button-2'))
+            .compositingFilter(this.feedback.filter('button-2'))
             .attributeModifier(this.feedback.control('button-2'))
           Button('开始打包')
             .accessibilityText('开始打包')
             .layoutWeight(1)
-            .backgroundColor(Theme.accent)
+            .backgroundColor(Theme.brand)
             .fontColor(Theme.onAccent)
             .onClick((): void => { vibration.dotVibration(); this.open('packing', this.current()?.id || ''); })
+            .visualEffect(this.feedback.effect('button-3'))
+            .compositingFilter(this.feedback.filter('button-3'))
             .attributeModifier(this.feedback.control('button-3'))
         }.width('100%')
 

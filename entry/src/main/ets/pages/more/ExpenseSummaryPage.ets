@@ -8,6 +8,9 @@ import { CosProject } from '../../model/Entities';
 import { Expense, expenseTotal } from '../../model/Planning';
 import { SectionHeading, EmptyState } from '../../component/Surfaces';
 import { pageTransition, StaggerEntrance } from '../../common/motion';
+import { today } from '../../common/format';
+import { monthlyExpenses } from '../../model/Statistics';
+import { InteractiveLineChart, LineChartPoint } from '../../component/charts/InteractiveLineChart';
 
 interface ExpenseCategory {
   name: string;
@@ -38,6 +41,8 @@ export struct ExpenseSummary {
   private get visibleRecords(): Expense[] {
     return this.records.filter((expense: Expense): boolean => !this.category || expense.category === this.category);
   }
+  @Computed
+  private get trend(): LineChartPoint[] { return monthlyExpenses(this.records, today()); }
 
   @Computed
   private get categories(): ExpenseCategory[] {
@@ -67,7 +72,7 @@ export struct ExpenseSummary {
             .fontSize(14).fontColor(Theme.accent)
         }.width('100%')
         Progress({ value: category.percent, total: 100, type: ProgressType.Linear })
-          .width('100%').color(Theme.accent).backgroundColor(Theme.tint).accessibilityLevel('no')
+          .width('100%').color(Theme.brand).backgroundColor(Theme.tint).accessibilityLevel('no')
       }.id('expense-category:' + category.name).width('100%').alignItems(HorizontalAlign.Start).padding(14)
         .backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
         .border({ width: this.category === category.name ? 1 : 0, color: Theme.accent })
@@ -76,6 +81,8 @@ export struct ExpenseSummary {
         .accessibilitySelected(this.category === category.name)
         .accessibilityText(category.name + '，花费 ' + (category.amount / 100).toFixed(2) + ' 元，占比 ' + category.percent.toFixed(1) + '%')
         .accessibilityDescription('双击筛选此分类，再次双击显示全部分类')
+        .visualEffect(this.feedback.effect('expense-category:' + category.name, true))
+        .compositingFilter(this.feedback.filter('expense-category:' + category.name, true))
         .attributeModifier(this.feedback.control('expense-category:' + category.name, true))
     }, (category: ExpenseCategory): string => category.name)
   }
@@ -85,7 +92,7 @@ export struct ExpenseSummary {
     if (this.category) {
       Button('显示全部分类').fontColor(Theme.accent).backgroundColor(Theme.tint)
         .onClick((): void => { vibration.dotVibration(); this.category = ''; })
-        .accessibilityText('取消花费分类筛选').attributeModifier(this.feedback.control('clear-category'))
+        .accessibilityText('取消花费分类筛选').visualEffect(this.feedback.effect('clear-category')).compositingFilter(this.feedback.filter('clear-category')).attributeModifier(this.feedback.control('clear-category'))
     }
     ForEach(this.visibleRecords, (expense: Expense) => {
       Row({ space: 8 }) {
@@ -97,10 +104,12 @@ export struct ExpenseSummary {
           .onClick((): void => { vibration.dotVibration(); this.edit('expense', expense.id, expense.projectId); })
           .accessibilityGroup(true).accessibilityRole(AccessibilityRoleType.BUTTON)
           .accessibilityText('编辑花费 ' + expense.name + '，' + (expense.amountCents / 100).toFixed(2) + ' 元，' + expense.date)
+          .visualEffect(this.feedback.effect('edit-expense:' + expense.id))
+          .compositingFilter(this.feedback.filter('edit-expense:' + expense.id))
           .attributeModifier(this.feedback.control('edit-expense:' + expense.id))
         Button('−').backgroundColor(Theme.bg).fontColor(Theme.muted).enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('expense', expense.id); })
-          .accessibilityText('删除花费 ' + expense.name).attributeModifier(this.feedback.control('remove-expense:' + expense.id))
+          .accessibilityText('删除花费 ' + expense.name).visualEffect(this.feedback.effect('remove-expense:' + expense.id)).compositingFilter(this.feedback.filter('remove-expense:' + expense.id)).attributeModifier(this.feedback.control('remove-expense:' + expense.id))
       }.id('expense-record:' + expense.id).padding(14).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (expense: Expense): string => expense.id)
     if (this.records.length === 0) {
@@ -125,7 +134,7 @@ export struct ExpenseSummary {
               this.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
               this.category = '';
             })
-            .accessibilityText('花费所属计划').attributeModifier(this.feedback.control('expense-project'))
+            .accessibilityText('花费所属计划').visualEffect(this.feedback.effect('expense-project')).compositingFilter(this.feedback.filter('expense-project')).attributeModifier(this.feedback.control('expense-project'))
           Column({ space: 8 }) {
             Text('实际花费 ¥' + (expenseTotal(this.records) / 100).toFixed(2)).fontSize(24).fontColor(Theme.accent)
               .accessibilityText('实际花费 ' + (expenseTotal(this.records) / 100).toFixed(2) + ' 元')
@@ -134,9 +143,11 @@ export struct ExpenseSummary {
             Text('只统计已记录的花费，复用衣柜装备不会自动计费。').fontSize(12).fontColor(Theme.muted)
               .accessibilityText('只统计已记录的花费，复用衣柜装备不会自动计费')
           }.padding(18).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
-            .alignItems(HorizontalAlign.Start).attributeModifier(this.feedback.control('expense-total', true))
+            .alignItems(HorizontalAlign.Start).visualEffect(this.feedback.effect('expense-total', true)).compositingFilter(this.feedback.filter('expense-total', true)).attributeModifier(this.feedback.control('expense-total', true))
         }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(1))
         Column({ space: Theme.sectionSpacing }) {
+          InteractiveLineChart({ title: '近半年花费趋势', unit: '元', points: this.trend,
+            lineColor: Theme.brand, paletteId: Theme.paletteId, chartHeight: 220, responsiveAxisFont: true })
           this.categoryChart()
           this.expenseRecords()
         }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(2))

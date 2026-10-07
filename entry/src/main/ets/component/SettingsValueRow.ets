@@ -1,4 +1,3 @@
-import { PressFeedback } from '../common/pressFeedback';
 import { HdsListItemCard, IconSize, PrefixIcon } from '@kit.UIDesignKit';
 import { Theme } from '../common/Theme';
 import { Icons } from '../common/Icons';
@@ -8,7 +7,6 @@ import { LIST_ITEM_PREFIX_MARGIN, LIST_ITEM_SUFFIX_MARGIN } from '../common/cons
 /** 设置项里的「标签 + 当前值（+ 可选动作）」一行，与 SettingsPanel 的卡片同一行高与边距。 */
 @ComponentV2
 export struct SettingsValueRow {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
   @Param value: string = '';
   @Param hint: string = '';
@@ -38,7 +36,7 @@ export struct SettingsValueRow {
           .padding({ left: 16, right: 16 })
           .enabled(this.isEnabled)
           .onClick((): void => { vibration.dotVibration(); this.action(); })
-          .accessibilityText(this.actionLabel + '，' + this.label).attributeModifier(this.feedback.control('button-1'))
+          .accessibilityText(this.actionLabel + '，' + this.label)
       }
     }
     .width('100%')
@@ -58,6 +56,6 @@ export struct SettingsValueRow {
       cardPrefixMargin: LIST_ITEM_PREFIX_MARGIN,
       cardSuffixMargin: LIST_ITEM_SUFFIX_MARGIN,
       accessibilityOptions: { accessibilityText: this.label + (this.value ? '，' + this.value : '') },
-    }).enabled(this.isEnabled).id('settings-value-' + this.label).attributeModifier(this.feedback.control('hdslistitemcard-2'))
+    }).enabled(this.isEnabled).id('settings-value-' + this.label)
   }
 }

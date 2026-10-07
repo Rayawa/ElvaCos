@@ -46,6 +46,8 @@ export struct EventDetail {
             .enabled(!this.state.busy)
             .onClick((): void => { vibration.dotVibration(); this.associate(p); })
             .accessibilityText('关联计划 ' + p.name)
+            .visualEffect(this.feedback.effect('link-project:' + p.id, true))
+            .compositingFilter(this.feedback.filter('link-project:' + p.id, true))
             .attributeModifier(this.feedback.control('link-project:' + p.id, true)) }
         }, (p: CosProject) => p.id)
       }.layoutWeight(1).width('100%').opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
@@ -53,9 +55,11 @@ export struct EventDetail {
       Button('完成')
         .accessibilityText('完成')
         .width('100%')
-        .backgroundColor(Theme.accent)
+        .backgroundColor(Theme.brand)
         .fontColor(Theme.onAccent)
         .onClick((): void => { vibration.dotVibration(); this.linking = false; })
+        .visualEffect(this.feedback.effect('button-2'))
+        .compositingFilter(this.feedback.filter('button-2'))
         .attributeModifier(this.feedback.control('button-2'))
         .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
         .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
@@ -94,6 +98,8 @@ export struct EventDetail {
           .fontColor(Theme.accent)
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.state.openReminderSettings(); })
+          .visualEffect(this.feedback.effect('button-4'))
+          .compositingFilter(this.feedback.filter('button-4'))
           .attributeModifier(this.feedback.control('button-4'))
         Text('开启通知后，在编辑活动中选择提醒时间。').fontSize(12).fontColor(Theme.muted)
       }
@@ -107,6 +113,8 @@ export struct EventDetail {
       .backgroundColor(Theme.surface)
       .borderRadius(Theme.cardRadius)
       .alignItems(HorizontalAlign.Start)
+      .visualEffect(this.feedback.effect('column-3', true))
+      .compositingFilter(this.feedback.filter('column-3', true))
       .attributeModifier(this.feedback.control('column-3', true))
   }
 
@@ -129,20 +137,20 @@ export struct EventDetail {
             Button('关联已有').backgroundColor(Theme.tint).fontColor(Theme.accent).fontSize(13).constraintSize({ minHeight: 36 })
               .onClick((): void => { vibration.dotVibration(); this.linking = true; })
                 .accessibilityText('关联已有计划')
+                .visualEffect(this.feedback.effect('button-5'))
+                .compositingFilter(this.feedback.filter('button-5'))
                 .attributeModifier(this.feedback.control('button-5'))
           }.width('100%').alignItems(VerticalAlign.Center)
           if (!this.state.projects.some((p: CosProject) => p.eventId === this.event.id)) { Text('使用标题栏的「新建计划」，本次活动和日期会自动填入。')
             .fontSize(13)
             .fontColor(Theme.muted) }
-          ForEach(this.state.projects.filter((p: CosProject) => p.eventId === this.event.id), (p: CosProject) => { 
-          ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
+          ForEach(this.state.projects.filter((p: CosProject) => p.eventId === this.event.id), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
         Blank().height(Theme.contentBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
-      .bindSheet(this.linking, this.linkSheet(), appSheetOptions((): void => { 
-    this.linking = false; }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.linking, this.linkSheet(), appSheetOptions((): void => { this.linking = false; }, this.sheetEntrance, this.getUIContext()))
   }
 }

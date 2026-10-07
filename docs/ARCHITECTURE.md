@@ -45,7 +45,7 @@ entry/src/main/ets/
 - pages/Dashboard：五个 Tab 的 HdsNavigation/NavPathStack、覆盖详情、启动与维护调度
 - pages/main/：五个一级业务页面
 - pages/detail/：角色、计划、装备、活动、照片、参考图详情
-- pages/more/：SettingsPage、ExpenseSummaryPage、AppLogPage、LocalHtmlPage
+- pages/more/：SettingsPage、DevPage、ExpenseSummaryPage、AppLogPage、LocalHtmlPage
 - component/：复用的 HDS 导航/卡片/设置、表单字段、照片网格、活动日历与 charts 下的 Canvas 图表
 - common/：appState 公共存储边界、constants 公共常量、types、主题/日期/反馈、偏好和系统能力
 - model/：ApplicationState、实体、领域规则、ProjectRoute 与 EditDraft
@@ -117,6 +117,8 @@ AccountService 先核对模块 client_id 配置，再发送带随机 state 的�
 目录与状态边界以 Dashboard 为参考，独立保留 ElvaCos 的 model/data 层。common/appState 是 Ability 与根页面共享状态的唯一入口，通过 AppStorageV2.connect 保存 @ObservedV2 AppState；Dashboard 使用 V1 公有存储，本工程不把 V2 领域对象直接塞入 V1。页面显式注入 @Require @Param state，局部筛选、弹层、Scroller 与 NavPathStack 不持久化。Preferences 的磁盘 key 和迁移保持不变；PreferenceSettings 与 SettingsPanel 使用 @StorageLink，明确 Builder 桥接到 V2 控件，保存经原有持久化方法。
 
 EntryAbility 先读取一次偏好并应用 ColorMode，再加载 pages/Dashboard。根页面 onPageShow 延后一轮事件循环加载 RDB；成功后延时执行媒体孤立文件收集和代理提醒核对。失败通过 loading/error 和重试入口报告；硬件/提醒失败不取消已保存的业务数据。onPageHide/aboutToDisappear 取消排队 Timer 并停止握姿，异步完成后检查可见性/请求代次。dispose 等待初始化、业务操作和偏好保存，再等待 RdbStore.close 的 Promise 完成后释放上下文。DetailDestination 与 Sheet 的显示生命周期继续复用已有动效工具；设置目的地共享根页面 MainEntranceSession，仅首次打开播放，缓存返回或重建直接显示完整内容。原生设置行及其内部控件不再绑定额外按压处理。
+
+DevPage（开发者选项）由设置页版本号连点五次进入，同样沿用 DetailDestination，不新增一级入口；只提供示例数据载入与只读诊断信息（应用版本与构建号、数据库结构版本、系统能力、common/DeviceInfo 汇总的完整 deviceInfo 字段、本机记录数量）。只读行把值放在可换行、可复制的整行宽度里，长值不会撑破卡片。入口点击不振动，构建号不再显示在设置页版本信息里。
 
 AppLogPage 从 constants 的 APP_LOG 读取版本说明；LocalHtmlPage 从 rawfile/privacy.html 读取 UTF-8 正文，过滤源文件隐藏模板和脚本，用原生 Text/Scroll 阅读，不维护第二份正文，不执行脚本或加载网络内容。读取支持 loading/error/retry，离开后取消排队任务并忽略过期结果。阅读与统计内容宽度上限 840vp，普通列表/详情上限 1440vp；短横屏首页/设置改为单列整体滚动。
 

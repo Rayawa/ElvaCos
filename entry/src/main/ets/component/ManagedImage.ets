@@ -24,13 +24,10 @@ export struct ManagedImage {
     Stack() {
       if (this.sourcePath && !this.failed) {
         Image(this.uri()).width('100%').height('100%').objectFit(this.fit)
-          .onComplete((event) => { 
-        if (event && event.width > 0 && event.height > 0) { 
-          this.loadedRatio = event.width / event.height; } 
-        this.loading = false; })
+          .onComplete((event) => { if (event && event.width > 0 && event.height > 0) { this.loadedRatio = event.width / event.height; } this.loading = false; })
           .onError(() => { this.loading = false; this.failed = true; this.onFailure(); })
           .accessibilityText(this.label).accessibilityDescription(this.loading ? '照片加载中' : '照片已加载')
-        if (this.loading) { LoadingProgress().width(24).height(24).color(Theme.accent).accessibilityText('照片加载中') }
+        if (this.loading) { LoadingProgress().width(24).height(24).color(Theme.brand).accessibilityText('照片加载中') }
       } else {
         Text('照片暂不可用').fontSize(13).fontColor(Theme.muted).textAlign(TextAlign.Center).accessibilityText(this.label + '，照片暂不可用')
       }
@@ -39,6 +36,8 @@ export struct ManagedImage {
       .backgroundColor(Theme.tint)
       .borderRadius(this.radius)
       .clip(true)
+      .visualEffect(this.feedback.effect('image', this.large))
+      .compositingFilter(this.feedback.filter('image', this.large))
       .attributeModifier(this.feedback.control('image', this.large))
   }
 }

@@ -18,14 +18,12 @@ export struct DateField {
       const selected = new Date();
       if (validTime(this.value)) { selected.setHours(Number(this.value.slice(0, 2)), Number(this.value.slice(3, 5)), 0, 0); }
       this.getUIContext()
-        .showTimePickerDialog({ selected: selected, useMilitaryTime: true, onAccept: (value: TimePickerResult): void => { 
-      this.change(String(value.hour ?? 0)
+        .showTimePickerDialog({ selected: selected, useMilitaryTime: true, onAccept: (value: TimePickerResult): void => { this.change(String(value.hour ?? 0)
         .padStart(2, '0') + ':' + String(value.minute ?? 0)
         .padStart(2, '0')); } });
     } else {
       this.getUIContext()
-        .showDatePickerDialog({ selected: validDate(this.value) ? new Date(this.value + 'T12:00:00') : new Date(), onDateAccept: (date: Date): void => { 
-      this.change(String(date.getFullYear())
+        .showDatePickerDialog({ selected: validDate(this.value) ? new Date(this.value + 'T12:00:00') : new Date(), onDateAccept: (date: Date): void => { this.change(String(date.getFullYear())
         .padStart(4, '0') + '-' + String(date.getMonth() + 1)
         .padStart(2, '0') + '-' + String(date.getDate())
         .padStart(2, '0')); } });
@@ -42,12 +40,16 @@ export struct DateField {
           .fontColor(this.value ? Theme.ink : Theme.muted)
           .onClick((): void => this.choose())
           .accessibilityText(this.label + '，' + (this.value || '未设置'))
+          .visualEffect(this.feedback.effect('button-1'))
+          .compositingFilter(this.feedback.filter('button-1'))
           .attributeModifier(this.feedback.control('button-1'))
         if (this.optional && this.value) { Button('清除')
           .backgroundColor(Theme.tint)
           .fontColor(Theme.accent)
           .onClick((): void => { vibration.dotVibration(); this.change(''); })
           .accessibilityText('清除' + this.label)
+          .visualEffect(this.feedback.effect('button-2'))
+          .compositingFilter(this.feedback.filter('button-2'))
           .attributeModifier(this.feedback.control('button-2')) }
       }.width('100%')
     }.width('100%').alignItems(HorizontalAlign.Start)

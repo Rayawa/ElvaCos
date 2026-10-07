@@ -1,0 +1,118 @@
+{
+  "retrievedAt": "2026-10-08",
+  "copyright": "角色与官方立绘版权归 miHoYo / HoYoverse；此处作为本地调试参考素材。",
+  "characters": [
+    {
+      "key": "hutao",
+      "name": "胡桃",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/07/22/300df2aed5060579f08d7db601d8710d_7586213496059203812.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/liyue"
+    },
+    {
+      "key": "raiden",
+      "name": "雷电将军",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/07/22/fdcbc9ef8859b7077d92ae38d925e15e_4430297517104014075.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/inazuma"
+    },
+    {
+      "key": "nahida",
+      "name": "纳西妲",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/10/26/fe684624008db25ac4b44ea4704f9ba0_3756826627935711351.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/sumeru"
+    },
+    {
+      "key": "furina",
+      "name": "芙宁娜",
+      "work": "原神",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/hk4e/113447/e8d153da1a2dca7a07fd76397cd60612_2043628622447437530.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/fontaine"
+    },
+    {
+      "key": "ayaka",
+      "name": "神里绫华",
+      "work": "原神",
+      "imageUrl": "https://webstatic.hoyoverse.com/upload/uploadstatic/contentweb/20210715/2021071516533380974.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/inazuma"
+    },
+    {
+      "key": "keqing",
+      "name": "刻晴",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/07/22/d063646e97392638e07da24ce6b8c3cb_3663735388079282123.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/liyue"
+    },
+    {
+      "key": "zhongli",
+      "name": "钟离",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/07/22/e699d7e2413ed5dfb384ee48c2b872d3_2081056854784197634.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/liyue"
+    },
+    {
+      "key": "venti",
+      "name": "温迪",
+      "work": "原神",
+      "imageUrl": "https://act-webstatic.hoyoverse.com/upload/contentweb/2022/07/22/965e940e6caafe8fbd4bf0e17653000b_4508958090491775485.png",
+      "sourcePage": "https://genshin.hoyoverse.com/en/character/mondstadt"
+    },
+    {
+      "key": "ellen",
+      "name": "艾莲·乔",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/113671/59a98a82a886f49c3b1b89bdc77cbb36_21606237077173472.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=113671"
+    },
+    {
+      "key": "jane",
+      "name": "简·杜",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/124675/be75dc37b5f356bdebc358fa21b7086a_5376265045261362106.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=124675"
+    },
+    {
+      "key": "miyabi",
+      "name": "星见雅",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/103379/a0b6a3fedf5b19a224dad6332f5c9404_8648655379164550438.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=103379"
+    },
+    {
+      "key": "anby",
+      "name": "安比·德玛拉",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/102103/1cf1ab68f06c0d2115ce382e6804e714_3383703376437037229.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=102103"
+    },
+    {
+      "key": "nicole",
+      "name": "妮可·德玛拉",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/102183/346659f4fb213f3075aee813997b9b31_990728217161469939.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=102183"
+    },
+    {
+      "key": "billy",
+      "name": "比利·奇德",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/102184/96e7d507f3aa3a6ccd9de17b97b1c062_6037497242185281511.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=102184"
+    },
+    {
+      "key": "zhuyuan",
+      "name": "朱鸢",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/122782/429d3e32cd49a1fb11cf4a2e802e0fef_7560478538216099357.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=122782"
+    },
+    {
+      "key": "burnice",
+      "name": "柏妮思·怀特",
+      "work": "绝区零",
+      "imageUrl": "https://fastcdn.hoyoverse.com/content-v2/nap/125214/9ccd4f5c1997318ec545a1f37bd23726_7904001525523783480.png",
+      "sourcePage": "https://zenless.hoyoverse.com/en-us/character/detail?id=125214"
+    }
+  ]
+}

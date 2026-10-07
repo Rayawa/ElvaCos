@@ -63,3 +63,8 @@ export function photoStage(photos: PhotoAsset[], filter: number): PhotoAsset[] {
     (filter === 3 && photo.status === PhotoStatus.WAITING) ||
     (filter === 4 && (photo.status === PhotoStatus.RETOUCHED || photo.status === PhotoStatus.FINAL || photo.status === PhotoStatus.PUBLISHED)));
 }
+
+export function portfolioStage(photos: PhotoAsset[], filter: number): PhotoAsset[] {
+  return photos.filter((photo: PhotoAsset): boolean =>
+    (photo.status === PhotoStatus.FINAL && filter !== 2) || (photo.status === PhotoStatus.PUBLISHED && filter !== 1));
+}

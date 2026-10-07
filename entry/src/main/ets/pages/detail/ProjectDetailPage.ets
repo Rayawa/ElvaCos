@@ -41,11 +41,9 @@ export struct ProjectDetail {
   private equipment(): Asset[] { return this.state.projectAssets(this.project.id)
     .sort((a: Asset, b: Asset) => Number(a.status === AssetStatus.OWNED) - Number(b.status === AssetStatus.OWNED) || a.name.localeCompare(b.name)); }
   private linked(asset: Asset): boolean { return this.state.projectAssets(this.project.id).some((a: Asset) => a.id === asset.id); }
-  private location(item: ChecklistItem): string { 
-  return this.state.assets.find((a: Asset) => a.id === item.assetId)?.location || (item.assetId ? '存放位置待补充' : '随身物品'); }
+  private location(item: ChecklistItem): string { return this.state.assets.find((a: Asset) => a.id === item.assetId)?.location || (item.assetId ? '存放位置待补充' : '随身物品'); }
   private async unlink(asset: Asset): Promise<void> {
-    if (await confirm(this.getUIContext(), '解除装备关联？', '本计划中对应的打包项也会移除，衣柜中的装备会保留。', '解除关联')) { 
-    await this.state.unlinkAsset(this.project.id, asset.id); }
+    if (await confirm(this.getUIContext(), '解除装备关联？', '本计划中对应的打包项也会移除，衣柜中的装备会保留。', '解除关联')) { await this.state.unlinkAsset(this.project.id, asset.id); }
   }
 
   @Builder linkSheet() {
@@ -61,8 +59,7 @@ export struct ProjectDetail {
             Button() {
               Row() {
                 Column({ space: 5 }) { Text(asset.name)
-                  .fontColor(Theme.ink); 
-                Text(ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] + ' · ' + (asset.location || '位置待补充'))
+                  .fontColor(Theme.ink); Text(ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] + ' · ' + (asset.location || '位置待补充'))
                   .fontSize(12)
                   .fontColor(Theme.muted) }.alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
@@ -73,6 +70,8 @@ export struct ProjectDetail {
               .enabled(!this.state.busy && !this.linked(asset))
               .onClick((): void => { vibration.dotVibration(); this.state.linkAsset(this.project.id, asset); })
               .accessibilityText('关联 ' + asset.name)
+              .visualEffect(this.feedback.effect('link-asset:' + asset.id, true))
+              .compositingFilter(this.feedback.filter('link-asset:' + asset.id, true))
               .attributeModifier(this.feedback.control('link-asset:' + asset.id, true))
           }
         }, (asset: Asset) => asset.id)
@@ -85,15 +84,19 @@ export struct ProjectDetail {
         .fontColor(Theme.accent)
         .enabled(!this.state.busy)
         .onClick((): void => { vibration.dotVibration(); this.route.linking = false; this.edit('asset', '', this.project.id); })
+        .visualEffect(this.feedback.effect('button-2'))
+        .compositingFilter(this.feedback.filter('button-2'))
         .attributeModifier(this.feedback.control('button-2'))
         .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
         .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
       Button('完成')
         .accessibilityText('完成')
         .width('100%')
-        .backgroundColor(Theme.accent)
+        .backgroundColor(Theme.brand)
         .fontColor(Theme.onAccent)
         .onClick((): void => { vibration.dotVibration(); this.route.linking = false; })
+        .visualEffect(this.feedback.effect('button-3'))
+        .compositingFilter(this.feedback.filter('button-3'))
         .attributeModifier(this.feedback.control('button-3'))
         .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
         .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
@@ -103,11 +106,13 @@ export struct ProjectDetail {
   @Builder checkButton(item: ChecklistItem) {
     Button(item.done ? '✓ 已装包' : '装包')
       .constraintSize({ minWidth: 88, minHeight: this.route.outing ? 64 : 48 })
-      .backgroundColor(item.done ? Theme.tint : Theme.accent)
+      .backgroundColor(item.done ? Theme.tint : Theme.brand)
       .fontColor(item.done ? Theme.accent : Theme.onAccent)
       .enabled(!this.state.busy)
       .onClick((): void => { vibration.dotVibration(); this.state.toggleChecklist(item); })
         .accessibilityText(item.label + (item.done ? '，已装包，点击取消' : '，点击确认装包'))
+        .visualEffect(this.feedback.effect('packing-confirm:' + item.id))
+        .compositingFilter(this.feedback.filter('packing-confirm:' + item.id))
         .attributeModifier(this.feedback.control('packing-confirm:' + item.id))
   }
 
@@ -127,8 +132,7 @@ export struct ProjectDetail {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       StatusPill({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.project.status)] })
     }.width('100%').alignItems(VerticalAlign.Center)
-    if (planDate(this.project, this.state.events)) { 
-    Text('计划日期 · ' + planDate(this.project, this.state.events)).fontSize(13).fontColor(Theme.muted) }
+    if (planDate(this.project, this.state.events)) { Text('计划日期 · ' + planDate(this.project, this.state.events)).fontSize(13).fontColor(Theme.muted) }
     if (this.project.eventId) {
       Button('活动 · ' + (this.state.events.find((e: CosEvent) => e.id === this.project.eventId)?.name || '未关联'))
         .backgroundColor(Theme.tint)
@@ -136,14 +140,12 @@ export struct ProjectDetail {
         .fontSize(13)
         .constraintSize({ minHeight: 36 })
         .onClick((): void => { vibration.dotVibration(); this.open('event', this.project.eventId); })
-        .accessibilityText('打开关联活动').attributeModifier(this.feedback.control('button-5'))
+        .accessibilityText('打开关联活动').visualEffect(this.feedback.effect('button-5')).compositingFilter(this.feedback.filter('button-5')).attributeModifier(this.feedback.control('button-5'))
     }
   }
 
-  private categories(): PreparationCategory[] { 
-  return this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.project.id); }
-  private tasks(categoryId: string): PreparationTask[] { 
-  return this.state.preparationTasks.filter((t: PreparationTask) => t.categoryId === categoryId)
+  private categories(): PreparationCategory[] { return this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.project.id); }
+  private tasks(categoryId: string): PreparationTask[] { return this.state.preparationTasks.filter((t: PreparationTask) => t.categoryId === categoryId)
     .sort((a: PreparationTask, b: PreparationTask) => Number(a.done) - Number(b.done) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)); }
 
   private visibleTasks(categoryId: string): PreparationTask[] {
@@ -151,8 +153,7 @@ export struct ProjectDetail {
     return this.expandedCategories.includes(categoryId) ? tasks : tasks.filter((t: PreparationTask) => !t.done).slice(0, 1);
   }
   private expandCategory(id: string): void {
-    vibration.dotVibration(); 
-  this.expandedCategories = this.expandedCategories.includes(id) ? this.expandedCategories.filter((key: string) => key !== id) : this.expandedCategories.concat(id);
+    vibration.dotVibration(); this.expandedCategories = this.expandedCategories.includes(id) ? this.expandedCategories.filter((key: string) => key !== id) : this.expandedCategories.concat(id);
   }
   @Builder preparationSheet() {
     Column({ space: 14 }) {
@@ -171,6 +172,8 @@ export struct ProjectDetail {
           .fontColor(Theme.accent)
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.route.preparing = false; this.edit('category', '', this.project.id); })
+          .visualEffect(this.feedback.effect('button-6'))
+          .compositingFilter(this.feedback.filter('button-6'))
           .attributeModifier(this.feedback.control('button-6'))
           .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
           .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
@@ -182,6 +185,8 @@ export struct ProjectDetail {
           .enabled(!this.state.busy && this.categories()
           .length > 0)
           .onClick((): void => { vibration.dotVibration(); this.route.preparing = false; this.edit('preparation', '', this.project.id); })
+          .visualEffect(this.feedback.effect('button-7'))
+          .compositingFilter(this.feedback.filter('button-7'))
           .attributeModifier(this.feedback.control('button-7'))
           .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
           .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
@@ -196,14 +201,12 @@ export struct ProjectDetail {
       Button(this.state.busy ? '添加中…' : '补入所选任务')
         .accessibilityText(this.state.busy ? '正在添加准备任务' : '补入所选准备任务')
         .width('100%')
-        .backgroundColor(Theme.accent)
+        .backgroundColor(Theme.brand)
         .fontColor(Theme.onAccent)
         .enabled(!this.state.busy && this.templateKeys.length > 0)
-        .onClick(async (): Promise<void> => { 
-      vibration.dotVibration(); 
-      if (await this.state.addPreparationTemplate(this.project.id, this.templateKeys)) { 
-        this.route.preparing = false; } 
-    })
+        .onClick(async (): Promise<void> => { vibration.dotVibration(); if (await this.state.addPreparationTemplate(this.project.id, this.templateKeys)) { this.route.preparing = false; } })
+          .visualEffect(this.feedback.effect('button-8'))
+          .compositingFilter(this.feedback.filter('button-8'))
           .attributeModifier(this.feedback.control('button-8'))
           .opacity(this.sheetEntrance.step >= 3 ? 1 : 0)
           .translate({ y: this.sheetEntrance.step >= 3 ? 0 : 20 })
@@ -224,7 +227,7 @@ export struct ProjectDetail {
       Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear })
         .accessibilityText('准备任务完成 ' + this.state.preparationPercent(this.project.id) + '%')
         .width('100%')
-        .color(Theme.accent)
+        .color(Theme.brand)
         .backgroundColor(Theme.tint)
       Text(preparationProgress(this.project.id, this.state.preparationTasks)
         .total === 0 ? '尚未添加准备任务，可以从模板开始。' : preparationProgress(this.project.id, this.state.preparationTasks)
@@ -242,6 +245,8 @@ export struct ProjectDetail {
       .width('100%')
       .backgroundColor(Theme.surface)
       .borderRadius(Theme.cardRadius)
+      .visualEffect(this.feedback.effect('column-9', true))
+      .compositingFilter(this.feedback.filter('column-9', true))
       .attributeModifier(this.feedback.control('column-9', true))
   }
 
@@ -272,6 +277,8 @@ export struct ProjectDetail {
             .layoutWeight(1)
             .onClick((): void => this.expandCategory(category.id))
             .accessibilityText((this.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
+            .visualEffect(this.feedback.effect('button-11' + ":" + category.id))
+            .compositingFilter(this.feedback.filter('button-11' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-11' + ":" + category.id))
           Button('编辑')
             .backgroundColor(Theme.bg)
@@ -279,12 +286,16 @@ export struct ProjectDetail {
             .fontSize(12)
             .onClick((): void => { vibration.dotVibration(); this.edit('category', category.id, this.project.id); })
             .accessibilityText('编辑分类 ' + category.name)
+            .visualEffect(this.feedback.effect('button-12' + ":" + category.id))
+            .compositingFilter(this.feedback.filter('button-12' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-12' + ":" + category.id))
           Button('＋')
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)
             .onClick((): void => { vibration.dotVibration(); this.edit('preparation', '', category.id); })
             .accessibilityText('添加 ' + category.name + ' 任务')
+            .visualEffect(this.feedback.effect('button-13' + ":" + category.id))
+            .compositingFilter(this.feedback.filter('button-13' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-13' + ":" + category.id))
           Button('−')
             .backgroundColor(Theme.bg)
@@ -292,6 +303,8 @@ export struct ProjectDetail {
             .enabled(!this.state.busy)
             .onClick((): void => { vibration.dotVibration(); this.remove('category', category.id); })
             .accessibilityText('删除分类 ' + category.name)
+            .visualEffect(this.feedback.effect('button-14' + ":" + category.id))
+            .compositingFilter(this.feedback.filter('button-14' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-14' + ":" + category.id))
         }.width('100%')
         ForEach(this.visibleTasks(category.id), (task: PreparationTask) => {
@@ -303,6 +316,8 @@ export struct ProjectDetail {
               .enabled(!this.state.busy)
               .onClick((): void => { vibration.dotVibration(); this.state.togglePreparation(task); })
                 .accessibilityText(category.name + ' · ' + task.label + (task.done ? '，已完成，点击取消' : '，点击完成'))
+                .visualEffect(this.feedback.effect('button-15' + ":" + category.id + ":" + task.id))
+                .compositingFilter(this.feedback.filter('button-15' + ":" + category.id + ":" + task.id))
                 .attributeModifier(this.feedback.control('button-15' + ":" + category.id + ":" + task.id))
             Column({ space: 4 }) {
               Text(task.label)
@@ -310,12 +325,13 @@ export struct ProjectDetail {
                 .fontColor(task.done ? Theme.muted : Theme.ink)
                 .decoration({ type: task.done ? TextDecorationType.LineThrough : TextDecorationType.None })
               if (task.dueDate) { Text('截止 ' + task.dueDate).fontSize(12).fontColor(Theme.muted) }
-              if (task.notes) { 
-              Text(task.notes).fontSize(12).fontColor(Theme.muted).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
+              if (task.notes) { Text(task.notes).fontSize(12).fontColor(Theme.muted).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
             }.layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
               .onClick((): void => { vibration.dotVibration(); this.edit('preparation', task.id, this.project.id); })
               .accessibilityText('编辑任务 ' + task.label)
+              .visualEffect(this.feedback.effect('column-16' + ":" + category.id + ":" + task.id))
+              .compositingFilter(this.feedback.filter('column-16' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('column-16' + ":" + category.id + ":" + task.id))
             Button('−')
               .backgroundColor(Theme.bg)
@@ -323,6 +339,8 @@ export struct ProjectDetail {
               .enabled(!this.state.busy)
               .onClick((): void => { vibration.dotVibration(); this.remove('preparation', task.id); })
               .accessibilityText('删除准备任务 ' + task.label)
+              .visualEffect(this.feedback.effect('button-17' + ":" + category.id + ":" + task.id))
+              .compositingFilter(this.feedback.filter('button-17' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('button-17' + ":" + category.id + ":" + task.id))
           }.width('100%')
         }, (task: PreparationTask) => task.id)
@@ -332,6 +350,8 @@ export struct ProjectDetail {
         .backgroundColor(Theme.surface)
         .borderRadius(Theme.cardRadius)
         .alignItems(HorizontalAlign.Start)
+        .visualEffect(this.feedback.effect('column-10' + ":" + category.id, true))
+        .compositingFilter(this.feedback.filter('column-10' + ":" + category.id, true))
         .attributeModifier(this.feedback.control('column-10' + ":" + category.id, true))
     }, (category: PreparationCategory) => category.id)
   }
@@ -347,16 +367,18 @@ export struct ProjectDetail {
           .fontColor(Theme.muted) }.layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
           .onClick((): void => { vibration.dotVibration(); this.open('asset', asset.id); })
-          .accessibilityText(asset.name + '，打开装备详情').attributeModifier(this.feedback.control('column-19' + ":" + asset.id))
+          .accessibilityText(asset.name + '，打开装备详情').visualEffect(this.feedback.effect('column-19' + ":" + asset.id)).compositingFilter(this.feedback.filter('column-19' + ":" + asset.id)).attributeModifier(this.feedback.control('column-19' + ":" + asset.id))
         Button('移除')
           .backgroundColor(Theme.bg)
           .fontColor(Theme.muted)
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.unlink(asset); })
           .accessibilityText('解除 ' + asset.name + ' 的计划关联')
+          .visualEffect(this.feedback.effect('button-20' + ":" + asset.id))
+          .compositingFilter(this.feedback.filter('button-20' + ":" + asset.id))
           .attributeModifier(this.feedback.control('button-20' + ":" + asset.id))
       }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(18).attributeModifier(this.feedback.control('row-18' + ":" + asset.id, true))
+    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(18).visualEffect(this.feedback.effect('row-18' + ":" + asset.id, true)).compositingFilter(this.feedback.filter('row-18' + ":" + asset.id, true)).attributeModifier(this.feedback.control('row-18' + ":" + asset.id, true))
     }, (asset: Asset) => asset.id)
     if (this.state.projectAssets(this.project.id).length === 0) {
       Row({ space: 8 }) { Text('还没有关联装备，可以新建或从衣柜复用。')
@@ -367,6 +389,8 @@ export struct ProjectDetail {
         .backgroundColor(Theme.tint)
         .fontColor(Theme.accent)
         .onClick((): void => { vibration.dotVibration(); this.edit('asset', '', this.project.id); })
+        .visualEffect(this.feedback.effect('button-21'))
+        .compositingFilter(this.feedback.filter('button-21'))
         .attributeModifier(this.feedback.control('button-21')) }.width('100%')
     }
     if (this.project.notes) { SectionHeading({ title: '备注' }); Text(this.project.notes).fontSize(14).fontColor(Theme.muted) }
@@ -387,6 +411,8 @@ export struct ProjectDetail {
         .backgroundColor(Theme.tint)
         .fontColor(Theme.accent)
         .onClick((): void => { vibration.dotVibration(); this.edit('team', '', this.project.id); })
+        .visualEffect(this.feedback.effect('button-22'))
+        .compositingFilter(this.feedback.filter('button-22'))
         .attributeModifier(this.feedback.control('button-22'))
     }.width('100%')
     ForEach(this.state.team.filter((m: TeamMember) => m.projectId === this.project.id), (m: TeamMember) => {
@@ -399,6 +425,8 @@ export struct ProjectDetail {
           .alignItems(HorizontalAlign.Start)
           .onClick((): void => { vibration.dotVibration(); this.edit('team', m.id, this.project.id); })
           .accessibilityText('编辑团队成员 ' + m.name)
+          .visualEffect(this.feedback.effect('column-24' + ":" + m.id))
+          .compositingFilter(this.feedback.filter('column-24' + ":" + m.id))
           .attributeModifier(this.feedback.control('column-24' + ":" + m.id))
         Button('−')
           .backgroundColor(Theme.bg)
@@ -406,12 +434,13 @@ export struct ProjectDetail {
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('team', m.id); })
           .accessibilityText('删除团队成员 ' + m.name)
+          .visualEffect(this.feedback.effect('button-25' + ":" + m.id))
+          .compositingFilter(this.feedback.filter('button-25' + ":" + m.id))
           .attributeModifier(this.feedback.control('button-25' + ":" + m.id))
       }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).attributeModifier(this.feedback.control('row-23' + ":" + m.id, true))
+    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-23' + ":" + m.id, true)).compositingFilter(this.feedback.filter('row-23' + ":" + m.id, true)).attributeModifier(this.feedback.control('row-23' + ":" + m.id, true))
     }, (m: TeamMember) => m.id)
-    if (!this.state.team.some((m: TeamMember) => m.projectId === this.project.id)) { 
-    Text('记录毛娘、妆娘、摄影、后勤和后期的人选。').fontColor(Theme.muted).fontSize(13) }
+    if (!this.state.team.some((m: TeamMember) => m.projectId === this.project.id)) { Text('记录毛娘、妆娘、摄影、后勤和后期的人选。').fontColor(Theme.muted).fontSize(13) }
     Row({ space: 8 }) {
       SectionHeading({ title: '实际花费' }).layoutWeight(1)
       Button('＋ 记一笔')
@@ -419,6 +448,8 @@ export struct ProjectDetail {
         .backgroundColor(Theme.tint)
         .fontColor(Theme.accent)
         .onClick((): void => { vibration.dotVibration(); this.edit('expense', '', this.project.id); })
+        .visualEffect(this.feedback.effect('button-26'))
+        .compositingFilter(this.feedback.filter('button-26'))
         .attributeModifier(this.feedback.control('button-26'))
     }.width('100%')
     Text('实际 ¥' + (expenseTotal(this.state.expenses, this.project.id) / 100)
@@ -436,6 +467,8 @@ export struct ProjectDetail {
           .alignItems(HorizontalAlign.Start)
           .onClick((): void => { vibration.dotVibration(); this.edit('expense', e.id, this.project.id); })
           .accessibilityText('编辑花费 ' + e.name)
+          .visualEffect(this.feedback.effect('column-28' + ":" + e.id))
+          .compositingFilter(this.feedback.filter('column-28' + ":" + e.id))
           .attributeModifier(this.feedback.control('column-28' + ":" + e.id))
         Button('−')
           .backgroundColor(Theme.bg)
@@ -443,15 +476,19 @@ export struct ProjectDetail {
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('expense', e.id); })
           .accessibilityText('删除花费 ' + e.name)
+          .visualEffect(this.feedback.effect('button-29' + ":" + e.id))
+          .compositingFilter(this.feedback.filter('button-29' + ":" + e.id))
           .attributeModifier(this.feedback.control('button-29' + ":" + e.id))
       }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).attributeModifier(this.feedback.control('row-27' + ":" + e.id, true))
+    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-27' + ":" + e.id, true)).compositingFilter(this.feedback.filter('row-27' + ":" + e.id, true)).attributeModifier(this.feedback.control('row-27' + ":" + e.id, true))
     }, (e: Expense) => e.id)
     Button('查看全部花费统计')
       .accessibilityText('查看全部花费统计')
       .backgroundColor(Theme.tint)
       .fontColor(Theme.accent)
       .onClick((): void => { vibration.dotVibration(); this.open('expenseStats', 'all'); })
+      .visualEffect(this.feedback.effect('button-30'))
+      .compositingFilter(this.feedback.filter('button-30'))
       .attributeModifier(this.feedback.control('button-30'))
   }
 
@@ -465,7 +502,7 @@ export struct ProjectDetail {
       .fontSize(13) }
     Progress({ value: checklistProgress(this.items()), total: 100, type: ProgressType.Linear })
       .accessibilityText('打包清单完成 ' + checklistProgress(this.items()) + '%')
-      .color(Theme.accent)
+      .color(Theme.brand)
       .backgroundColor(Theme.tint)
       .width('100%')
     if (this.items().length === 0) { EmptyState({
@@ -490,10 +527,12 @@ export struct ProjectDetail {
           .enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('checklist', item.id); })
           .accessibilityText('删除清单项 ' + item.label)
+          .visualEffect(this.feedback.effect('button-32' + ":" + item.id))
+          .compositingFilter(this.feedback.filter('button-32' + ":" + item.id))
           .attributeModifier(this.feedback.control('button-32' + ":" + item.id)) }
         if (this.state.hand() !== 'left') { this.checkButton(item) }
       }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(20).attributeModifier(this.feedback.control('row-31' + ":" + item.id, true))
+    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(20).visualEffect(this.feedback.effect('row-31' + ":" + item.id, true)).compositingFilter(this.feedback.filter('row-31' + ":" + item.id, true)).attributeModifier(this.feedback.control('row-31' + ":" + item.id, true))
     }, (item: ChecklistItem) => item.id)
   }
 
@@ -519,9 +558,7 @@ export struct ProjectDetail {
       .scrollBar(BarState.Off)
       .align(Alignment.Top)
       .transition(pageTransition())
-      .bindSheet(this.route.preparing || this.route.linking, this.activeSheet(), appSheetOptions((): void => { 
-    this.route.preparing = false; 
-    this.route.linking = false; }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.route.preparing || this.route.linking, this.activeSheet(), appSheetOptions((): void => { this.route.preparing = false; this.route.linking = false; }, this.sheetEntrance, this.getUIContext()))
       .onDisAppear((): void => { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); this.state.suspend(); })
   }
 }

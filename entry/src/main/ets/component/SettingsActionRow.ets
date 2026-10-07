@@ -1,4 +1,3 @@
-import { PressFeedback } from '../common/pressFeedback';
 import { TextModifier } from '@kit.ArkUI';
 import { HdsListItemCard, IconSize, PrefixIcon, SuffixCustomBuilder } from '@kit.UIDesignKit';
 import { Theme } from '../common/Theme';
@@ -8,7 +7,6 @@ import { vibration } from '../common/vibration';
 // Dashboard/MyPage MoreRow, with business label/icon/action passed as V2 inputs.
 @ComponentV2
 export struct SettingsActionRow {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
   @Param icon: Resource = Icons.help;
   @Param isEnabled: boolean = true;
@@ -30,6 +28,6 @@ export struct SettingsActionRow {
       cardPrefixMargin: 8,
       cardSuffixMargin: 8,
       accessibilityOptions: { accessibilityText: this.label },
-    }).enabled(this.isEnabled).id('settings-action-' + this.label).attributeModifier(this.feedback.control('hdslistitemcard-1'))
+    }).enabled(this.isEnabled).id('settings-action-' + this.label)
   }
 }

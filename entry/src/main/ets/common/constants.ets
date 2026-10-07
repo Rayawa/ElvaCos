@@ -7,6 +7,7 @@ export const STORAGE_KEY_VIBRATION_LEVEL = 'vibrationLevel';
 export const STORAGE_KEY_LIGHT_FIELD_LEVEL = 'lightFieldLevel';
 export const STORAGE_KEY_IMMERSIVE_MATERIAL_LEVEL = 'immersiveMaterialLevel';
 export const STORAGE_KEY_APPEARANCE = 'appearance';
+export const STORAGE_KEY_THEME_COLOR = 'themeColor';
 export const STORAGE_KEY_HAND = 'hand';
 export const STORAGE_KEY_ACCOUNT_OPEN_ID = 'accountOpenId';
 export const STORAGE_KEY_ACCOUNT_UNION_ID = 'accountUnionId';
@@ -16,6 +17,7 @@ export const DEFAULT_VIBRATION_LEVEL = 1;
 export const DEFAULT_LIGHT_FIELD_LEVEL = 1;
 export const DEFAULT_IMMERSIVE_MATERIAL_LEVEL = 1;
 export const DEFAULT_APPEARANCE = 'system';
+export const DEFAULT_THEME_COLOR = 'blue';
 export const DEFAULT_HAND = 'left';
 export const PAGE_TRANSITION_DURATION_MS = 300;
 export const PAGE_EXIT_DURATION_MS = 220;
@@ -65,7 +67,7 @@ export const APPEARANCE_LIGHT: string = 'sky';
 export const APPEARANCE_DARK: string = 'mist';
 export const APPEARANCE_SYSTEM: string = 'system';
 export const APPEARANCE_VALUES: string[] = [APPEARANCE_LIGHT, APPEARANCE_SYSTEM, APPEARANCE_DARK];
-export const APPEARANCE_LABELS: string[] = ['天蓝', '跟随系统', '雾蓝'];
+export const APPEARANCE_LABELS: string[] = ['浅色', '跟随系统', '深色'];
 export const HAND_VALUES: string[] = ['left', 'auto', 'right'];
 export const HAND_LABELS: string[] = ['左手', '智感握持', '右手'];
 export const PROJECT_STATUSES: ProjectStatus[] = [ProjectStatus.IDEA, ProjectStatus.PLANNING, ProjectStatus.PREPARING, ProjectStatus.READY, ProjectStatus.EVENT, ProjectStatus.SHOOTING, ProjectStatus.POST, ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED];
@@ -95,19 +97,31 @@ export const PREPARATION_TEMPLATES: CategoryTemplate[] = [
 
 export const APP_BUILD_NUMBER = 10000001;
 export const STORAGE_KEY_APPLICATION_STATE = 'applicationState';
+export const SETTINGS_ENTRANCE_KEY = 'SettingsPage';
+// 版本号连点进入开发者选项：窗口内未点满就重置，避免误触累积。
+export const DEVELOPER_ENTRANCE_TAPS = 5;
+export const DEVELOPER_ENTRANCE_WINDOW_MS = 1600;
+export const DEVELOPER_PAGE_TITLE = '开发者选项';
 export const PRIVACY_RAWFILE = 'privacy.html';
 export const READING_MAX_WIDTH = 840;
 export const MAIN_PAGE_TITLES: string[] = ['首页', 'Cos', '活动', '衣柜', '我的'];
 
 export const APP_LOG: ReleaseNote[] = [{
   version: APP_VERSION,
-  date: '2026-10-07',
+  type: 'beta',
+  buildNumber: APP_BUILD_NUMBER,
+  date: '2026-10-08',
   changes: [
     '按 Dashboard 整理 ability、common、component 与 pages/main、detail、more，保留独立领域、数据库和媒体层。',
     '统一应用公共状态入口，设置沿用 Preferences 与 StorageLink，移除页面默认创建的业务状态。',
-    '新增更新日志和原生隐私政策阅读页；隐私正文直接读取本地 privacy.html。',
+    '新增支持 Beta、RC、正式版独立筛选的更新日志和原生隐私政策阅读页；隐私正文直接读取本地 privacy.html。',
     '根据容器宽高切换布局，补齐短横屏滚动、阅读宽度和花费分类交互。',
     '启动数据加载与维护分阶段执行，取消过期握姿监听和异步界面回写，补齐中文无障碍标签。',
+    '设置页与主页共享启动期入场记录，只在首次打开时播放；设置列表使用原生触摸反馈，移除叠加按压特效。',
+    '提供蓝、薄荷绿、樱花粉、杏橙、珊瑚红五组浅深配色，外观独立选择浅色、跟随系统或深色。',
+    '增加月度花费趋势与照片处理分布，修复照片筛选刷新、卡片留白、活动倒计时和日历按压光效。',
+    '内置原神与绝区零离线示例，可在开发者选项中追加；仅调试构建首次空库自动加载，Release 构建保持空白。',
+    '工程文档改为现状与参考说明，后续开发以当次任务为准。',
   ],
 }];
 
@@ -118,9 +132,9 @@ export const HDS_TITLE_SIZE_SMALL: number = 0;
 export const SCHEMA_VERSION = 3;
 export const MIN_SPLIT_HEIGHT = 600;
 export const LAYOUT_CONTENT_TOP: number = 100;
-export const LAYOUT_DETAIL_TOP: number = 100;
+export const LAYOUT_DETAIL_TOP: number = 90;
 export const LAYOUT_DETAIL_TOP_WITH_SEGMENT: number = 112;
-export const LAYOUT_CONTENT_BOTTOM: number = 110;
+export const LAYOUT_CONTENT_BOTTOM: number = 90;
 export const LAYOUT_HOME_CONTENT_BOTTOM: number = 96;
 export const LAYOUT_TOOLBAR_BOTTOM_RESERVATION: number = 96;
 export const LAYOUT_SECTION_SPACING: number = 14;

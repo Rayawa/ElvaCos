@@ -38,8 +38,7 @@ export struct EventsPage {
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private events(): CosEvent[] { 
-  return this.state.events.filter((e: CosEvent) => this.filter === 2 ? e.dateMode === 'pending' : this.filter === 1 ? e.dateMode !== 'pending' && (e.status === 'Attended' || eventEnd(e) < today()) : e.dateMode !== 'pending' && e.status !== 'Attended' && eventEnd(e) >= today())
+  private events(): CosEvent[] { return this.state.events.filter((e: CosEvent) => this.filter === 2 ? e.dateMode === 'pending' : this.filter === 1 ? e.dateMode !== 'pending' && (e.status === 'Attended' || eventEnd(e) < today()) : e.dateMode !== 'pending' && e.status !== 'Attended' && eventEnd(e) >= today())
     .sort((a: CosEvent, b: CosEvent) => this.filter === 1 ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)); }
   @Builder content(e: CosEvent) {
     Row({ space: 18 }) {
@@ -73,6 +72,8 @@ export struct EventsPage {
                   .onSelect((index: number): void => { vibration.dotVibration(); this.filterChanged(index); })
                   .id('event-list-filter')
                   .accessibilityText('活动日期筛选')
+                  .visualEffect(this.feedback.effect('select-1'))
+                  .compositingFilter(this.feedback.filter('select-1'))
                   .attributeModifier(this.feedback.control('select-1'))
               }
             }.width('100%')

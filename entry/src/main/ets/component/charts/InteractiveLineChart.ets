@@ -1,0 +1,608 @@
+import { common } from '@kit.AbilityKit';
+import { hdsEffect } from '@kit.UIDesignKit';
+import { vibration } from '../../common/vibration';
+import { pressLightFieldFilter, pressVisualEffect } from '../../common/visualEffects';
+import { Theme } from '../../common/Theme';
+import { ChartConfigurationObserver } from './ChartConfigurationObserver';
+
+export interface ChartViewportState { zoom: number; panRatio: number; }
+
+export interface LineChartPoint {
+    label: string;
+    value: number;
+    detail: string;
+}
+
+export interface LineChartSeries {
+    label: string;
+    color: Resource;
+    points: LineChartPoint[];
+}
+
+@ComponentV2
+export struct InteractiveLineChart {
+    @Param paletteId: string = '';
+    // 移植 Dashboard 的折线绘制、选点、缩放与入场动画，适配 V2 状态和 ElvaCos 主题。
+    @Param title: string = '';
+    @Param unit: string = '';
+    @Param points: LineChartPoint[] = [];
+    @Param series: LineChartSeries[] = [];
+    @Param lineColor: Resource = Theme.brand;
+    @Param showTitle: boolean = true;
+    @Param chartHeight: number = 250;
+    @Param responsiveAxisFont: boolean = false;
+    @Param enablePressEffect: boolean = true;
+    @Param viewport: ChartViewportState = { zoom: 1, panRatio: 0 };
+    @Event onViewportChange: (viewport: ChartViewportState) => void = () => {};
+    private settings: RenderingContextSettings = new RenderingContextSettings(true);
+    private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
+    @Local private canvasWidth: number = 320;
+    @Local private selected: number = 0;
+    @Local private zoom: number = 1;
+    @Local private panOffset: number = 0;
+    @Local private pressed: boolean = false;
+    @Local private pressedLegend: string = '';
+    private zoomAtGestureStart: number = 1;
+    private panAtGestureStart: number = 0;
+    private canvasReady: boolean = false;
+    private drawProgress: number = 1;
+    private animationToken: number = 0;
+    private animatedDataSignature: string = '';
+    private legendPressToken: number = 0;
+    private legendPressTimer: number = -1;
+    private animationTimer: number = -1;
+    private drawTimer: number = -1;
+    private configuration: ChartConfigurationObserver = new ChartConfigurationObserver();
+    aboutToAppear(): void {
+        this.configuration.start(this.getUIContext().getHostContext() as common.UIAbilityContext, (): void => { this.draw(); });
+    }
+
+    private beginLegendPress(label: string): void {
+        const token = ++this.legendPressToken;
+        this.pressedLegend = label;
+        if (this.legendPressTimer >= 0) clearTimeout(this.legendPressTimer);
+        this.legendPressTimer = setTimeout((): void => {
+            this.legendPressTimer = -1;
+            if (this.legendPressToken === token && this.pressedLegend === label) {
+                this.pressedLegend = '';
+            }
+        }, 800);
+    }
+
+    private endLegendPress(): void {
+        this.legendPressToken++;
+        if (this.legendPressTimer >= 0) {
+            clearTimeout(this.legendPressTimer);
+            this.legendPressTimer = -1;
+        }
+        this.pressedLegend = '';
+    }
+
+    private sourceSeries(): LineChartSeries[] {
+        if (this.series.length > 0) return this.series;
+        return [{ label: this.title, color: this.lineColor, points: this.points } as LineChartSeries];
+    }
+
+    private pointCount(): number {
+        const source = this.sourceSeries();
+        return source.length > 0 ? source[0].points.length : 0;
+    }
+
+    private labels(): LineChartPoint[] {
+        const source = this.sourceSeries();
+        return source.length > 0 ? source[0].points : [];
+    }
+
+    private dataSignature(): string {
+        const parts: string[] = [];
+        for (const chartSeries of this.sourceSeries()) {
+            parts.push(chartSeries.label);
+            for (const point of chartSeries.points) {
+                parts.push(point.label, String(point.value));
+            }
+        }
+        return parts.join('\u0001');
+    }
+
+    @Monitor('points', 'series')
+    private onDataChanged(): void {
+        if (this.dataSignature() === this.animatedDataSignature) {
+            this.draw();
+            return;
+        }
+        this.selected = Math.max(0, this.pointCount() - 1);
+        this.applyViewportState(false);
+        if (this.animationTimer >= 0) clearTimeout(this.animationTimer);
+        this.animationTimer = setTimeout((): void => {
+            this.animationTimer = -1;
+            this.startEntranceAnimation();
+        }, 0);
+    }
+
+    @Monitor('viewport')
+    private onViewportPropChanged(): void {
+        this.applyViewportState();
+    }
+    @Monitor('paletteId')
+    private paletteChanged(): void { this.draw(); }
+
+    private viewportZoom(): number {
+        const value = Number(this.viewport.zoom);
+        return value >= 1 ? Math.min(4, value) : 1;
+    }
+
+    private viewportPanRatio(): number {
+        const value = Number(this.viewport.panRatio);
+        return value >= 0 ? Math.min(1, value) : 0;
+    }
+
+    private applyViewportState(redraw: boolean = true): void {
+        this.zoom = this.viewportZoom();
+        this.panOffset = this.clampPan(this.maxPan(this.zoom) * this.viewportPanRatio(), this.zoom);
+        if (redraw) this.draw();
+    }
+
+    private emitViewport(): void {
+        if (!this.onViewportChange) return;
+        const maximum = this.maxPan();
+        this.onViewportChange({
+            zoom: this.zoom,
+            panRatio: maximum > 0 ? this.panOffset / maximum : 0,
+        });
+    }
+
+    private startEntranceAnimation(): void {
+        if (!this.canvasReady || this.pointCount() === 0) {
+            this.draw();
+            return;
+        }
+        const signature = this.dataSignature();
+        if (signature === this.animatedDataSignature) {
+            this.draw();
+            return;
+        }
+        this.animatedDataSignature = signature;
+        if (this.pointCount() > 180) {
+            this.drawProgress = 1;
+            this.draw();
+            return;
+        }
+        const token = ++this.animationToken;
+        const startedAt = Date.now();
+        this.drawProgress = 0;
+        const tick = (): void => {
+            if (token !== this.animationToken) return;
+            const elapsed = Math.min(1, (Date.now() - startedAt) / 800);
+            this.drawProgress = 1 - Math.pow(1 - elapsed, 3);
+            this.draw();
+            if (elapsed < 1) {
+                this.animationTimer = setTimeout((): void => {
+                    this.animationTimer = -1;
+                    tick();
+                }, 16);
+            }
+        };
+        tick();
+    }
+
+    private rgba(color: number, alpha: number): string {
+        const red = (color >>> 16) & 0xFF;
+        const green = (color >>> 8) & 0xFF;
+        const blue = color & 0xFF;
+        return `rgba(${red},${green},${blue},${alpha})`;
+    }
+
+    private pointY(points: LineChartPoint[], index: number, top: number, drawHeight: number, maximum: number): number {
+        const baseline = top + drawHeight;
+        const value = points[index]?.value ?? 0;
+        const target = top + drawHeight * (1 - value / maximum);
+        return baseline - (baseline - target) * this.drawProgress;
+    }
+
+    private traceSmoothLine(points: LineChartPoint[], top: number, drawHeight: number, maximum: number): void {
+        if (points.length === 0) return;
+        this.context.moveTo(this.pointX(0), this.pointY(points, 0, top, drawHeight, maximum));
+        for (let index = 1; index < points.length; index++) {
+            const previousX = this.pointX(index - 1);
+            const previousY = this.pointY(points, index - 1, top, drawHeight, maximum);
+            const x = this.pointX(index);
+            const y = this.pointY(points, index, top, drawHeight, maximum);
+            const controlOffset = (x - previousX) * 0.34;
+            this.context.bezierCurveTo(previousX + controlOffset, previousY, x - controlOffset, y, x, y);
+        }
+    }
+
+    aboutToDisappear(): void {
+        this.configuration.stop();
+        this.animationToken++;
+        this.endLegendPress();
+        if (this.animationTimer >= 0) {
+            clearTimeout(this.animationTimer);
+            this.animationTimer = -1;
+        }
+        if (this.drawTimer >= 0) {
+            clearTimeout(this.drawTimer);
+            this.drawTimer = -1;
+        }
+    }
+
+    private maximum(): number {
+        let maximum = this.unit === '分' ? 5 : 1;
+        for (const chartSeries of this.sourceSeries()) {
+            for (const point of chartSeries.points) maximum = Math.max(maximum, point.value);
+        }
+        return maximum;
+    }
+
+    private valueLabel(value: number): string {
+        return this.unit === '元' ? '¥' + value.toFixed(2) : `${value}${this.unit === '%' ? '%' : ''}`;
+    }
+
+    private dimensions(): number[] {
+        const labelWidth = String(Math.round(this.maximum())).length * this.axisFontSize() * 0.62 + 14;
+        const left = Math.max(this.responsiveAxisFont && this.canvasWidth < 600 ? 50 :
+            (this.responsiveAxisFont && this.canvasWidth < 840 ? 58 : 60), Math.min(150, labelWidth));
+        const right = 10;
+        return [left, right, Math.max(1, this.canvasWidth - left - right)];
+    }
+
+    private axisFontSize(): number {
+        if (!this.responsiveAxisFont) return 15;
+        if (this.canvasWidth < 600) return 11;
+        if (this.canvasWidth < 840) return 13;
+        return 14;
+    }
+
+    private dateFontSize(): number {
+        if (!this.responsiveAxisFont) return 15;
+        if (this.canvasWidth < 600) return 10;
+        if (this.canvasWidth < 840) return 12;
+        return 13;
+    }
+
+    private bottomAxisSpace(): number {
+        if (!this.responsiveAxisFont) return 58;
+        if (this.canvasWidth < 600) return 46;
+        if (this.canvasWidth < 840) return 52;
+        return 56;
+    }
+
+    private dateBaselineInset(): number {
+        if (!this.responsiveAxisFont) return 14;
+        if (this.canvasWidth < 600) return 22;
+        if (this.canvasWidth < 840) return 25;
+        return 28;
+    }
+
+    private dateLabelSpacing(): number {
+        if (!this.responsiveAxisFont) return 82;
+        if (this.canvasWidth < 600) return 96;
+        if (this.canvasWidth < 840) return 88;
+        return 82;
+    }
+
+    private summaryColumns(): number {
+        if (this.canvasWidth < 600) return 2;
+        if (this.canvasWidth < 840) return 4;
+        return 6;
+    }
+
+    private maxPan(zoom: number = this.zoom): number {
+        const drawWidth = this.dimensions()[2];
+        return Math.max(0, drawWidth * zoom - drawWidth);
+    }
+
+    private clampPan(value: number, zoom: number = this.zoom): number {
+        return Math.max(0, Math.min(this.maxPan(zoom), value));
+    }
+
+    private pointX(index: number): number {
+        const dimensions = this.dimensions();
+        const virtualWidth = dimensions[2] * this.zoom;
+        return dimensions[0] + virtualWidth * index / Math.max(1, this.pointCount() - 1) - this.panOffset;
+    }
+
+    private selectAt(x: number): void {
+        if (this.pointCount() === 0) return;
+        const dimensions = this.dimensions();
+        const virtualX = x - dimensions[0] + this.panOffset;
+        const ratio = Math.max(0, Math.min(1, virtualX / Math.max(1, dimensions[2] * this.zoom)));
+        const index = Math.round(ratio * Math.max(0, this.pointCount() - 1));
+        if (index !== this.selected && (AppStorage.get<number>('vibrationLevel') || 0) > 0) vibration.dotVibration();
+        this.selected = index;
+        this.draw();
+    }
+
+    private resolveColor(resource: Resource): number {
+        const host = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        try {
+            return host.resourceManager.getColorSync(resource.id);
+        } catch (error) {
+            console.warn('[ElvaCos][component/charts/InteractiveLineChart][WARN]',
+                `折线颜色读取失败: ${JSON.stringify(error)}`);
+            return 0xFF1E6FCD;
+        }
+    }
+
+    private selectedDetail(): string {
+        const source = this.sourceSeries();
+        const labels = this.labels();
+        if (source.length === 0 || labels.length === 0) return `暂无${this.title}`;
+        if (source.length === 1) return source[0].points[Math.min(this.selected, source[0].points.length - 1)].detail;
+        const values: string[] = [];
+        for (const chartSeries of source) {
+            const point = chartSeries.points[Math.min(this.selected, chartSeries.points.length - 1)];
+            values.push(`${chartSeries.label} ${this.valueLabel(point?.value ?? 0)}`);
+        }
+        return `${labels[Math.min(this.selected, labels.length - 1)].label} · ${values.join(' · ')}`;
+    }
+
+    private selectedDate(): string {
+        const labels = this.labels();
+        return labels.length > 0 ? labels[Math.min(this.selected, labels.length - 1)].label : '';
+    }
+
+    private selectedSeriesValue(chartSeries: LineChartSeries): string {
+        const point = chartSeries.points[Math.min(this.selected, chartSeries.points.length - 1)];
+        return this.valueLabel(point?.value ?? 0);
+    }
+
+    private draw(): void {
+        const width = this.canvasWidth;
+        const height = this.chartHeight;
+        this.context.clearRect(0, 0, width, height);
+        const source = this.sourceSeries();
+        const labels = this.labels();
+        if (source.length === 0 || labels.length === 0) return;
+        const host = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        let gridColor = 0x33334455;
+        let textColor = 0xFF666666;
+        try {
+            gridColor = host.resourceManager.getColorSync(Theme.groupDivider.id);
+            textColor = host.resourceManager.getColorSync(Theme.muted.id);
+        } catch (error) {
+            console.warn('[ElvaCos][component/charts/InteractiveLineChart][WARN]',
+                `图表颜色读取失败: ${JSON.stringify(error)}`);
+        }
+        const dimensions = this.dimensions();
+        const left = dimensions[0];
+        const drawWidth = dimensions[2];
+        const top = 18;
+        const bottom = this.bottomAxisSpace();
+        const drawHeight = Math.max(1, height - top - bottom);
+        const baseline = top + drawHeight;
+        const maximum = this.maximum();
+        this.context.strokeStyle = gridColor;
+        this.context.fillStyle = textColor;
+        this.context.lineWidth = 1;
+        this.context.font = `${this.axisFontSize()}vp sans-serif`;
+        this.context.setLineDash([5, 6]);
+        for (let row = 0; row <= 4; row++) {
+            const y = top + drawHeight * row / 4;
+            this.context.beginPath();
+            this.context.moveTo(left, y);
+            this.context.lineTo(left + drawWidth, y);
+            this.context.stroke();
+            this.context.textAlign = 'right';
+            const tick = maximum * (4 - row) / 4;
+            const tickLabel = this.unit === '%' ? `${tick.toFixed(1)}%` :
+                (this.unit === '分' ? tick.toFixed(1) : this.unit === '元' && maximum < 10 ? tick.toFixed(2) : String(Math.round(tick)));
+            this.context.fillText(tickLabel, left - 8, y + 4);
+        }
+        this.context.setLineDash([]);
+        this.context.save();
+        this.context.beginPath();
+        this.context.rect(left, 0, drawWidth, height);
+        this.context.clip();
+
+        for (const chartSeries of source) {
+            if (chartSeries.points.length === 0) continue;
+            const color = this.resolveColor(chartSeries.color);
+            const firstX = this.pointX(0);
+            const lastX = this.pointX(chartSeries.points.length - 1);
+            const pointSpacing = Math.abs(this.pointX(Math.min(1, chartSeries.points.length - 1)) - firstX);
+            const drawPointMarkers = pointSpacing >= 6;
+            const gradient = this.context.createLinearGradient(0, top, 0, baseline);
+            gradient.addColorStop(0, this.rgba(color, source.length > 1 ? 0.16 : 0.34));
+            gradient.addColorStop(1, this.rgba(color, 0));
+            this.context.fillStyle = gradient;
+            this.context.beginPath();
+            this.traceSmoothLine(chartSeries.points, top, drawHeight, maximum);
+            this.context.lineTo(lastX, baseline);
+            this.context.lineTo(firstX, baseline);
+            this.context.closePath();
+            this.context.fill();
+            this.context.strokeStyle = color;
+            this.context.lineWidth = 2.4;
+            this.context.lineJoin = 'round';
+            this.context.lineCap = 'round';
+            this.context.beginPath();
+            this.traceSmoothLine(chartSeries.points, top, drawHeight, maximum);
+            this.context.stroke();
+            for (let index = 0; index < chartSeries.points.length; index++) {
+                if (!drawPointMarkers && index !== this.selected) continue;
+                const x = this.pointX(index);
+                if (x < left - 6 || x > left + drawWidth + 6) continue;
+                const y = this.pointY(chartSeries.points, index, top, drawHeight, maximum);
+                this.context.fillStyle = color;
+                this.context.beginPath();
+                this.context.arc(x, y, index === this.selected ? 4.5 : 2.5, 0, Math.PI * 2);
+                this.context.fill();
+                if (index === this.selected) {
+                    this.context.strokeStyle = this.rgba(color, 0.24);
+                    this.context.lineWidth = 5;
+                    this.context.beginPath();
+                    this.context.arc(x, y, 6.5, 0, Math.PI * 2);
+                    this.context.stroke();
+                }
+            }
+        }
+
+        // 数据曲线裁剪在绘图区内，坐标文字单独绘制，避免首尾月份被截断。
+        this.context.restore();
+        this.context.font = `${this.dateFontSize()}vp sans-serif`;
+        const labelStep = Math.max(1,
+            Math.ceil(labels.length / Math.max(2, Math.floor(drawWidth / this.dateLabelSpacing()))));
+        for (let index = 0; index < labels.length; index++) {
+            const x = this.pointX(index);
+            if (x < left - 6 || x > left + drawWidth + 6) continue;
+            if (index % labelStep === 0 || index === labels.length - 1) {
+                this.context.fillStyle = textColor;
+                const monthly = /^\d{4}-\d{2}$/.test(labels[index].label);
+                this.context.textAlign = monthly && index === 0 ? 'left' :
+                    monthly && index === labels.length - 1 ? 'right' : 'center';
+                this.context.save();
+                this.context.translate(x, height - this.dateBaselineInset());
+                if (!monthly) { this.context.rotate(-Math.PI / 5); }
+                this.context.fillText(monthly ? Number(labels[index].label.slice(5, 7)) + '月' : labels[index].label, 0, 0);
+                this.context.restore();
+            }
+        }
+        if (this.selected >= 0 && this.selected < labels.length) {
+            const selectedX = this.pointX(this.selected);
+            if (selectedX >= left && selectedX <= left + drawWidth) {
+                this.context.strokeStyle = textColor;
+                this.context.lineWidth = 1;
+                this.context.setLineDash([4, 4]);
+                this.context.beginPath();
+                this.context.moveTo(selectedX, top);
+                this.context.lineTo(selectedX, baseline);
+                this.context.stroke();
+                this.context.setLineDash([]);
+            }
+        }
+    }
+
+    @Builder
+    private seriesSummary(): void {
+        Column({ space: 8 }) {
+          Text(this.selectedDate()).fontSize(this.responsiveAxisFont && this.canvasWidth < 600 ? 13 : 15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Theme.ink).width('100%')
+          GridRow({ columns: this.summaryColumns(), gutter: { x: 6, y: 6 } }) {
+            ForEach(this.sourceSeries(), (chartSeries: LineChartSeries) => {
+              GridCol({ span: 1 }) {
+                Row({ space: 7 }) {
+                  Row().width(10).height(10).borderRadius(5).backgroundColor(chartSeries.color)
+                  Text(chartSeries.label).fontSize(13).fontColor(Theme.muted)
+                  Blank()
+                  Text(this.selectedSeriesValue(chartSeries)).fontSize(13).fontWeight(FontWeight.Medium)
+                    .fontColor(Theme.ink)
+                }
+                .width('100%').padding({ left: 8, right: 8, top: 7, bottom: 7 })
+                .borderRadius(10).backgroundColor(Theme.tint)
+                .border({ width: 1, color: Theme.line })
+                .scale({ x: this.pressedLegend === chartSeries.label ? 0.98 : 1,
+                    y: this.pressedLegend === chartSeries.label ? 0.98 : 1 })
+                .animation({ duration: 120, curve: Curve.EaseOut })
+                .visualEffect(pressVisualEffect(this.pressedLegend === chartSeries.label,
+                    hdsEffect.PointLightIlluminatedType.BORDER_CONTENT, 5, 84))
+                .compositingFilter(pressLightFieldFilter(this.pressedLegend === chartSeries.label))
+                .onTouch((event: TouchEvent): void => {
+                    if (event.type === TouchType.Down) this.beginLegendPress(chartSeries.label);
+                    else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                        this.endLegendPress();
+                    }
+                })
+                .onClick((): void => this.endLegendPress())
+                .accessibilityText(`${chartSeries.label}，${this.selectedSeriesValue(chartSeries)}`)
+              }
+            }, (chartSeries: LineChartSeries) => chartSeries.label)
+          }
+          .width('100%')
+          .accessibilityText('各系列当前数值')
+        }.width('100%')
+    }
+
+    build() {
+        Column({ space: 10 }) {
+            if (this.showTitle) {
+                Text(this.title).fontSize(18).fontWeight(FontWeight.Bold)
+                    .fontColor(Theme.ink).width('100%').accessibilityText(this.title)
+            }
+            if (this.pointCount() > 0) {
+                Canvas(this.context)
+                    .id('line-chart-canvas:' + this.title)
+                    .width('100%').height(this.chartHeight)
+                    .scale({ x: this.enablePressEffect && this.pressed ? 0.995 : 1,
+                        y: this.enablePressEffect && this.pressed ? 0.995 : 1 })
+                    .animation({ duration: 120, curve: Curve.EaseOut })
+                    .visualEffect(pressVisualEffect(this.enablePressEffect && this.pressed,
+                        this.enablePressEffect ? hdsEffect.PointLightIlluminatedType.BORDER :
+                            hdsEffect.PointLightIlluminatedType.NONE, 4, 100))
+                    .compositingFilter(pressLightFieldFilter(this.enablePressEffect && this.pressed))
+                    .onReady(() => {
+                        this.canvasReady = true;
+                        this.selected = Math.max(0, this.pointCount() - 1);
+                        this.applyViewportState(false);
+                        this.startEntranceAnimation();
+                    })
+                    .onAreaChange((_oldArea: Area, newArea: Area): void => {
+                        const width = Number(newArea.width);
+                        if (width > 0) {
+                            this.canvasWidth = width;
+                            this.applyViewportState(false);
+                            if (this.drawTimer >= 0) clearTimeout(this.drawTimer);
+                            this.drawTimer = setTimeout((): void => {
+                                this.drawTimer = -1;
+                                this.draw();
+                            }, 0);
+                        }
+                    })
+                    .onTouch((event: TouchEvent): void => {
+                        if (this.enablePressEffect && event.type === TouchType.Down) {
+                            this.pressed = true;
+                        } else if (this.enablePressEffect &&
+                            (event.type === TouchType.Up || event.type === TouchType.Cancel)) {
+                            this.pressed = false;
+                        }
+                        if (event.touches.length > 0 && (event.type === TouchType.Down || event.type === TouchType.Move)) {
+                            this.selectAt(event.touches[0].x);
+                        }
+                    })
+                    .gesture(GestureGroup(GestureMode.Parallel,
+                        PanGesture({ fingers: 1, direction: PanDirection.Horizontal })
+                            .onActionStart((): void => {
+                                this.panAtGestureStart = this.panOffset;
+                                if ((AppStorage.get<number>('vibrationLevel') || 0) > 0) vibration.dotVibration();
+                            })
+                            .onActionUpdate((event: GestureEvent): void => {
+                                this.panOffset = this.clampPan(this.panAtGestureStart - event.offsetX);
+                                this.draw();
+                            })
+                            .onActionEnd((): void => this.emitViewport()),
+                        PinchGesture({ fingers: 2, distance: 4 })
+                            .onActionStart((): void => {
+                                this.zoomAtGestureStart = this.zoom;
+                                if ((AppStorage.get<number>('vibrationLevel') || 0) > 0) vibration.dotVibration();
+                            })
+                            .onActionUpdate((event: GestureEvent): void => {
+                                const nextZoom = Math.max(1, Math.min(4, this.zoomAtGestureStart * event.scale));
+                                const oldMax = this.maxPan(this.zoom);
+                                const ratio = oldMax > 0 ? this.panOffset / oldMax : 0.5;
+                                this.zoom = nextZoom;
+                                this.panOffset = this.clampPan(this.maxPan(nextZoom) * ratio, nextZoom);
+                                this.draw();
+                            })
+                            .onActionEnd((): void => this.emitViewport())
+                    ))
+                    .accessibilityText(`${this.title}折线图，点一下可查看对应日期，需要时可放大或左右拖动`)
+                if (this.sourceSeries().length > 1) {
+                    this.seriesSummary()
+                } else {
+                    Text(this.selectedDetail()).fontSize(15).lineHeight(22)
+                        .id('line-chart-detail:' + this.title)
+                        .fontColor(Theme.muted).width('100%')
+                        .accessibilityText(this.selectedDetail())
+                }
+            } else {
+                Text(`暂无${this.title}`).fontColor(Theme.muted).padding(24)
+                    .accessibilityText(`暂无${this.title}`)
+            }
+        }
+        .width('100%').padding(14).borderRadius(Theme.cardRadius).backgroundColor(Theme.surface)
+        .border({ width: 1, color: Theme.line })
+        .accessibilityGroup(true)
+        .accessibilityText(this.pointCount() > 0 ? `${this.title}，${this.selectedDetail()}` : `${this.title}暂无数据`)
+    }
+}

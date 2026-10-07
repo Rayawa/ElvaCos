@@ -10,4 +10,12 @@ export class CategoryTemplate {
   constructor(name: string, tasks: TaskTemplate[]) { this.name = name; this.tasks = tasks; }
 }
 
-export interface ReleaseNote { version: string; date: string; changes: string[]; }
+export type ReleaseType = 'beta' | 'rc' | 'release';
+
+export interface ReleaseNote {
+  version: string;
+  date: string;
+  type: ReleaseType;
+  buildNumber: number;
+  changes: string[];
+}

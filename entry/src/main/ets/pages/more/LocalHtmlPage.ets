@@ -49,7 +49,7 @@ export struct LocalHtmlPage {
       Column({ space: 16 }) {
         Blank().height(Theme.detailTop).accessibilityLevel('no')
         if (this.loading) {
-          LoadingProgress().width(36).height(36).color(Theme.accent).accessibilityText('正在加载隐私政策')
+          LoadingProgress().width(36).height(36).color(Theme.brand).accessibilityText('正在加载隐私政策')
         } else if (this.error) {
           EmptyState({ title: '文档加载失败', message: this.error, button: '重试', action: (): void => { this.load(); } })
         } else {

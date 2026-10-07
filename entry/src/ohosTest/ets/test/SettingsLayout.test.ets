@@ -76,9 +76,9 @@ export default function settingsLayoutTest(): void {
         const scroll = await required(ON.id('settings-scroll'), width + ' scroll');
         const referenceBounds = await revealRow(scroll, '材质等级');
         const preferenceBounds = await revealRow(scroll, '应用外观');
-        const sky = await (await required(ON.text('天蓝'), 'light appearance')).getBounds();
+        const sky = await (await required(ON.text('浅色'), 'light appearance')).getBounds();
         const system = await (await required(ON.text('跟随系统'), 'system appearance')).getBounds();
-        const mist = await (await required(ON.text('雾蓝'), 'dark appearance')).getBounds();
+        const mist = await (await required(ON.text('深色'), 'dark appearance')).getBounds();
         expect(sky.right <= system.left && system.right <= mist.left).assertTrue();
         const canvas = await (await required(ON.id('settings-layout-canvas'), 'canvas')).getBounds();
         const pixelsPerVp = (canvas.right - canvas.left) / (width === 'narrow' ? 320 : 378);
@@ -233,7 +233,7 @@ export default function settingsLayoutTest(): void {
           for (const suffix of ['.png', '.json']) { if (fileIo.accessSync(path + suffix)) { fileIo.unlinkSync(path + suffix); } }
           await driver.screenCap(path + '.png');
           await driver.dumpLayout(path + '.json');
-          for (const label of ['应用外观', '天蓝', '雾蓝', '跟随系统']) {
+          for (const label of ['应用外观', '浅色', '深色', '跟随系统']) {
             const text = await (await required(ON.text(label), label)).getBounds();
             expect(text.top >= card.top && text.bottom <= card.bottom && text.left >= card.left && text.right <= card.right).assertTrue();
           }

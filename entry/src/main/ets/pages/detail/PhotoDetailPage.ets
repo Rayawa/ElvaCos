@@ -50,6 +50,8 @@ export struct PhotoDetail {
             .value(PHOTO_LABELS[PHOTO_STATUSES.indexOf(this.photo.status)])
             .onSelect((i: number) => { vibration.dotVibration(); this.state.setPhotoStatus(this.photo, PHOTO_STATUSES[i]); })
             .accessibilityText('照片业务状态')
+            .visualEffect(this.feedback.effect('select-1'))
+            .compositingFilter(this.feedback.filter('select-1'))
             .attributeModifier(this.feedback.control('select-1'))
           Button('所属计划 · ' + this.state.projectName(this.photo.projectId))
             .width('100%')
@@ -57,7 +59,7 @@ export struct PhotoDetail {
             .fontColor(Theme.accent)
             .constraintSize({ minHeight: 52 })
             .onClick((): void => { vibration.dotVibration(); this.open('project', this.photo.projectId); })
-            .accessibilityText('打开所属计划 ' + this.state.projectName(this.photo.projectId)).attributeModifier(this.feedback.control('button-2'))
+            .accessibilityText('打开所属计划 ' + this.state.projectName(this.photo.projectId)).visualEffect(this.feedback.effect('button-2')).compositingFilter(this.feedback.filter('button-2')).attributeModifier(this.feedback.control('button-2'))
           Text('原始版本无损保留，不修改系统相册。').fontSize(12).fontColor(Theme.muted)
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })

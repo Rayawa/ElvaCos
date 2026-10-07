@@ -25,11 +25,22 @@ export class Icons {
   static trash: Resource = $r('app.media.trash');
   static help: Resource = $r('app.media.question');
   static tutorial: Resource = $r('app.media.tutorial');
+  static appLog: Resource = $r('app.media.app_log');
   static privacy: Resource = $r('app.media.privacy');
   static cloud: Resource = $r('app.media.cloud');
   static exportData: Resource = $r('app.media.export');
   static restoreData: Resource = $r('app.media.load');
+  static theme: Resource = $r('app.media.theme');
+  static hand: Resource = $r('app.media.hand');
   static chevronRight: Resource = $r('app.media.right');
+
+  // 更新日志发布类型，复用 Dashboard 的开启/关闭图标与浅深色资源。
+  static beta: Resource = $r('app.media.beta');
+  static betaOn: Resource = $r('app.media.betaON');
+  static rc: Resource = $r('app.media.rc');
+  static rcOn: Resource = $r('app.media.rcON');
+  static release: Resource = $r('app.media.release');
+  static releaseOn: Resource = $r('app.media.releaseON');
 
   // 详情与表单动作
   static add: Resource = $r('sys.media.ohos_ic_public_add');
@@ -39,8 +50,10 @@ export class Icons {
   static pending: Resource = $r('sys.symbol.circle');
   static remove: Resource = $r('sys.media.ohos_ic_public_remove');
   static importPhoto: Resource = $r('sys.media.ohos_ic_public_albums');
-  static toolbarAdd(): SymbolGlyphModifier { 
-  return new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('sys.color.icon_primary')]); }
-  static toolbarCover(): SymbolGlyphModifier { 
-  return new SymbolGlyphModifier($r('sys.symbol.picture')).fontColor([$r('sys.color.icon_primary')]); }
+  static toolbarAdd(): SymbolGlyphModifier {
+    return new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('sys.color.icon_primary')]);
+  }
+  static toolbarCover(): SymbolGlyphModifier {
+    return new SymbolGlyphModifier($r('sys.symbol.picture')).fontColor([$r('sys.color.icon_primary')]);
+  }
 }

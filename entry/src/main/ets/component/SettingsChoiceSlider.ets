@@ -1,4 +1,3 @@
-import { PressFeedback } from '../common/pressFeedback';
 import { Theme } from '../common/Theme';
 import { vibration } from '../common/vibration';
 
@@ -10,7 +9,6 @@ import { vibration } from '../common/vibration';
  */
 @ComponentV2
 export struct SettingsChoiceSlider {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param index: number = 0;
   @Param labels: string[] = [];
   @Param accessibilityLabel: string = '';
@@ -56,7 +54,7 @@ export struct SettingsChoiceSlider {
     Column({ space: 1 }) {
       Slider({ value: $$this.current, min: 0, max: this.maxIndex(), step: 1, style: SliderStyle.InSet })
         .width(this.controlWidth())
-        .selectedColor(Theme.accent)
+        .selectedColor(Theme.brand)
         .trackColor(Theme.tint)
         .blockBorderColor(Theme.surface)
         .showSteps(true)
@@ -67,7 +65,7 @@ export struct SettingsChoiceSlider {
           if (mode === SliderChangeMode.Click || mode === SliderChangeMode.End) { this.choose(Math.round(value)); }
         })
         .accessibilityText(`${this.accessibilityLabel}，当前${this.labels[this.selected] || ''}，共 ${this.labels.length} 档`)
-          .attributeModifier(this.feedback.control('slider-1'))
+
       Row() {
         ForEach(this.labels, (label: string, position: number) => {
           Text(label)
@@ -80,9 +78,9 @@ export struct SettingsChoiceSlider {
             .enabled(this.isEnabled)
             .onClick((): void => { this.choose(position); })
             .accessibilityText(label)
-              .accessibilityRole(AccessibilityRoleType.BUTTON)
-              .accessibilitySelected(position === this.selected)
-              .attributeModifier(this.feedback.control('text-2' + ":" + label))
+            .accessibilityRole(AccessibilityRoleType.BUTTON)
+            .accessibilitySelected(position === this.selected)
+
         }, (label: string) => label)
       }
       .width(this.controlWidth())

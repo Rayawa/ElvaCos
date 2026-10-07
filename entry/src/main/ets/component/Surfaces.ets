@@ -30,11 +30,9 @@ export struct InteractiveCard {
       .animation({ duration: 130, curve: curves.springMotion(0.35, 0.9) })
       .visualEffect(this.effect())
       .compositingFilter(pressLightFieldFilter(this.effects && this.pressed))
-      .onTouch((event: TouchEvent) => { 
-    if (event.type === TouchType.Down) { 
-      this.pressed = true; } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { 
-      this.pressed = false; } })
+      .onTouch((event: TouchEvent) => { if (event.type === TouchType.Down) { this.pressed = true; } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.pressed = false; } })
       .onClick((): void => { vibration.dotVibration(); this.action(); }).focusable(true)
+      .accessibilityRole(AccessibilityRoleType.BUTTON)
       .accessibilityText(this.label).accessibilityDescription(this.hint).accessibilityLevel('yes')
   }
 }
@@ -68,18 +66,22 @@ export struct EmptyState {
       Text(this.title).fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink).textAlign(TextAlign.Center)
       Text(this.message).fontSize(13).fontColor(Theme.muted).textAlign(TextAlign.Center)
       if (this.button) { Button(this.button)
-        .backgroundColor(Theme.accent)
+        .backgroundColor(Theme.brand)
         .fontColor(Theme.onAccent)
         .fontSize(14)
         .constraintSize({ minHeight: 40 })
         .onClick((): void => { vibration.dotVibration(); this.action(); })
         .accessibilityText(this.button)
+        .visualEffect(this.feedback.effect('button-2'))
+        .compositingFilter(this.feedback.filter('button-2'))
         .attributeModifier(this.feedback.control('button-2')) }
     }.width('100%')
       .padding(20)
       .backgroundColor(Theme.surface)
       .borderRadius(Theme.cardRadius)
       .shadow({ radius: 8, color: Theme.shadow, offsetY: 2 })
+      .visualEffect(this.feedback.effect('column-1', true))
+      .compositingFilter(this.feedback.filter('column-1', true))
       .attributeModifier(this.feedback.control('column-1', true))
   }
 }
@@ -95,6 +97,8 @@ export struct StatusPill {
     .padding({ left: 10, right: 10, top: 5, bottom: 5 })
     .backgroundColor(Theme.tint)
     .borderRadius(12)
+    .visualEffect(this.feedback.effect('status'))
+    .compositingFilter(this.feedback.filter('status'))
     .attributeModifier(this.feedback.control('status')) }
 }
 
@@ -142,6 +146,8 @@ export struct Field {
           .fontColor(Theme.ink)
           .onChange((value: string) => this.change(value))
           .accessibilityText(this.label)
+          .visualEffect(this.feedback.effect('textarea-3'))
+          .compositingFilter(this.feedback.filter('textarea-3'))
           .attributeModifier(this.feedback.control('textarea-3'))
       } else {
         TextInput({ text: this.value, placeholder: this.placeholder })
@@ -151,6 +157,8 @@ export struct Field {
           .fontColor(Theme.ink)
           .onChange((value: string) => this.change(value))
           .accessibilityText(this.label)
+          .visualEffect(this.feedback.effect('textinput-4'))
+          .compositingFilter(this.feedback.filter('textinput-4'))
           .attributeModifier(this.feedback.control('textinput-4'))
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
