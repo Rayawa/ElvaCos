@@ -1,5 +1,5 @@
 > hvigor [32mUP-TO-DATE :entry:default@PreBuild...  [39m
-> hvigor [32mFinished :entry:default@CreateModuleInfo... after 1 ms [39m
+> hvigor [32mFinished :entry:default@CreateModuleInfo... after 2 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@GenerateMetadata...  [39m
 > hvigor [32mFinished :entry:default@ConfigureCmake... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@MergeProfile...  [39m
@@ -10,11 +10,11 @@
 > hvigor [32mFinished :entry:default@ProcessIntegratedHsp... after 1 ms [39m
 > hvigor [32mFinished :entry:default@BuildNativeWithCmake... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@MakePackInfo...  [39m
-> hvigor [32mFinished :entry:default@SyscapTransform... after 8 ms [39m
+> hvigor [32mFinished :entry:default@SyscapTransform... after 16 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@ProcessProfile...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@ProcessRouterMap...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@ProcessShareConfig...  [39m
-> hvigor [32mFinished :entry:default@ProcessStartupConfig... after 1 ms [39m
+> hvigor [32mFinished :entry:default@ProcessStartupConfig... after 2 ms [39m
 > hvigor [32mFinished :entry:default@BuildNativeWithNinja... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@ProcessResource...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@GenerateLoaderJson...  [39m
@@ -22,20 +22,20 @@
 > hvigor [32mUP-TO-DATE :entry:default@CompileResource...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@DoNativeStrip...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@CompileArkTS...  [39m
-> hvigor [32mFinished :entry:default@BuildJS... after 1 ms [39m
+> hvigor [32mFinished :entry:default@BuildJS... after 2 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@CacheNativeLibs...  [39m
 > hvigor [32mUP-TO-DATE :entry:default@GeneratePkgModuleJson...  [39m
-> hvigor [32mFinished :entry:default@ProcessCompiledResources... after 1 ms [39m
+> hvigor [32mFinished :entry:default@ProcessCompiledResources... after 2 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@PackageHap...  [39m
-> hvigor [32mFinished :entry:default@PackingCheck... after 4 ms [39m
+> hvigor [32mFinished :entry:default@PackingCheck... after 7 ms [39m
 > hvigor [32mUP-TO-DATE :entry:default@SignHap...  [39m
-> hvigor [32mFinished :entry:default@CollectDebugSymbol... after 1 ms [39m
+> hvigor [32mFinished :entry:default@CollectDebugSymbol... after 2 ms [39m
 > hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
-> hvigor [32mBUILD SUCCESSFUL in 1 s 105 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 5 s 691 ms [39m
 
 33 tasks in total: 14 executed, 19 up-to-date
 > hvigor [32mUP-TO-DATE :entry:ohosTest@PreBuild...  [39m
-> hvigor [32mFinished :entry:ohosTest@CreateModuleInfo... after 2 ms [39m
+> hvigor [32mFinished :entry:ohosTest@CreateModuleInfo... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@GenerateMetadata...  [39m
 > hvigor [32mFinished :entry:ohosTest@ConfigureCmake... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@MergeProfile...  [39m
@@ -43,15 +43,15 @@
 > hvigor [32mFinished :entry:ohosTest@PreCheckSyscap... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@GeneratePkgContextInfo...  [39m
 > hvigor [32mFinished :entry:ohosTest@GeneratePkgSdkInfo... after 2 ms [39m
-> hvigor [32mFinished :entry:ohosTest@ProcessIntegratedHsp... after 2 ms [39m
+> hvigor [32mFinished :entry:ohosTest@ProcessIntegratedHsp... after 1 ms [39m
 > hvigor [32mFinished :entry:ohosTest@BuildNativeWithCmake... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@MakePackInfo...  [39m
-> hvigor [32mFinished :entry:ohosTest@SyscapTransform... after 15 ms [39m
+> hvigor [32mFinished :entry:ohosTest@SyscapTransform... after 8 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@ProcessProfile...  [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@ProcessRouterMap...  [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@ProcessShareConfig...  [39m
-> hvigor [32mFinished :entry:ohosTest@ProcessStartupConfig... after 3 ms [39m
-> hvigor [32mFinished :entry:ohosTest@BuildNativeWithNinja... after 2 ms [39m
+> hvigor [32mFinished :entry:ohosTest@ProcessStartupConfig... after 1 ms [39m
+> hvigor [32mFinished :entry:ohosTest@BuildNativeWithNinja... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@ProcessResource...  [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@GenerateLoaderJson...  [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@ProcessLibs...  [39m
@@ -348,16 +348,16 @@
  Function may throw exceptions. Special handling is required.
 [39m[39m
 [39m
-> hvigor [32mFinished :entry:ohosTest@OhosTestCompileArkTS... after 4 s 343 ms [39m
-> hvigor [32mFinished :entry:ohosTest@OhosTestCopyMockConfigJson... after 3 ms [39m
+> hvigor [32mFinished :entry:ohosTest@OhosTestCompileArkTS... after 3 s 544 ms [39m
+> hvigor [32mFinished :entry:ohosTest@OhosTestCopyMockConfigJson... after 1 ms [39m
 > hvigor [32mUP-TO-DATE :entry:ohosTest@GeneratePkgModuleJson...  [39m
-> hvigor [32mFinished :entry:ohosTest@ProcessCompiledResources... after 2 ms [39m
-> hvigor [32mFinished :entry:ohosTest@PackageHap... after 907 ms [39m
-> hvigor [32mFinished :entry:ohosTest@PackingCheck... after 35 ms [39m
-> hvigor [32mFinished :entry:ohosTest@SignHap... after 4 s 73 ms [39m
+> hvigor [32mFinished :entry:ohosTest@ProcessCompiledResources... after 1 ms [39m
+> hvigor [32mFinished :entry:ohosTest@PackageHap... after 585 ms [39m
+> hvigor [32mFinished :entry:ohosTest@PackingCheck... after 7 ms [39m
+> hvigor [32mFinished :entry:ohosTest@SignHap... after 4 s 570 ms [39m
 > hvigor [32mFinished :entry:ohosTest@CollectDebugSymbol... after 2 ms [39m
 > hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
-> hvigor [32mBUILD SUCCESSFUL in 13 s 804 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 11 s 365 ms [39m
 
 34 tasks in total: 18 executed, 16 up-to-date
 [Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/default/entry-default-signed.hap msg:install bundle successfully. 
@@ -386,7 +386,7 @@ OHOS_REPORT_STATUS: numtests=4
 OHOS_REPORT_STATUS: stream=
 OHOS_REPORT_STATUS: test=titleSegmentAndTabsStayFixedAcrossAllSecondaryViews
 OHOS_REPORT_STATUS_CODE: 0
-OHOS_REPORT_STATUS: consuming=51788
+OHOS_REPORT_STATUS: consuming=52830
 
 
 OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
@@ -405,7 +405,7 @@ OHOS_REPORT_STATUS: numtests=4
 OHOS_REPORT_STATUS: stream=
 OHOS_REPORT_STATUS: test=libraryLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop
 OHOS_REPORT_STATUS_CODE: 0
-OHOS_REPORT_STATUS: consuming=16966
+OHOS_REPORT_STATUS: consuming=17117
 
 
 OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
@@ -424,7 +424,7 @@ OHOS_REPORT_STATUS: numtests=4
 OHOS_REPORT_STATUS: stream=
 OHOS_REPORT_STATUS: test=repeatedValidationUsesToastWithoutMovingTheForm
 OHOS_REPORT_STATUS_CODE: 0
-OHOS_REPORT_STATUS: consuming=9061
+OHOS_REPORT_STATUS: consuming=9291
 
 
 OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
@@ -443,16 +443,16 @@ OHOS_REPORT_STATUS: numtests=4
 OHOS_REPORT_STATUS: stream=
 OHOS_REPORT_STATUS: test=planTaskSegmentsAndActionBarStayFixedAndReturnToTheSelectedView
 OHOS_REPORT_STATUS_CODE: 0
-OHOS_REPORT_STATUS: consuming=25954
+OHOS_REPORT_STATUS: consuming=26026
 
 
 OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
-OHOS_REPORT_STATUS: suiteconsuming=103769
+OHOS_REPORT_STATUS: suiteconsuming=105264
 
 
 OHOS_REPORT_RESULT: stream=Tests run: 4, Failure: 0, Error: 0, Pass: 4, Ignore: 0
 OHOS_REPORT_CODE: 0
-OHOS_REPORT_STATUS: taskconsuming=103769
+OHOS_REPORT_STATUS: taskconsuming=105264
 
 TestFinished-ResultCode: 0
 TestFinished-ResultMsg: your test finished!!!

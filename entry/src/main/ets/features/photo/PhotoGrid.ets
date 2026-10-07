@@ -72,7 +72,12 @@ export struct PhotoGrid {
   }
   build() {
     List({ space: Theme.sectionSpacing, scroller: this.scroller }) {
-      ListItem() { Column({ space: 12 }) { this.header(); this.controls() }.width('100%').padding({ top: this.topInset > 0 ? this.topInset + Theme.sectionSpacing : 0 }) }
+      ListItem() {
+        Column() {
+          Blank().height(this.topInset > 0 ? this.topInset + Theme.sectionSpacing : 0).width('100%')
+          Column({ space: 12 }) { this.header(); this.controls() }.width('100%')
+        }.width('100%')
+      }
       if (this.photos.length === 0) {
         ListItem() { EmptyState({ title: '每一张，都是一次登场', message: '切换到计划的「照片」，通过系统选择器导入。' }) }
       } else if (this.visible().length === 0) {
@@ -89,7 +94,7 @@ export struct PhotoGrid {
           }
         }, (row: PhotoAsset[]) => row.map((photo: PhotoAsset) => photo.id + ':' + photo.thumbnailPath + ':' + photo.status + ':' + this.selecting + ':' + this.selectedIds.includes(photo.id)).join('|'))
       }
-      ListItem() { Column().height(this.bottomInset).width('100%') }
+      ListItem() { Column() { Blank().height(this.bottomInset).width('100%') }.width('100%') }
     }.width('100%').height('100%').padding({ left: this.sidePadding, right: this.sidePadding }).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring).onAreaChange((_old: Area, area: Area) => { this.viewportWidth = Number(area.width); })
   }
 }

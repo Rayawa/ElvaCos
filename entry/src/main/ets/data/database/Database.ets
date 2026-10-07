@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { relationalStore } from '@kit.ArkData';
-import { SCHEMA, SCHEMA_VERSION } from './Schema';
+import { SCHEMA, SCHEMA_VERSION, MIGRATION_2, MIGRATION_3 } from './Schema';
 
 // Use the store's writer connection: createTransaction() uses a separate
 // connection whose PRAGMA foreign_keys setting is not inherited.
@@ -25,8 +25,11 @@ export class Database {
       if (store.version < SCHEMA_VERSION) {
         store.beginTransaction();
         try {
-          for (const sql of SCHEMA) { await store.executeSql(sql); }
-          await store.executeSql('PRAGMA user_version = 1');
+          const version = store.version;
+          if (version < 1) { for (const sql of SCHEMA) { await store.executeSql(sql); } }
+          if (version < 2) { for (const sql of MIGRATION_2) { await store.executeSql(sql); } }
+          if (version < 3) { for (const sql of MIGRATION_3) { await store.executeSql(sql); } }
+          await store.executeSql('PRAGMA user_version = 3');
           store.commit();
         } catch (error) { store.rollBack(); throw error as Error; }
       }

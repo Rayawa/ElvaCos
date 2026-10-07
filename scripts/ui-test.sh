@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
+if [ "${ELVACOS_DEVICE_TEST_LOCKED:-0}" != "1" ]; then
+  exec python3 scripts/device_test_lock.py "$0" "$@"
+fi
 TASK_DEVECO=${DEVECO_HOME:-"$HOME/Applications/DevEco-Studio.app/Contents"}
 [ -d "$TASK_DEVECO/Contents" ] && TASK_DEVECO="$TASK_DEVECO/Contents"
 TASK_HDC="$TASK_DEVECO/sdk/default/openharmony/toolchains/hdc"

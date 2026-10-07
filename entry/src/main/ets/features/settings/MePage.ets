@@ -1,3 +1,4 @@
+import { scrollByAxis } from '../../common/scroll';
 import { AppState } from '../../common/AppState';
 import { Theme, formatTime } from '../../common/Theme';
 import { DiaryEntry, PhotoAsset, PhotoStatus, CosProject, ProjectStatus } from '../../model/Entities';
@@ -70,9 +71,11 @@ export struct MePage {
                 if (this.state.diary.length === 0) { EmptyState({ title: '故事从现在开始', message: '建立第一个计划后，准备过程会慢慢留在这里。' }) }
               }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
             }
-          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: this.bottomInset }).width('100%')
+            Blank().height(this.bottomInset).width('100%')
+          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%')
         }.width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
       }
     }.width('100%').height('100%')
+      .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
   }
 }

@@ -1,3 +1,6 @@
+import { checkSchedule } from '../../model/Schedule';
+import { PreparationBundle } from '../../model/Preparation';
+import { insertPreparation } from './PreparationRepository';
 import { relationalStore } from '@kit.ArkData';
 import { Database, WriteTransaction } from '../database/Database';
 import { Character, CharacterVariant, CosProject, Asset, CosEvent, ChecklistItem, PhotoAsset, DiaryEntry, ProjectAsset, ProjectStatus, AssetStatus, AssetType, PhotoStatus, PhotoVersion } from '../../model/Entities';
@@ -107,15 +110,19 @@ export class CosProjectRepository {
     }
     return result;
   }
-  async save(item: CosProject, logText: string = '', character?: Character): Promise<void> {
+  async save(item: CosProject, logText: string = '', character?: Character, preparation?: PreparationBundle): Promise<void> {
     await this.db.transaction(async (tx: WriteTransaction) => {
     if (character) { await tx.execute('INSERT INTO characters (id,name,work_name,description,cover,favorite,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', [character.id, character.name, character.workName, character.description, character.cover, character.favorite ? 1 : 0, character.status, character.createdAt, character.updatedAt]); }
     await tx.execute('INSERT INTO projects (id, character_id, variant_id, event_id, name, status, notes, target_date, budget_cents, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET character_id=excluded.character_id, variant_id=excluded.variant_id, event_id=excluded.event_id, name=excluded.name, status=excluded.status, notes=excluded.notes, target_date=excluded.target_date, budget_cents=excluded.budget_cents, created_at=excluded.created_at, updated_at=excluded.updated_at', [item.id, item.characterId, item.variantId || null, item.eventId || null, item.name, item.status, item.notes, item.targetDate, item.budgetCents, item.createdAt, item.updatedAt]);
+      if (preparation) {
+        if (preparation.categories.some((c) => c.projectId !== item.id) || preparation.tasks.some((t) => t.projectId !== item.id)) { throw new Error('准备模板不属于此计划'); }
+        await insertPreparation(tx, preparation);
+      }
       if (logText) { const entry = new DiaryEntry(); await tx.execute('INSERT INTO diary_entries VALUES (?,?,?,?)', [entry.id, item.id, logText, entry.createdAt]); }
     });
   }
 
-  async remove(id: string): Promise<void> { await this.db.transaction(async (tx: WriteTransaction) => { await tx.execute("UPDATE characters SET cover='' WHERE cover IN (SELECT thumbnail_path FROM photos WHERE project_id=?)", [id]); await tx.execute('DELETE FROM projects WHERE id=?', [id]); }); }
+  async remove(id: string): Promise<void> { await this.db.transaction(async (tx: WriteTransaction) => { await tx.execute("UPDATE characters SET cover='' WHERE cover IN (SELECT thumbnail_path FROM photos WHERE project_id=?)", [id]); await tx.execute("UPDATE characters SET cover='' WHERE cover IN (SELECT thumbnail_path FROM reference_images WHERE project_id=?)", [id]); await tx.execute('DELETE FROM projects WHERE id=?', [id]); }); }
 }
 
 export class AssetRepository {
@@ -179,6 +186,7 @@ export class CosEventRepository {
         item.id = str(rows, 'id');
         item.name = str(rows, 'name');
         item.date = str(rows, 'date');
+        item.dateMode = str(rows, 'date_mode'); item.endDate = str(rows, 'end_date'); item.timeMode = str(rows, 'time_mode'); item.startTime = str(rows, 'start_time'); item.endTime = str(rows, 'end_time'); item.eventType = str(rows, 'event_type'); item.reminderId = num(rows, 'reminder_id'); item.reminderMinutes = num(rows, 'reminder_minutes');
         item.city = str(rows, 'city');
         item.venue = str(rows, 'venue');
         item.url = str(rows, 'url');
@@ -195,7 +203,8 @@ export class CosEventRepository {
     return result;
   }
   async save(item: CosEvent): Promise<void> {
-    await this.db.getStore().executeSql('INSERT INTO events (id, name, date, city, venue, url, status, ticket_purchased, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, date=excluded.date, city=excluded.city, venue=excluded.venue, url=excluded.url, status=excluded.status, ticket_purchased=excluded.ticket_purchased, notes=excluded.notes, created_at=excluded.created_at', [item.id, item.name, item.date, item.city, item.venue, item.url, item.status, item.ticketPurchased ? 1 : 0, item.notes, item.createdAt]);
+    checkSchedule(item);
+    await this.db.getStore().executeSql('INSERT INTO events (id,name,date,city,venue,url,status,ticket_purchased,notes,created_at,date_mode,end_date,time_mode,start_time,end_time,event_type,reminder_id,reminder_minutes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,date=excluded.date,city=excluded.city,venue=excluded.venue,url=excluded.url,status=excluded.status,ticket_purchased=excluded.ticket_purchased,notes=excluded.notes,date_mode=excluded.date_mode,end_date=excluded.end_date,time_mode=excluded.time_mode,start_time=excluded.start_time,end_time=excluded.end_time,event_type=excluded.event_type,reminder_id=excluded.reminder_id,reminder_minutes=excluded.reminder_minutes', [item.id,item.name,item.date,item.city,item.venue,item.url,item.status,item.ticketPurchased ? 1 : 0,item.notes,item.createdAt,item.dateMode,item.endDate,item.timeMode,item.startTime,item.endTime,item.eventType,item.reminderId,item.reminderMinutes]);
   }
   async remove(id: string): Promise<void> { await this.db.getStore().executeSql('DELETE FROM events WHERE id=?', [id]); }
 }

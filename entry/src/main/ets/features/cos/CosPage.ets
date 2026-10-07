@@ -1,3 +1,5 @@
+import { scrollByAxis } from '../../common/scroll';
+import { planDate } from '../../model/Rules';
 import { DashboardSearch } from '../../components/DashboardSearch';
 import { ManagedImage } from '../../components/ManagedImage';
 import { AppState } from '../../common/AppState';
@@ -33,7 +35,7 @@ export struct CosPage {
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private plans(): CosProject[] { return this.state.projects.filter((p: CosProject) => (p.name + this.state.characterName(p.characterId)).includes(this.query) && (this.statusFilter === 2 || (this.statusFilter === 1 ? p.status === ProjectStatus.COMPLETED : p.status !== ProjectStatus.COMPLETED && p.status !== ProjectStatus.ARCHIVED))); }
+  private plans(): CosProject[] { return this.state.projects.filter((p: CosProject) => (p.name + this.state.characterName(p.characterId)).includes(this.query) && (this.statusFilter === 3 || (this.statusFilter === 1 ? p.status === ProjectStatus.COMPLETED : this.statusFilter === 2 ? !planDate(p, this.state.events) && p.status !== ProjectStatus.COMPLETED && p.status !== ProjectStatus.ARCHIVED : p.status !== ProjectStatus.COMPLETED && p.status !== ProjectStatus.ARCHIVED))); }
   private characters(): Character[] { return this.state.characters.filter((c: Character) => (c.name + c.workName).includes(this.query)); }
   @Builder characterBody(character: Character) {
     Row({ space: 16 }) {
@@ -57,16 +59,18 @@ export struct CosPage {
           }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 12 }) {
           if (this.projects) {
-            Select([{ value: '进行中' }, { value: '已完成' }, { value: '全部' }]).value(['进行中', '已完成', '全部'][this.statusFilter]).onSelect((index: number) => { vibration.dotVibration(); this.statusFilter = index; }).accessibilityText('计划状态筛选')
+            Select([{ value: '进行中' }, { value: '已完成' }, { value: '日期待定' }, { value: '全部' }]).value(['进行中', '已完成', '日期待定', '全部'][this.statusFilter]).onSelect((index: number) => { vibration.dotVibration(); this.statusFilter = index; }).accessibilityText('计划状态筛选')
             ForEach(this.plans(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
             if (this.plans().length === 0) { EmptyState({ title: '没有符合条件的计划', message: '切换筛选，或新建一份 Cos 计划。', button: '＋ 新建 Cos 计划', action: () => this.add('project', '') }) }
           } else {
             ForEach(this.characters(), (c: Character) => { InteractiveCard({ label: c.name, hint: '双击打开角色详情', effects: this.state.settings.effects, action: () => this.open('character', c.id), content: (): void => this.characterBody(c) }) }, (c: Character) => c.id)
-            if (this.characters().length === 0) { EmptyState({ title: this.query ? '没有找到角色' : '让喜欢有迹可循', message: this.query ? '换个角色名或作品名试试。' : '添加一个角色，开始你的 Cos 记录。' }) }
+            if (this.characters().length === 0) { EmptyState({ title: this.query ? '没有找到角色' : '让喜欢有迹可循', message: this.query ? '换个角色名或作品名试试。' : '添加一个角色，开始你的 Cos 记录。', button: '＋ 添加角色', action: (): void => this.add('character', '') }) }
           }
           }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-        }.padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: this.bottomInset }).width('100%')
+          Blank().height(this.bottomInset).width('100%')
+        }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%')
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
     }.width('100%').height('100%')
+      .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
   }
 }

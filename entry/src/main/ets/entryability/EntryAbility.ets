@@ -12,9 +12,15 @@ const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.openReminder(want);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
+  private openReminder(want: Want): void {
+    const id = want.parameters?.eventId;
+    if (typeof id === 'string') { applicationState.pendingEventId = id; }
+  }
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void { this.openReminder(want); }
   onDestroy(): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
   }

@@ -1,0 +1,71 @@
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=36981
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=8319
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=3
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=24933
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: suiteconsuming=70233
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 3, Failure: 0, Error: 0, Pass: 3, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=70233
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.

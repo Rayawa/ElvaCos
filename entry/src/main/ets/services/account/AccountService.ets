@@ -1,3 +1,4 @@
+import { util } from '@kit.ArkTS';
 import { authentication } from '@kit.AccountKit';
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
@@ -8,6 +9,7 @@ export class AccountResult {
   ok: boolean = false;
   account: HuaweiAccount = new HuaweiAccount();
   message: string = '';
+  errorCode: number = 0;
 }
 
 /**
@@ -23,6 +25,15 @@ export class AccountService {
     return canIUse('SystemCapability.AuthenticationServices.HuaweiID.Auth');
   }
 
+  static configurationMessage(context: common.UIAbilityContext): string {
+    const metadata = context.currentHapModuleInfo.metadata || [];
+    const client = metadata.find((entry) => entry.name === 'client_id');
+    if (!client || !client.value.trim() || client.value.startsWith('YOUR_')) {
+      return '当前安装包未配置华为账号 Client ID，暂时无法登录；本机数据和其他功能可继续使用';
+    }
+    return '';
+  }
+
   private message(error: BusinessError): string {
     switch (error.code) {
       case authentication.AuthenticationErrorCode.USER_CANCELED:
@@ -32,7 +43,9 @@ export class AccountService {
       case authentication.AuthenticationErrorCode.NETWORK_ERROR:
         return '网络不可用，请检查网络后重试';
       case authentication.AuthenticationErrorCode.PACKAGE_FINGERPRINT_CHECK_ERROR:
-        return '华为账号服务未就绪：请在 AppGallery Connect 为当前包名和签名开通 Account Kit';
+        return '华为账号配置无效（1001500001）：请核对当前包名与签名指纹';
+      case authentication.AuthenticationErrorCode.PARAMETER_INVALID:
+        return '华为账号配置无效（1001502003）：请核对应用 Client ID 与签名 Profile';
       case authentication.AuthenticationErrorCode.DUPLICATE_REQUEST_REJECTED:
         return '登录请求正在处理中，请稍候';
       case authentication.AuthenticationErrorCode.REQUEST_RESTRICTED:
@@ -40,7 +53,7 @@ export class AccountService {
       case authentication.AuthenticationErrorCode.UNSUPPORTED:
         return '当前系统版本不支持华为账号登录';
       default:
-        return `华为账号登录未完成（错误码 ${error.code}）`;
+        return error.code ? `华为账号登录未完成（错误码 ${error.code}）` : error.message || '华为账号登录未完成，请重试';
     }
   }
 
@@ -51,13 +64,16 @@ export class AccountService {
       result.message = '当前设备不支持华为账号登录';
       return result;
     }
+    const configuration = AccountService.configurationMessage(context);
+    if (configuration) { result.message = configuration; return result; }
     try {
       const provider = new authentication.HuaweiIDProvider();
       const request = provider.createLoginWithHuaweiIDRequest();
       request.forceLogin = true;
-      request.state = 'elvacos-signin';
+      request.state = util.generateRandomUUID();
       const controller = new authentication.AuthenticationController(context);
       const response = (await controller.executeRequest(request)) as authentication.LoginWithHuaweiIDResponse;
+      if (response.state !== request.state) { throw new Error('登录响应校验失败，请重试'); }
       const credential = response.data;
       if (!credential || !credential.openID) {
         result.message = '未取得华为账号标识，请重试';
@@ -73,6 +89,7 @@ export class AccountService {
       return result;
     } catch (error) {
       const businessError = error as BusinessError;
+      result.errorCode = businessError.code || 0;
       console.error('[ElvaCos][services/account/AccountService][ERROR]',
         `华为账号登录失败. Code: ${businessError.code}, message: ${businessError.message}`);
       result.message = this.message(businessError);
@@ -91,14 +108,16 @@ export class AccountService {
     try {
       const provider = new authentication.HuaweiIDProvider();
       const request = provider.createCancelAuthorizationRequest();
-      request.state = 'elvacos-signout';
+      request.state = util.generateRandomUUID();
       const controller = new authentication.AuthenticationController(context);
-      await controller.executeRequest(request);
+      const response = await controller.executeRequest(request) as authentication.CancelAuthorizationResponse;
+      if (response.state !== request.state) { throw new Error('退出响应校验失败，请重试'); }
       result.ok = true;
       result.message = '已退出华为账号';
       return result;
     } catch (error) {
       const businessError = error as BusinessError;
+      result.errorCode = businessError.code || 0;
       console.error('[ElvaCos][services/account/AccountService][ERROR]',
         `退出华为账号失败. Code: ${businessError.code}, message: ${businessError.message}`);
       result.message = this.message(businessError);

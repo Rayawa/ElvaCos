@@ -1,0 +1,87 @@
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=titleSegmentAndTabsStayFixedAcrossAllSecondaryViews
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=titleSegmentAndTabsStayFixedAcrossAllSecondaryViews
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=46982
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=libraryLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=libraryLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=16961
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=repeatedValidationUsesToastWithoutMovingTheForm
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=repeatedValidationUsesToastWithoutMovingTheForm
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=9284
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=planTaskSegmentsAndActionBarStayFixedAndReturnToTheSelectedView
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=4
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=planTaskSegmentsAndActionBarStayFixedAndReturnToTheSelectedView
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=25598
+
+
+OHOS_REPORT_STATUS: class=DashboardLayoutFidelity
+OHOS_REPORT_STATUS: suiteconsuming=98825
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 4, Failure: 0, Error: 0, Pass: 4, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=98825
+

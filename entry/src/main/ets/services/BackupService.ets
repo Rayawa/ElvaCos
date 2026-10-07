@@ -12,7 +12,7 @@ export class BackupService {
   async exportMetadata(): Promise<string> { return this.metadata.exportMetadata(); }
   async export(): Promise<boolean> {
     const output = await this.exportMetadata();
-    const uris = await new picker.DocumentViewPicker(this.context).save({ newFileNames: ['cos-metadata-' + Date.now() + '.json'], fileSuffixChoices: ['JSON|.json'] });
+    const uris = await new picker.DocumentViewPicker(this.context).save({ newFileNames: ['ElvaCos-metadata-' + Date.now() + '.json'], fileSuffixChoices: ['JSON|.json'] });
     if (uris.length === 0) { return false; }
     const file = await fs.open(uris[0], fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
     try { await fs.write(file.fd, output); } finally { await fs.close(file); }

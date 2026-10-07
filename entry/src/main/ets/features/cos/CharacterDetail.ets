@@ -1,3 +1,5 @@
+import { ReferenceGallery } from '../../components/ReferenceGallery';
+import { ReferenceImage } from '../../model/Planning';
 import { ManagedImage } from '../../components/ManagedImage';
 import { pageTransition, startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 import { vibration } from '../../common/vibration';
@@ -37,7 +39,7 @@ export struct CharacterDetail {
           if (this.character.description) { Text(this.character.description).fontSize(14).fontColor(Theme.muted) }
         }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
         Column({ space: Theme.sectionSpacing }) {
-          Text('在关联计划的照片详情中，可将照片设为角色封面。').fontSize(12).fontColor(Theme.muted)
+          ReferenceGallery({ state: this.state, images: this.state.references.filter((r: ReferenceImage) => r.characterId === this.character.id), add: (): void => { this.state.importReferences('', this.character.id); }, open: (id: string): void => this.open('reference', id) })
           SectionHeading({ title: '角色版本', trailing: this.variants().length + ' 个' })
           ForEach(this.variants(), (v: CharacterVariant) => {
             Row({ space: 10 }) {
@@ -50,7 +52,8 @@ export struct CharacterDetail {
           ForEach(this.projects(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
           if (this.projects().length === 0) { EmptyState({ title: '从喜欢到登场', message: '为这个角色创建一份计划，把准备过程留存下来。' }) }
         }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-      }.alignItems(HorizontalAlign.Start).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: Theme.contentBottom })
+        Blank().height(Theme.contentBottom).width('100%')
+      }.alignItems(HorizontalAlign.Start).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding })
     }.width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
   }
 }

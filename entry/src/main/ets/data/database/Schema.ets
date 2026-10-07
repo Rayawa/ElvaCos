@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION: number = 1;
+export const SCHEMA_VERSION: number = 3;
 export const SCHEMA: string[] = [
   `CREATE TABLE characters (id TEXT PRIMARY KEY, name TEXT NOT NULL, work_name TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', cover TEXT NOT NULL DEFAULT '', favorite INTEGER NOT NULL DEFAULT 0 CHECK(favorite IN (0,1)), status TEXT NOT NULL DEFAULT 'Wishlist', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE TABLE variants (id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE, name TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', UNIQUE(character_id,name), UNIQUE(id,character_id))`,
@@ -16,4 +16,28 @@ export const SCHEMA: string[] = [
   `CREATE INDEX photos_project_idx ON photos(project_id,created_at)`,
   `CREATE INDEX checklist_project_idx ON checklist_items(project_id,sort_order)`,
   `CREATE INDEX diary_date_idx ON diary_entries(created_at)`
+];
+
+// v1 remains immutable. Existing packing confirmations retain their meaning.
+export const MIGRATION_2: string[] = [
+  `CREATE TABLE preparation_categories (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0 CHECK(sort_order>=0), UNIQUE(project_id,name), UNIQUE(id,project_id))`,
+  `CREATE TABLE preparation_tasks (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, category_id TEXT NOT NULL, label TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0 CHECK(done IN (0,1)), due_date TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0 CHECK(sort_order>=0), FOREIGN KEY(category_id,project_id) REFERENCES preparation_categories(id,project_id) ON DELETE CASCADE)`,
+  `CREATE INDEX preparation_project_idx ON preparation_tasks(project_id,category_id,sort_order)`
+];
+
+export const MIGRATION_3: string[] = [
+  `CREATE TABLE team_members (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, role TEXT NOT NULL, name TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '')`,
+  `CREATE TABLE expenses (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, name TEXT NOT NULL, category TEXT NOT NULL, amount_cents INTEGER NOT NULL CHECK(amount_cents>=0), date TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`,
+  `CREATE TABLE reference_images (id TEXT PRIMARY KEY, project_id TEXT REFERENCES projects(id) ON DELETE CASCADE, character_id TEXT REFERENCES characters(id) ON DELETE CASCADE, source_uri TEXT NOT NULL, local_path TEXT NOT NULL, thumbnail_path TEXT NOT NULL, caption TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, CHECK((project_id IS NULL) != (character_id IS NULL)), UNIQUE(project_id,source_uri), UNIQUE(character_id,source_uri))`,
+  `CREATE INDEX team_project_idx ON team_members(project_id)`,
+  `CREATE INDEX expenses_project_idx ON expenses(project_id,date)`,
+  `CREATE INDEX reference_project_idx ON reference_images(project_id,created_at)`,
+  `ALTER TABLE events ADD COLUMN date_mode TEXT NOT NULL DEFAULT 'single' CHECK(date_mode IN ('pending','single','multiple'))`,
+  `ALTER TABLE events ADD COLUMN end_date TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE events ADD COLUMN time_mode TEXT NOT NULL DEFAULT 'none' CHECK(time_mode IN ('none','start','range'))`,
+  `ALTER TABLE events ADD COLUMN start_time TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE events ADD COLUMN end_time TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE events ADD COLUMN event_type TEXT NOT NULL DEFAULT '漫展'`,
+  `ALTER TABLE events ADD COLUMN reminder_id INTEGER NOT NULL DEFAULT -1 CHECK(reminder_id>=-1)`,
+  `ALTER TABLE events ADD COLUMN reminder_minutes INTEGER NOT NULL DEFAULT -1 CHECK(reminder_minutes IN (-1,0,30,60,1440))`
 ];

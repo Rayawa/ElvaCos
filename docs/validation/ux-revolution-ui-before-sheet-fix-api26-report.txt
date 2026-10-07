@@ -1,0 +1,132 @@
+OHOS_REPORT_SUM: 6
+OHOS_REPORT_STATUS: class=HdsShell
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=tabsSecondarySegmentsAndTitleMenusWork
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=tabsSecondarySegmentsAndTitleMenusWork
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=29326
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=fixedChromeAndIndependentSettingsRespectSafeAreas
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=fixedChromeAndIndependentSettingsRespectSafeAreas
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=24327
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=titleMenuOpensCancelableCharacterFormWithoutWritingData
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=titleMenuOpensCancelableCharacterFormWithoutWritingData
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=8381
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=newPlanCreatesRoleInlineAndCanBeCanceledWithoutWrites
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=newPlanCreatesRoleInlineAndCanBeCanceledWithoutWrites
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=10854
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=planViewsUseContextualActionsAndReturnToTheirTaskView
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stack=    at present entry (entry/src/ohosTest/ets/test/UiShell.test.ets:27:15)
+OHOS_REPORT_STATUS: stream=Error in planViewsUseContextualActionsAndReturnToTheirTaskView, Missing visible application component: 补入所选任务
+OHOS_REPORT_STATUS: test=planViewsUseContextualActionsAndReturnToTheirTaskView
+OHOS_REPORT_STATUS_CODE: -1
+OHOS_REPORT_STATUS: consuming=9886
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=settingsUseAlignedHandChoicesAndRealHelpSheets
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=6
+OHOS_REPORT_STATUS: stack=    at tap entry (entry/src/ohosTest/ets/test/UiShell.test.ets:13:59)
+OHOS_REPORT_STATUS: stream=Error in settingsUseAlignedHandChoicesAndRealHelpSheets, Missing application component: 我的
+OHOS_REPORT_STATUS: test=settingsUseAlignedHandChoicesAndRealHelpSheets
+OHOS_REPORT_STATUS_CODE: -1
+OHOS_REPORT_STATUS: consuming=631
+
+
+OHOS_REPORT_STATUS: class=HdsShell
+OHOS_REPORT_STATUS: suiteconsuming=83405
+OHOS_REPORT_STATUS: Missing application component: 首页, error in afterAll function
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 6, Failure: 0, Error: 2, Pass: 4, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=83405
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.

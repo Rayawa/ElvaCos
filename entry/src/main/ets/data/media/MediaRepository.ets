@@ -1,8 +1,9 @@
+import { ReferenceImage } from '../../model/Planning';
 import { common } from '@kit.AbilityKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { fileIo as fs, fileUri } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
-import { PhotoAsset } from '../../model/Entities';
+import { PhotoAsset, ManagedMedia } from '../../model/Entities';
 
 export class MediaRepository {
   static imageUri(path: string): string {
@@ -10,7 +11,13 @@ export class MediaRepository {
     return path.startsWith('file://') ? path : fileUri.getUriFromPath(path);
   }
   private context: common.Context;
-  constructor(context: common.Context) { this.context = context; }
+  private mediaRoot: string;
+  constructor(context: common.Context, testRoot?: string) {
+    this.context = context;
+    if (testRoot && (!testRoot.startsWith(context.filesDir + '/verification-') || testRoot.slice(context.filesDir.length + 1).includes('/'))) { throw new Error('Invalid verification media path'); }
+    this.mediaRoot = testRoot || context.filesDir + '/media';
+  }
+  async exists(media: ManagedMedia): Promise<boolean> { return !!media.localPath && !!media.thumbnailPath && await fs.access(media.localPath) && await fs.access(media.thumbnailPath); }
   private cacheRoot(testRoot?: string): string {
     if (testRoot && (!testRoot.startsWith(this.context.cacheDir + '/verification-') || testRoot.slice(this.context.cacheDir.length + 1).includes('/'))) { throw new Error('Invalid verification cache path'); }
     return testRoot || this.context.cacheDir;
@@ -43,7 +50,7 @@ export class MediaRepository {
     return result.photoUris;
   }
   async import(uri: string, projectId: string): Promise<PhotoAsset> {
-    const dir = this.context.filesDir + '/media';
+    const dir = this.mediaRoot;
     if (!(await fs.access(dir))) { await fs.mkdir(dir, true); }
     const photo = new PhotoAsset(); photo.projectId = projectId; photo.sourceUri = uri;
     photo.localPath = dir + '/' + photo.id + '.original';
@@ -70,15 +77,20 @@ export class MediaRepository {
       return photo;
     } catch (error) { await this.remove(photo); throw error as Error; } finally { await fs.close(sourceFile); }
   }
-  async remove(photo: PhotoAsset): Promise<void> {
+  async importReference(uri: string, projectId: string, characterId: string): Promise<ReferenceImage> {
+    const media = await this.import(uri, projectId);
+    const r = new ReferenceImage(); r.id = media.id; r.projectId = projectId; r.characterId = characterId; r.sourceUri = media.sourceUri; r.localPath = media.localPath; r.thumbnailPath = media.thumbnailPath; return r;
+  }
+  async remove(photo: ManagedMedia): Promise<void> {
     for (const path of [photo.localPath, photo.thumbnailPath]) {
-      if (path.startsWith(this.context.filesDir + '/media/')) { try { await fs.unlink(path); } catch (error) {} }
+      if (path.startsWith(this.mediaRoot + '/')) { try { await fs.unlink(path); } catch (error) {} }
     }
   }
-  async collect(photos: PhotoAsset[]): Promise<void> {
-    const dir = this.context.filesDir + '/media';
+  async collect(photos: PhotoAsset[], references: ReferenceImage[] = []): Promise<void> {
+    const dir = this.mediaRoot;
     const keep: string[] = [];
     photos.forEach((p: PhotoAsset) => { keep.push(p.localPath); keep.push(p.thumbnailPath); });
+    references.forEach((r: ReferenceImage) => { keep.push(r.localPath); keep.push(r.thumbnailPath); });
     try {
       const names = await fs.listFile(dir);
       for (const name of names) { const path = dir + '/' + name; if (!keep.includes(path)) { await fs.unlink(path); } }

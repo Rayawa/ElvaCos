@@ -13,9 +13,28 @@
     "installationFree": false,
     "pages": "$profile:main_pages",
     "requestPermissions": [
-      { "name": "ohos.permission.VIBRATE" },
-      { "name": "ohos.permission.HDR_BRIGHTNESS" },
-      { "name": "ohos.permission.DETECT_GESTURE", "reason": "$string:grip_reason", "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" } }
+      {
+        "name": "ohos.permission.PUBLISH_AGENT_REMINDER"
+      },
+      {
+        "name": "ohos.permission.VIBRATE"
+      },
+      {
+        "name": "ohos.permission.HDR_BRIGHTNESS"
+      },
+      {
+        "name": "ohos.permission.DETECT_GESTURE",
+        "reason": "$string:grip_reason",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ],
+          "when": "inuse"
+        }
+      },
+      {
+        "name": "ohos.permission.INTERNET"
+      }
     ],
     "abilities": [
       {
@@ -50,7 +69,13 @@
             "name": "ohos.extension.backup",
             "resource": "$profile:backup_config"
           }
-        ],
+        ]
+      }
+    ],
+    "metadata": [
+      {
+        "name": "client_id",
+        "value": "6917618412076034516"
       }
     ]
   }

@@ -5,7 +5,10 @@ import re
 import sqlite3
 import unittest
 
-SQL = re.findall(r'`([^`]+)`', Path('entry/src/main/ets/data/database/Schema.ets').read_text())
+SOURCE = Path('entry/src/main/ets/data/database/Schema.ets').read_text()
+SQL = re.findall(r'`([^`]+)`', SOURCE)
+V1 = re.findall(r'`([^`]+)`', SOURCE.split('export const MIGRATION_2')[0])
+V2 = re.findall(r'`([^`]+)`', SOURCE.split('export const MIGRATION_2')[1].split('export const MIGRATION_3')[0])
 
 class RelationalModelTest(unittest.TestCase):
     def setUp(self):
@@ -77,5 +80,37 @@ class RelationalModelTest(unittest.TestCase):
                 self.db.execute("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('bad','missing','Broken','Idea',1,1)")
         except sqlite3.IntegrityError: pass
         self.assertEqual(self.db.execute('SELECT count(*) FROM projects').fetchone()[0], 1)
+
+    def test_v1_migration_preserves_packing_assets_and_photos(self):
+        old = sqlite3.connect(':memory:')
+        try:
+            old.execute('PRAGMA foreign_keys=ON')
+            for sql in V1: old.execute(sql)
+            old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Old',1,1)")
+            old.execute("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('p','c','Old Plan','Preparing',1,1)")
+            old.execute("INSERT INTO assets(id,name,type,status,created_at) VALUES('a','Owned wig','Wig','Owned',1)")
+            old.execute("INSERT INTO checklist_items VALUES('packed','p','a','Wig',1,0)")
+            old.execute("INSERT INTO photos VALUES('ph','p','gallery://1','/original','/thumb','Raw','',1)")
+            for sql in V2: old.execute(sql)
+            self.assertEqual(old.execute('SELECT done FROM checklist_items').fetchone()[0], 1)
+            self.assertEqual(old.execute('SELECT local_path FROM photos').fetchone()[0], '/original')
+            self.assertEqual(old.execute('SELECT status FROM assets').fetchone()[0], 'Owned')
+            self.assertEqual(old.execute('SELECT count(*) FROM preparation_tasks').fetchone()[0], 0)
+        finally: old.close()
+
+    def test_preparation_category_cannot_cross_projects(self):
+        self.db.execute("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('p2','c','Other','Ready',1,1)")
+        self.db.execute("INSERT INTO preparation_categories VALUES('g','p','Wig',0)")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("INSERT INTO preparation_tasks(id,project_id,category_id,label) VALUES('t','p2','g','Styling')")
+
+    def test_preparation_completion_is_independent_and_category_cascades(self):
+        self.db.execute("INSERT INTO preparation_categories VALUES('g','p','Wig',0)")
+        self.db.execute("INSERT INTO preparation_tasks(id,project_id,category_id,label,done) VALUES('t','p','g','Styling',1)")
+        self.db.execute("INSERT INTO checklist_items VALUES('pack','p','a','Wig',0,0)")
+        self.assertEqual(self.db.execute('SELECT done FROM checklist_items').fetchone()[0], 0)
+        self.db.execute("DELETE FROM preparation_categories WHERE id='g'")
+        self.assertEqual(self.db.execute('SELECT count(*) FROM preparation_tasks').fetchone()[0], 0)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM checklist_items').fetchone()[0], 1)
 
 if __name__ == '__main__': unittest.main(verbosity=2)

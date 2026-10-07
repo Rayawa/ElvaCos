@@ -269,7 +269,7 @@ export struct SettingsPanel {
             this.usernameItem()
 
             Divider()
-                .color(Theme.line)
+                .color(Theme.divider)
                 .strokeWidth(0.5)
                 .margin({
                     left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -280,7 +280,7 @@ export struct SettingsPanel {
                 this.vibrationLevelItem()
 
                 Divider()
-                    .color(Theme.line)
+                    .color(Theme.divider)
                     .strokeWidth(0.5)
                     .margin({
                         left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -292,7 +292,7 @@ export struct SettingsPanel {
 
             if (SUPPORTS_HARMONY_API_23) {
                 Divider()
-                    .color(Theme.line)
+                    .color(Theme.divider)
                     .strokeWidth(0.5)
                     .margin({
                         left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,
@@ -303,7 +303,7 @@ export struct SettingsPanel {
             }
 
             Divider()
-                .color(Theme.line)
+                .color(Theme.divider)
                 .strokeWidth(0.5)
                 .margin({
                     left: LIST_ITEM_DIVIDER_HORIZONTAL_MARGIN,

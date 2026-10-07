@@ -1,4 +1,7 @@
-import { Driver, ON, Rect } from '@kit.TestKit';
+import { DeviceCalendarService } from '../../../main/ets/services/DeviceCalendarService';
+import { AccountService } from '../../../main/ets/services/account/AccountService';
+import { CosEvent } from '../../../main/ets/model/Entities';
+import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
 
 export default function uiShellTest(): void {
@@ -72,8 +75,8 @@ export default function uiShellTest(): void {
       }
       await tap('计划'); await present('新建计划');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
-      await tap('漫展'); await present('记录漫展');
-      await tap('过去'); await tap('想去'); await tap('即将');
+      await tap('活动'); await present('添加活动');
+      await tap('日历'); await present('今天'); await tap('列表'); await present('event-list-filter');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
       await tap('衣柜'); await tap('装备'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
@@ -160,9 +163,10 @@ export default function uiShellTest(): void {
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (plans && plans.length > 0) {
         await plans[0].click(); await driver.delayMs(400);
-        await present('装备可用率'); await detailActions();
-        await tap('添加装备'); await present('添加装备'); await present('名称 *');
-        await tap('sheet-close'); await present('装备可用率');
+        await present('准备进度'); await detailActions();
+        await tap('准备任务'); await present('补入所选任务'); await present('常用准备模板'); await tap('sheet-close');
+        await tap('从衣柜'); await present('从衣柜添加'); await tap('＋ 新装备'); await present('添加装备'); await present('名称 *');
+        await tap('sheet-close'); await present('准备进度');
         await tap('打包'); await present('打包清单');
         expect((await driver.findComponents(ON.id('project-packing').inWindow(bundle))).length).assertEqual(1);
         await tap('添加物品'); await present('添加清单项'); await tap('sheet-close'); await present('打包清单');
@@ -179,13 +183,67 @@ export default function uiShellTest(): void {
           await back(); await driver.delayMs(350); await present('批量选片');
         }
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-plan-photos.png');
-        await tap('准备'); await present('装备可用率');
+        await tap('准备'); await present('准备进度');
         await back(); await driver.delayMs(250);
       }
       await tap('首页');
     });
+    it('calendarChangesMonthAndCanCreatePendingOrMultidayActivityWithoutSaving', 0, async () => {
+      await tap('活动'); await tap('日历'); await present('今天'); await present('calendar-previous'); await present('calendar-next');
+      await tap('calendar-next'); await tap('今天');
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-calendar.png');
+      await tap('添加活动'); await present('添加活动'); await present('event-date-mode');
+      const mode = await driver.findComponent(ON.id('event-date-mode').inWindow(bundle));
+      await mode.click(); await tap('日期待定');
+      expect(((await driver.findComponents(ON.text('日期 *').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      expect(((await driver.findComponents(ON.id('event-device-calendar').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      await mode.click(); await tap('多日'); await present('开始日期 *'); await present('结束日期 *'); await present('event-device-calendar');
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-event-schedule.png');
+      await tap('sheet-close'); await present('今天'); await tap('列表'); await present('日历'); await tap('首页');
+    });
+    it('photoImportPlanSheetCanBeClosedWithoutLaunchingPickerOrWritingData', 0, async () => {
+      await tap('衣柜'); await tap('照片'); await tap('导入照片');
+      const form = await driver.findComponents(ON.text('新建 Cos 计划').inWindow(bundle));
+      if (form && form.length > 0) { await tap('sheet-close'); } else {
+        await present('选择照片所属计划'); await tap('sheet-close'); await present('导入照片');
+      }
+      await tap('首页');
+    });
+    it('expenseSummaryUsesCoveringRouteAndCancelableRecordSheet', 0, async () => {
+      await tap('首页'); await tap('home-expenses'); await present('花费统计'); await detailActions(); await present('花费明细');
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-expenses.png');
+      await tap('记一笔'); await present('添加花费'); await present('实际花费（元） *'); await present('付款日期 *');
+      await tap('sheet-close'); await present('花费统计'); await back(); await present('新建计划');
+    });
+    it('unconfiguredAccountStopsBeforeSystemLoginAndKeepsLocalState', 0, async () => {
+      await tap('首页');
+      const ability = await abilityDelegatorRegistry.getAbilityDelegator().getCurrentTopAbility();
+      const configuration = AccountService.configurationMessage(ability.context);
+      if (configuration) {
+        const result = await new AccountService().signIn(ability.context);
+        expect(result.ok).assertFalse(); expect(result.message.includes('Client ID')).assertTrue();
+        await present('新建计划');
+      }
+    });
+    it('systemCalendarEditorCanBeCanceledWithoutCreatingDeviceOrAppData', 0, async () => {
+      await tap('首页');
+      const ability = await abilityDelegatorRegistry.getAbilityDelegator().getCurrentTopAbility();
+      const event = new CosEvent(); event.name = '日历联动验证（不保存）'; event.date = '2027-01-03'; event.city = '杭州'; event.venue = '公园'; event.timeMode = 'range'; event.startTime = '09:00'; event.endTime = '11:00'; event.reminderMinutes = 30;
+      let settled = false; let added = false; let failure = '';
+      const operation = new DeviceCalendarService().add(event, ability.context).then((value: boolean): void => { settled = true; added = value; }, (error: Error): void => { settled = true; failure = error.message; });
+      await driver.delayMs(1500);
+      expect(settled).assertFalse();
+      expect((await driver.findComponents(ON.text(event.name))).length > 0).assertTrue();
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-device-calendar-confirm.png');
+      await driver.pressBack(); await driver.delayMs(400);
+      const discard = await driver.findComponent(ON.text('放弃'));
+      if (discard) { await discard.click(); }
+      await operation; expect(failure).assertEqual(''); expect(added).assertFalse();
+      await driver.delayMs(400); await present('新建计划');
+    });
     it('settingsUseAlignedHandChoicesAndRealHelpSheets' , 0, async () => {
       await tap('我的'); await tap('作品'); await tap('设置'); await present('用户名');
+      await tap('说明'); await present('云空间与同步'); await present('导出元数据备份'); await tap('sheet-close');
       await scrollBody(); await present('材质等级');
       await driver.delayMs(700);
       expect(((await driver.findComponents(ON.text('操作偏好').inWindow(bundle)))?.length || 0)).assertEqual(0);

@@ -1,0 +1,15 @@
+2026-10-07 SDK verify-app on installed signed formal HAP.
+Package client_id: 6917618412076034516
+Bundle: top.rayawa.elvacos
+Profile app-identifier: 6918744149341255159
+Profile within validity: True
+Actual leaf certificate SHA-256: DF:21:A3:C0:9F:79:54:57:93:05:F8:5C:64:F8:0C:AD:86:F7:98:53:EE:3A:88:7C:1D:EC:95:D2:18:DF:3A:37
+Leaf certificate matches configured certificate: True
+Signature verification does not certify AGC account authentication.
+
+10-07 15:32:42.950  INFO - Find Hap Signing Block success, version: 3, block count: 3
+10-07 15:32:43.013  INFO - verify codesign success
+10-07 15:32:43.063  INFO - verify permission sign success.
+10-07 15:32:43.065  INFO - Write certificate chain success!
+10-07 15:32:43.066  INFO - verify: Verify success
+10-07 15:32:43.066  INFO - verify-app success

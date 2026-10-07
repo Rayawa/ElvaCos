@@ -50,7 +50,8 @@ export struct AssetDetail {
             .accessibilityText('打开计划 ' + p.name)
           }, (p: CosProject) => p.id)
         }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-      }.width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: Theme.contentBottom }).alignItems(HorizontalAlign.Start)
+        Blank().height(Theme.contentBottom).width('100%')
+      }.width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
   }
 }

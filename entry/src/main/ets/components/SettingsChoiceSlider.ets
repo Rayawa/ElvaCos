@@ -13,12 +13,18 @@ export struct SettingsChoiceSlider {
   @Param labels: string[] = [];
   @Param accessibilityLabel: string = '';
   @Param isEnabled: boolean = true;
-  @Event changed: (index: number) => void = () => {};
+  @Event changed: (index: number) => Promise<boolean> = async () => true;
   @Local private current: number = 0;
+  @Local private selected: number = 0;
+  private dragging: boolean = false;
+  private pending: number = 0;
+  private revision: number = 0;
 
-  aboutToAppear(): void { this.current = this.index; }
+  aboutToAppear(): void { this.current = this.index; this.selected = this.index; }
   @Monitor('index')
-  indexChanged(): void { this.current = this.index; }
+  indexChanged(): void {
+    if (!this.dragging && this.pending === 0) { this.current = this.index; this.selected = this.index; }
+  }
 
   private controlWidth(): number { return 190; }
 
@@ -26,11 +32,21 @@ export struct SettingsChoiceSlider {
 
   private labelWidth(label: string): number { return label.length > 2 ? 64 : 40; }
 
-  private choose(position: number): void {
+  private async choose(position: number): Promise<void> {
+    if (!this.isEnabled) { return; }
     this.current = position;
-    if (!this.isEnabled || position === this.index) { return; }
+    if (position === this.selected && (this.pending > 0 || position === this.index)) { return; }
+    this.selected = position;
+    const revision = ++this.revision;
+    this.pending++;
     vibration.dotVibration();
-    this.changed(position);
+    let saved = false;
+    try { saved = await this.changed(position); }
+    finally {
+      this.pending--;
+      // 成功时保持本地选择，等父组件输入刷新；不能在下一帧之前回写旧 index。
+      if (!saved && revision === this.revision && !this.dragging) { this.current = this.index; this.selected = this.index; }
+    }
   }
 
   build() {
@@ -44,21 +60,22 @@ export struct SettingsChoiceSlider {
         .showTips(false)
         .enabled(this.isEnabled)
         .onChange((value: number, mode: SliderChangeMode): void => {
+          this.dragging = mode === SliderChangeMode.Begin || mode === SliderChangeMode.Moving;
           if (mode === SliderChangeMode.Click || mode === SliderChangeMode.End) { this.choose(Math.round(value)); }
         })
-        .accessibilityText(`${this.accessibilityLabel}，当前${this.labels[this.index] || ''}，共 ${this.labels.length} 档`)
+        .accessibilityText(`${this.accessibilityLabel}，当前${this.labels[this.selected] || ''}，共 ${this.labels.length} 档`)
       Row() {
         ForEach(this.labels, (label: string, position: number) => {
           Text(label)
             .fontSize(12)
-            .fontWeight(position === this.index ? FontWeight.Medium : FontWeight.Regular)
-            .fontColor(position === this.index ? Theme.accent : Theme.muted)
+            .fontWeight(position === this.selected ? FontWeight.Medium : FontWeight.Regular)
+            .fontColor(position === this.selected ? Theme.accent : Theme.muted)
             .width(this.labelWidth(label))
             .textAlign(TextAlign.Center)
-            .maxLines(1)
+            .maxLines(2)
             .enabled(this.isEnabled)
-            .onClick((): void => this.choose(position))
-            .accessibilityText(label + (position === this.index ? '，已选择' : ''))
+            .onClick((): void => { this.choose(position); })
+            .accessibilityText(label + (position === this.selected ? '，已选择' : ''))
         }, (label: string) => label)
       }
       .width(this.controlWidth())
@@ -66,6 +83,6 @@ export struct SettingsChoiceSlider {
     }
     .width(this.controlWidth())
     .accessibilityGroup(true)
-    .accessibilityText(`${this.accessibilityLabel}，当前${this.labels[this.index] || ''}`)
+    .accessibilityText(`${this.accessibilityLabel}，当前${this.labels[this.selected] || ''}`)
   }
 }

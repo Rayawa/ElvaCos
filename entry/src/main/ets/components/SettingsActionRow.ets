@@ -1,18 +1,19 @@
 import { TextModifier } from '@kit.ArkUI';
 import { HdsListItemCard, IconSize, PrefixIcon, SuffixCustomBuilder } from '@kit.UIDesignKit';
 import { Theme } from '../common/Theme';
+import { Icons } from '../common/Icons';
 import { vibration } from '../common/vibration';
 
 // Dashboard/MyPage MoreRow, with business label/icon/action passed as V2 inputs.
 @ComponentV2
 export struct SettingsActionRow {
   @Param label: string = '';
-  @Param icon: Resource = $r('sys.media.ohos_ic_public_more');
+  @Param icon: Resource = Icons.help;
   @Param isEnabled: boolean = true;
   @Param danger: boolean = false;
   @Event action: () => void = () => {};
   @Builder rightSuffix() {
-    Image($r('sys.media.chevron_right_titlebar')).width(20).height(20).objectFit(ImageFit.Contain).fillColor(Theme.muted).accessibilityText('进入')
+    Image(Icons.chevronRight).width(20).height(20).objectFit(ImageFit.Contain).accessibilityText('进入')
   }
   build() {
     HdsListItemCard({

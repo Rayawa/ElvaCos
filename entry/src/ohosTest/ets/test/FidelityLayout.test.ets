@@ -59,7 +59,7 @@ export default function fidelityLayoutTest(): void {
       expect(baselineTabs.bottom < window.bottom).assertTrue();
       const views: LayoutView[] = [
         new LayoutView('Cos', 1, '角色'), new LayoutView('Cos', 1, '计划'),
-        new LayoutView('漫展', 2, '即将'), new LayoutView('漫展', 2, '过去'), new LayoutView('漫展', 2, '想去'),
+        new LayoutView('活动', 2, '列表'), new LayoutView('活动', 2, '日历'),
         new LayoutView('衣柜', 3, '装备'), new LayoutView('衣柜', 3, '照片'),
         new LayoutView('我的', 4, '作品'), new LayoutView('我的', 4, '时间轴'),
       ];
@@ -72,7 +72,8 @@ export default function fidelityLayoutTest(): void {
         const titleBefore = await titles[0].getBounds();
         expect(titleBefore.top > window.top).assertTrue();
         expect(segmentBefore.top < titleBefore.bottom && segmentBefore.bottom > titleBefore.top).assertTrue();
-        // 分段宽度按标题长度与项数规划，各页宽度可以不同，但必须水平居中且不压住左侧标题。
+        // Dashboard uses 50% for every title segment; Latin titles must not shrink it and wide windows must not cap it.
+        expect(Math.abs((segmentBefore.right - segmentBefore.left) - (window.right - window.left) * 0.5) <= 2).assertTrue();
         const segmentCenter = (segmentBefore.left + segmentBefore.right) / 2;
         const windowCenter = (window.left + window.right) / 2;
         expect(Math.abs(segmentCenter - windowCenter) <= 2).assertTrue();
@@ -142,7 +143,7 @@ export default function fidelityLayoutTest(): void {
       let actionTop: number = 0;
       let actionBottom: number = 0;
       const sections = ['准备', '打包', '照片'];
-      const actions = ['添加装备', '添加物品', '导入照片'];
+      const actions = ['准备任务', '添加物品', '导入照片'];
       for (let index = 0; index < sections.length; index++) {
         await tap(sections[index]); await driver.delayMs(400);
         sameRect(baseline, await segment.getBounds());

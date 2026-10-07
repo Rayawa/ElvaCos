@@ -1,0 +1,122 @@
+Settings slider fix / API 26 isolated component layout verification
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=36315
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=7877
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=22607
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=22723
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=5
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=81199
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: suiteconsuming=170721
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 5, Failure: 0, Error: 0, Pass: 5, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=170721
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.
+OHOS_REPORT_RESULT: stream=Tests run: 5, Failure: 0, Error: 0, Pass: 5, Ignore: 0
+force stop process successfully.
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/default/entry-default-signed.hap msg:install bundle successfully. 
+AppMod finish
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap msg:install bundle successfully. 
+AppMod finish
+PASS: overlapping selections serialize, merge and retain the final choice without global loading
+PASS: save failure reports an error, releases pending state and permits later saves
+PASS: refresh avoids AppStorage hydration and global loading
+PASS: only changed preferences write; unrelated saves do not reapply color mode
+4 checks passed (production ArkTS transpiled, platform services mocked; no device data written)

@@ -4,6 +4,8 @@ export class ProjectRoute {
   id: string = '';
   @Trace section: number = 0;
   @Trace outing: boolean = false;
+  @Trace sheetKind: number = 0;
+  @Trace preparing: boolean = false;
   @Trace linking: boolean = false;
   constructor(id: string, section: number = 0) { this.id = id; this.section = section; }
 }

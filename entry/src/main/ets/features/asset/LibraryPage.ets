@@ -1,3 +1,4 @@
+import { scrollByAxis } from '../../common/scroll';
 import { DashboardSearch } from '../../components/DashboardSearch';
 import { AppState } from '../../common/AppState';
 import { Theme } from '../../common/Theme';
@@ -65,9 +66,11 @@ export struct LibraryPage {
               ForEach(this.assets(), (a: Asset) => { InteractiveCard({ label: a.name, effects: this.state.settings.effects, action: () => this.open('asset', a.id), content: (): void => this.assetContent(a) }) }, (a: Asset) => a.id)
               if (this.assets().length === 0) { EmptyState({ title: this.query ? '没有找到装备' : '让每一件装备有归处', message: this.query ? '换个名称或存放位置试试。' : '记录存放位置、状态和价格，再关联到计划。' }) }
             }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: this.bottomInset }).width('100%')
+            Blank().height(this.bottomInset).width('100%')
+          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%')
         }.id('library-scroll').layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
       }
     }.width('100%').height('100%')
+      .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
   }
 }

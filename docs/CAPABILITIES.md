@@ -6,6 +6,7 @@
 |---|---|---|
 | HdsNavigation / HdsNavDestination / HdsTabs | HdsNavigation 18、HdsNavDestination/HdsTabs 20；UIDesign.HDSComponent.Core；Stage | API 23 直接使用；主路由覆盖式详情，详情 HdsTabs 动作，主页五 Tab 独立导航 |
 | TabSegmentButtonV2 $selectedIndex / onItemClicked | 18；ArkUI.Full；Stage；无新增权限；已核对本机 SDK @ohos.arkui.advanced.SegmentButtonV2.d.ets | 分别更新选中状态与处理点击反馈，直接复用 Dashboard 原调用方式 |
+| onAxisEvent / AxisEvent / getVerticalAxisValue / getHorizontalAxisValue | 17；ArkUI.ArkUI.Full；Stage；无额外权限；common.d.ts 核验；修饰键查询继承 BaseEvent（12） | 直接复制 Dashboard common/scroll.ets，五个主页和设置将滚轮 / 触控板纵向轴事件交给页面 Scroller；忽略 Ctrl、纯横向与无效值 |
 | ToolbarItem.symbolIcon / SymbolGlyphModifier | 12；ArkUI.Full；Stage；无额外权限 | Icons 集中提供原生 toolbar 加号/照片 Symbol，避免图片资源图标在详情工具栏缺失；其余语义图标保留原资源 |
 | HDS hdsMaterial / systemMaterialEffect | 23；HDSComponent.Core；系统材质策略与设备性能限制 | 复用 Dashboard 的 ADAPTIVE 与持久化等级；不是 ArkUI API 26 的 uiMaterial 调用 |
 | RDB relationalStore | 9；ArkData；沙箱无需额外权限 | 直接使用，版本迁移与外键事务 |
@@ -30,6 +31,7 @@
 
 - [关系型数据库持久化](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/data-persistence-by-rdb-store)
 - [按压阴影](https://developer.huawei.com/consumer/cn/doc/HarmonyOS-Guides/ui-design-visual-effect-background-color)
+- [轴事件](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/ts-universal-events-axis)
 - [Navigation API 与 API 26 材质示例](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/ts-basic-components-navigation)
 - [Picker API](https://developer.huawei.com/consumer/en/doc/harmonyos-references/js-apis-file-picker)
 - [Share Kit 变更声明](https://developer.huawei.com/consumer/cn/doc/doccenter-release-notes/js-apidiff-sharekit-b065)
@@ -44,3 +46,26 @@ HDS 导航不是把 Navigation 简单改名：titleBar.content/style、HdsNaviga
 安全区：Window.setWindowLayoutFullScreen / getWindowAvoidArea / avoidAreaChange（since 9，SystemCapability.WindowManager.WindowManager.Core，无权限）读取状态栏、挖孔和手势区；窗口保留原生避让，根 Tabs 扩展背景，HDS 标题 avoidLayoutSafeArea（since 20）负责标题避让。详情覆盖主 Tabs，只显示本页的 HdsTabs 操作栏，滚动内容底部留白避让。参见 UI_STYLE.md 的官方依据。
 
 - [Image 加载沙箱图片 URI](https://developer.huawei.com/consumer/cn/doc/doccenter-dev-faq/faqs-arkui-903)
+
+## 活动提醒与日期选择（2026-10-07）
+
+隔离布局测试新增 ApplicationContext.setFontSizeScale（本机 SDK application/ApplicationContext.d.ts：since 13，SystemCapability.Ability.AbilityRuntime.Core，Stage，仅主线程，无额外权限）。只存在于 ohosTest 源码及构建时临时主模块，不进入正式应用；用 1 / 2 切换验证真实 ArkUI 字体缩放，退出时复位并恢复正式包。参考 [ApplicationContext 官方 API](https://developer.huawei.com/consumer/en/doc/harmonyos-references-V13/js-apis-inner-application-applicationcontext-V13)；官方页面此次抓取未返回正文，签名与限制以本机 SDK 声明核验，并由实际 Text 高度验证生效。系统字体跟随与全页面大字体验收仍单独跟踪。
+
+| 能力 | 本机 SDK 核对 | 应用处理 |
+|---|---|---|
+| UIContext.showDatePickerDialog / showTimePickerDialog | since 10；ArkUI.Full；Stage；无权限；DatePicker onDateAccept since 10，TimePicker onAccept since 8 | DateField 统一封装；日期/时间表单不要求键盘输入格式 |
+| reminderAgentManager.publishReminder / cancelReminder | since 9；Notification.ReminderAgent；发布需 PUBLISH_AGENT_REMINDER | 用户选择提醒才调用；一次日历提醒、无重复响铃；失败不阻止保存 |
+| getAllValidReminders / ReminderInfo | since 12；Notification.ReminderAgent | 启动核对本应用有效提醒，取消元数据中已移除的 ID |
+| notificationManager.requestEnableNotification(context) | since 10；Notification.Notification；Stage | 只在新建或变更已选提醒时申请授权；未变更提醒复用已有 ID |
+| notificationManager.openNotificationSettings(context) | since 13；Notification.NotificationSettings；Stage | 用户点击活动详情「通知设置」才打开，处理首次拒绝后无法再次弹授权的问题 |
+| ReminderRequest.wantAgent.parameters | since 12；Notification.ReminderAgent | 通知跳转本机 eventId，找不到已删除活动时保留首页 |
+
+依据：[华为后台任务 FAQ](https://developer.huawei.com/consumer/cn/doc/doccenter-dev-faq/faqs-background-tasks-11)、[代理提醒 API](https://developer.huawei.com/consumer/cn/doc/harmonyos-references/js-apis-reminderagentmanager)、[代理提醒指南](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/agent-powered-reminder)。日期选择器官方页面本次抓取未返回有效正文，调用签名及 since/syscap 以本机 SDK 的 UIContext/date_picker/time_picker 声明核对。真实授权、后台触发与通知跳转仍需设备交互验收，不由编译及协调器注入测试宣称通过。
+
+## 2026-10-07 · 设备日历与账号诊断
+
+Calendar Kit：getCalendarManager since 10，editEvent since 12，syscap SystemCapability.Applications.CalendarData。editEvent 由系统确认页让用户选择日历账户/提醒，不需要 READ_CALENDAR / WRITE_CALENDAR / WHOLE_CALENDAR；本次不新增日历权限。SDK 明确此接口返回正 ID 表示成功，负值表示取消，0 非法；不允许传入原事件 ID 或 identifier。采用独立系统日程添加，后续由系统日历管理，应用不宣称双向自动同步。全天结束时间取末日之后的本地零点，跨月/年仍包含末日。仅有开始时间时默认一小时，系统确认页可修改。
+
+官方依据：[Calendar Kit 概述](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V14/calendarmanager-overview-V14)，本机 SDK `@ohos.calendarManager.d.ts`。SDK 核对 since/syscap/无权限；直接 API 文档抓取失败，未以缺失网页宣称系统投递验收通过。
+
+账号接入检查和配置步骤见 [HUAWEI_ACCOUNT_SETUP.md](HUAWEI_ACCOUNT_SETUP.md)。

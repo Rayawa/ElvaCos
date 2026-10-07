@@ -1,6 +1,85 @@
 # 首版验证记录
 
-更新：2026-10-06。范围为需求中 P0 垂直切片；P1/P2 在 ROADMAP.md 单独跟踪。
+更新：2026-10-07。范围为需求中 P0 垂直切片；P1/P2 在 ROADMAP.md 单独跟踪。
+
+## 2026-10-07 设置滑块保存与外观顺序
+
+- 对照 Dashboard 的 `SettingsPanel`：本工程额外的保存后 `reloadSettings` / 外观与操作模式 `updateSettings` 曾经过 `AppState.perform`，触发全局 loading 并禁用控件；设置加载还会重复水合 AppStorage、调用 `setColorMode`。现在偏好操作使用独立串行队列，加载状态只在固定高度的设置状态行展示，失败继续走全局 Toast。
+- 外观顺序为天蓝 0 / 跟随系统 1 / 雾蓝 2；仍保存 sky / system / mist 字符串，不改偏好迁移。不同设置项按字段合并，避免整份旧快照覆盖其他已保存选择。
+- 外观与操作模式滑块在拖动 / 待保存期间忽略旧输入，标签即时反映本地选择；失败复位，成功等待父组件更新，不在下一帧前回写旧档位。刷新设置不再重新水合 AppStorage；相同外观不重复设置 ColorMode。
+- 最终 `scripts/build.sh`：BUILD SUCCESSFUL。隔离 `settings-layout-test.sh`：`Tests run: 5, Failure: 0, Error: 0, Pass: 5, Ignore: 0`；新增天蓝、跟随系统、雾蓝从左到右的边界断言，窄屏 / 手机 / 宽屏及两倍应用字号既有检查通过。完成后正式包与测试包恢复成功，未清理 personal.db。
+- 额外模拟检查直接转译正式 AppState / SettingsService ArkTS，替换平台服务：连续提交串行执行及最终值、跨字段合并且 busy 不变、保存失败后队列继续 / 错误提示、刷新不水合 / 仅改动字段写入 / 相同外观不重设，共 4/4。该检查不访问真机数据，也不代表真实触摸拖动验收。报告：`docs/validation/settings-slider-api26-report.txt`。
+- `SliderChangeMode.Begin / Moving` 已核对[华为 Slider 文档](https://developer.huawei.com/consumer/en/doc/harmonyos-references-V14/ts-basic-components-slider-V14)及本机 SDK `ets/component/slider.d.ts`：since 7、SystemCapability.ArkUI.ArkUI.Full，无新增权限，满足最低 API 23。API 23、真实多窗和连续触摸体验仍待验收。
+
+## 2026-10-07 设置两倍字号与复测脚本修复
+
+外观 / 操作模式滑块标签由最多一行改为最多两行，保留 Dashboard 的 12fp、40 / 64vp 标签宽度、190vp 控件宽度。默认字号卡片密度继续与原版材质行一致；两倍字号时完整显示「天蓝 / 雾蓝 / 跟随系统」及操作模式档位，没有锁定字号。
+
+- 正式包和 ohosTest 构建通过；API 26 组件布局 **5/5，Failure 0、Error 0、Ignore 0**：[最终组件报告](validation/font-components-api26-report.txt)。保留既有四项布局、滚轮和路由测试，第五项分别执行 378 / 320vp 的两倍应用字号：探针高度增加超过 1.7 倍，完整四字标签形成两行，整张卡片处于视口内、文字在卡片内，行高与原版材质行相差不超过 2px；复位后探针四边与初始值一致。
+- 同一正式 UI 版本的固定区域回归 **4/4，Failure 0、Error 0、Ignore 0**：[固定区域报告](validation/font-fixed-areas-api26-report.txt)。验证标题、分段、底栏、照片末项、重复 Toast 与计划详情返回；后续只调整测试的滚动测量方式，没有再改正式 UI。全九项正式 UI 流程本轮未重复，最近通过记录仍为上一轮。
+- 测试只在临时主模块中使用 ApplicationContext.setFontSizeScale(1 / 2)，不改变系统字号、不加载业务服务、不打开 personal.db 或操作偏好。结束后正式包与测试包恢复安装成功；正式 HAP 清单仍只有 EntryAbility。
+
+早期字号用例仅检查文字边界，报告 5/5 却漏掉标签裁切；截图发现只有「天 / 雾 / 跟随」，因此增加两行高度断言并修复。该报告与[修复前截图](validation/settings-font-before-wrap-api26.png)保留为 `font-before-label-wrap-api26-report.txt`，不能作为完整标签通过证据。手机中间版本 5/5 保存为 `font-phone-intermediate-api26-report.txt`。随后加入窄屏时为 4/5、Failure 1：scrollSearch 只让标题可见，TestKit 测到视口裁切后的标签高度；改为整张卡片滚入视口再测，保留原断言，最终 5/5。失败报告保留为 `font-before-viewport-fix-api26-report.txt`。
+
+最终截图已检查：[378vp 两倍字号](validation/settings-phone-large-font-api26.png)、[320vp 两倍字号](validation/settings-narrow-large-font-api26.png)。测试脚本恢复为共享设备锁、临时主模块构建、明确检查安装成功、退出恢复两个包与精确 Hypium 字段校验；早期仅装测试 feature 的脚本不能启动当前测试 host，已纠正。截图 / 布局文件在生成前仅删除同名测试产物，避免 TestKit 覆盖短文件时残留尾部字节。
+
+证据保存后已移除四个临时工程，以及本轮明确生成的六个设备字号截图 / 布局缓存。尝试重新打开恢复的正式应用时设备已锁屏，aa start 返回 10106102，未自动启动；没有更改开发者模式或绕过锁屏。安装恢复成功与测试通过不受这一启动限制影响。
+
+这些结果针对应用内字号 API 和组件画布；系统字体跟随配置、HdsNavigation / HdsTabs / 分段的大字体、全页面字体缩放及真实多窗 / 大屏安全区仍待验收。AppScope 当前未显式声明 followSystem，不能以本轮结果宣称已经支持系统字号变化。
+
+## 2026-10-07 待办 / 最近照片统一反馈与轴事件
+
+首页准备、打包、选片入口改用 TaskLinkCard，最近照片改用 InteractiveCard，统一按压阴影、点光源、HDR 隔离、0.985 缩放、弹簧与点击触觉。页面只发出原路由动作，没有新增业务写入或另一套反馈。圆圈与尾部箭头在 Icons 注册；圈形系统符号已核对 SDK 资源索引并通过正式编译与截图确认。
+
+`common/scroll.ets` 与 Dashboard 原文件逐字节一致（cmp 通过），五个主页和设置的根容器均已接入。API 17 起的轴事件与 BaseEvent 的 API 12 修饰键查询已核对本机 SDK，均属 ArkUI.Full，满足 API 23 基线，无新增权限；官方来源见 CAPABILITIES。
+
+- 正式包与 ohosTest 包构建成功；初次新增测试因坐标对象没有显式 Point 类型而未开始，补齐类型后通过，未安装该失败构建。
+- API 26 组件布局 **4/4，Failure 0、Error 0、Ignore 0**：[最终组件报告](validation/task-axis-components-api26-report.txt)。既有设置密度、宽屏滚动隔离、首页宽窄切换和 96vp 尾部留白均通过；新增用例注入鼠标滚轮，指针位于左侧概览时右侧准备任务向上移动、左侧四边不变，Ctrl+滚轮后任务四边不变。依次点击准备 / 打包 / 选片卡片获得同一计划 ID 的对应路由，再点最近照片获得准确照片 ID。
+- 正式应用触摸固定区域 **4/4，Failure 0、Error 0、Ignore 0**：[固定区域报告](validation/task-axis-fixed-api26-report.txt)。五个主页 / 设置轴事件和三类待办卡片已包含在此版；最近照片随后接入统一封装，由最终组件用例验证，其后未改变导航源码。最近正式应用完整 UI 回归为上一轮 9/9，本轮未重复全部九项。
+- 测试数据只在内存，未启动业务服务或打开 personal.db；正式应用回归只读现有记录。最终测试结束，正式包与测试包恢复安装均成功；正式 HAP 清单检查仅有 EntryAbility。
+
+截图已检查：[待办卡片](validation/task-axis-home-wide-start-api26.png)、[末尾照片](validation/task-axis-home-wide-bottom-api26.png)、[滚轮转发](validation/task-axis-home-wheel-api26.png)。照片为空路径的测试占位，不使用用户原片。最近照片接入前的中间组件报告保留为 `validation/task-axis-before-photo-api26-report.txt`。
+
+以上鼠标测试为当前手机中注入事件、宽屏画布缩放，不等于真实触控板 / 2in1 / 平板系统安全区体验验收。API 23 真机、系统大字体、物理触觉与 HDR / 光场体验继续待验收，不能据此宣称全设备 1:1 已完成。
+
+## 2026-10-07 首页分栏与滚动留白
+
+首页复用 Dashboard HomePage 的 840vp 断点与固定概览 / 独立滚动分栏；首页和设置共用 DashboardSplitLayout，4:6 权重、16vp 间距、1440vp 上限。问候恢复原版 26vp Bold + 14vp 资源文案。Cos、活动、衣柜装备、时间轴、角色 / 装备 / 照片详情的底部 padding 改为滚动内容内的 Blank；照片惰性列表首尾也使用 Blank，首部距离保持原值。未修改 RDB、Preferences 或业务数据流程。
+
+正式包及 ohosTest 包构建成功。API 26 同台手机上的组件布局 **3/3，Failure 0、Error 0、Ignore 0**，报告：[首页与设置布局](validation/home-settings-layout-api26-report.txt)。两项既有设置测试继续通过；新增首页测试检查 378→920→378vp 画布切换、当前计划完整位于固定概览中、右侧滚动后概览 / 花费入口 / 计划四边不变，以及照片末项距视口底部至少 96vp。所有测试记录只在内存，不启动业务服务、不打开 personal.db。
+
+首次截图发现远期活动倒计时数字折行，已使用 16–32fp 自适应字号与 maxLines(1) 修复，并增加单行高度断言。修复前组件报告仍为 3/3，但当时未覆盖该数字断言，保留为 `validation/home-settings-before-countdown-api26-report.txt`；最终 3/3 报告包含新增断言，截图确认数字单行。测试结束正式包与测试包恢复均成功。
+
+留白修改后的正式应用只读固定区域回归 **4/4，Failure 0、Error 0、Ignore 0**，报告：[固定区域](validation/home-tail-layout-api26-report.txt)，覆盖八个二级视图、照片末项、重复 Toast 与任务详情返回。该报告在倒计时修复前执行，验证的是同一版导航与留白；最终倒计时另由组件测试验证。
+
+最终正式包 UI 回归 **9/9，Failure 0、Error 0、Ignore 0**，报告：[正式应用 UI](validation/home-tail-ui-api26-report.txt)。覆盖五 Tab、设置覆盖路由与帮助 Sheet、角色和计划新建取消、任务视图与详情返回、活动列表 / 日历、照片导入选择取消，以及首页花费入口与记账弹层取消。此轮重新构建并安装最终正式包，保留业务记录；没有改变业务数据或偏好。
+
+组件截图：[宽屏起始](validation/home-wide-start-api26.png)、[右侧到底](validation/home-wide-bottom-api26.png)、[恢复手机](validation/home-phone-restored-api26.png)。均已检查，画布使用内存测试记录且在手机中缩放，不能作为真实平板 / 多窗安全区、系统大字体或全设备 1:1 风格验收。覆盖式详情大屏双栏仍未实现。
+
+## 2026-10-07 审批恢复后的真机复测
+
+用户确认额度问题已解决后，在同一台 BRA-AL00 / API 26 手机重新执行 `scripts/settings-layout-test.sh` 和 `scripts/layout-test.sh`；审批正常通过，正式包及 ohosTest 包均构建、签名、安装成功。
+
+| 检查 | 本次结果 | 报告 |
+|---|---|---|
+| 设置组件布局 | Tests run 2、Pass 2、Failure 0、Error 0、Ignore 0 | [设置报告](validation/approval-retry-settings-api26-report.txt) |
+| 正式应用固定区域回归 | Tests run 4、Pass 4、Failure 0、Error 0、Ignore 0 | [布局报告](validation/approval-retry-layout-api26-report.txt) |
+
+设置复测覆盖 320 / 378 / 920vp 组件画布：卡片密度与复用的 Dashboard 材质行一致、末项完整可见，宽屏右侧滚动时左侧应用信息与图标位置不变。测试结束后正式包与测试包恢复安装均成功，正式清单没有 SettingsLayoutAbility。固定区域复测覆盖八个二级视图的标题 / 分段 / 底栏、照片末项避让与重复点击回顶、重复校验 Toast，以及计划三任务视图和照片详情返回位置。
+
+已核对本次 02:19–02:22 生成的设置、照片末项、重复 Toast 和照片详情返回截图；照片与计划相关测试实际执行，未因没有记录跳过。测试未新增、删除、清空业务记录或修改偏好。组件画布仍为手机上的缩放布局，API 23 真机、真实平板 / 多窗安全区、大字体及完整 Dashboard 风格验收继续待验证。
+
+## 2026-10-07 设置细节与宽屏组件验证
+
+设置分组标题改为 Dashboard 的 14vp Bold；偏好分割线使用 border，动作组使用 v3_chart_grid。深浅色各 14 项同名资源逐项一致。840vp 以上采用左侧固定应用信息、右侧独立滚动功能列表，权重 4:6、最大宽度 1440vp。
+
+独立布局测试使用临时工程副本，在主模块注册不导出的 SettingsLayoutAbility，渲染真实 SettingsPage。只创建内存 AppState，不启动业务服务，不打开 personal.db，不操作偏好或破坏性入口；结束时恢复正式包与测试包。正式工程清单不包含测试 Ability。320 / 378 / 920vp 画布在当前手机内缩放展示，不能替代真实平板、多窗或系统安全区验收。
+
+早期测试 feature 的渲染资源异常，初次报告保存为 `validation/settings-layout-initial-api26-report.txt`（Pass 0、Error 2）。改用临时主模块后，人工截图确认真实配色、应用与列表图标正常；测试工具不暴露 HDS 自定义组件的 id，后续按文字及包含它的原生 HdsListItem 定位完整卡片。最终复测 **2 / 2 通过，Failure 0、Error 0、Pass 2、Ignore 0**，报告为 `validation/settings-layout-api26-report.txt`。第一项逐一执行 378 / 320vp：偏好卡片与复制的 Dashboard 材质行高度一致，符合 68 / 116vp 的相应密度（原生 HDS 边界包含内部留白）；最后一张隐私协议卡片完整位于滚动视口内。第二项执行 920vp：左右布局分离，右侧滚动后左侧信息容器与应用图标四边完全不变，最后一张卡片完整可见。已人工检查三种尺寸的截图，正式包及测试包均恢复成功。
+
+随后在正式应用上执行只读固定区域回归，**4 / 4 通过，Failure 0、Error 0、Pass 4**，报告为 `validation/settings-followup-layout-api26-report.txt`：当前八个二级视图的标题 / 分段 / 浮动底栏滚动前后位置不变；照片末项避让与重复点击回顶、相同错误再次 Toast、准备 / 打包 / 照片动作栏及详情返回位置通过。测试未新增、删除或清空业务记录。
+
+组件画布证据：[320vp](validation/settings-narrow-api26.png)、[920vp](validation/settings-wide-api26.png)。这些截图包含测试页的宽度按钮与缩放画布，不代表真实平板导航或系统安全区已验收。
 
 ## 已通过
 
@@ -9,14 +88,17 @@
 | 正式 HAP 编译与签名 | 通过 | `scripts/build.sh`，Release SDK 26.0.0.105；compatible API 23，target 26 |
 | ohosTest HAP 编译与签名 | 通过 | `scripts/build.sh assembleHap ohosTest`；ArkTS 类型检查 |
 | SQL 关系测试 | 9 / 9 | `python3 scripts/test_schema.py`；执行实际 Schema.ets 提取的 SQL，SQLite 内存库 |
-| 真机 Hypium | 17 / 17 | API 26 设备；Tests run: 17, Failure: 0, Error: 0, Pass: 17, Ignore: 0；含隔离偏好迁移、安全缓存清理及备份数据层拆分后的恢复回滚验证 |
+| 真机 Hypium | 47 / 47 | API 26 设备；Failure 0、Error 0、Pass 47；最近领域报告 ux-revolution-native-api26-report.txt，含增量迁移、准备 / 活动 / 花费 / 参考图与备份验证；本轮只改布局，未重复运行领域测试 |
 | 真机安装与启动 | 通过 | 最新签名正式包安装，EntryAbility 启动成功 |
 | 初次 HDS UI 真机测试 | 3 / 3 | 覆盖式详情与加宽底栏调整前；API 26 手机；五 Tab、二级分段、标题菜单、照片加载、固定区域、独立设置、末项避让、Toast、取消表单；Tests run: 3, Failure: 0, Error: 0, Pass: 3, Ignore: 0 |
+| 最近正式应用完整 UI 回归 | 9 / 9 | 上一轮 API 26 手机；Failure 0、Error 0、Pass 9；home-tail-ui-api26-report.txt，覆盖首页、覆盖路由、设置及表单取消；本轮新增行为另见组件与固定区域报告 |
+| 当前只读布局回归 | 4 / 4 | API 26 手机；Failure 0、Error 0、Pass 4；font-fixed-areas-api26-report.txt，覆盖八个二级视图（含活动列表 / 日历）、照片末项、重复 Toast 与计划详情返回位置 |
+| 首页与设置组件布局 | 5 / 5 | API 26 手机缩放画布；Failure 0、Error 0、Pass 5；font-components-api26-report.txt，含 320 / 378 / 920vp、左右滚动隔离、首页宽窄切换、滚轮 / Ctrl、任务 / 照片路由与两倍应用字号 |
 | 类型与权限检查 | 通过 | 业务代码未使用 any/unknown；无全图库、网络、联系人、定位权限；关系型 SQL 全部位于 data 层 |
 
 原生测试使用 `verification-UUID.db` 加密数据库，模块 Context，不启动测试前台页面。测试结束删除数据库和自己生成的图片，不修改 personal.db 或系统图库。`aa test` 即使失败也可能返回退出码 0，因此脚本检查 Hypium 的 Failure / Error / Pass。
 
-## 17 项真机测试
+## 初轮 17 项真机测试（当前 23 项增量见下文）
 
 领域规则 6 项：整数分金额、无效金额拒绝、真实日期/闰年、资产就绪状态、空/完成清单进度、名称清理与空名称拒绝。
 
@@ -110,7 +192,7 @@ UI 测试采用窗口内选择器，每项及文字操作开始聚焦应用；�
 
 ## 固定区域与重复 Toast 补充检查
 
-2026-10-06，新增独立只读 FidelityLayout 测试，正式与测试包构建成功并安装，Tests run: 3, Failure: 0, Error: 0, Pass: 3, Ignore: 0。报告见 `validation/layout-api26-report.txt`；复现入口为 `scripts/layout-test.sh`，不要与其他设备界面任务同时运行。
+2026-10-06，新增独立只读 FidelityLayout 测试，正式与测试包构建成功并安装，Tests run: 3, Failure: 0, Error: 0, Pass: 3, Ignore: 0。历史报告见 `validation/layout-initial-api26-report.txt`；当前完整 4 项报告为 `validation/layout-api26-report.txt`，复现入口为 `scripts/layout-test.sh`，不要与其他设备界面任务同时运行。
 
 - 逐一进入角色、项目、即将、过去、想去、衣柜、照片、作品、时间轴九个二级视图，比较滚动前后的标题、分段和首页 Tab 项四边坐标；全部不变。各视图分段边界也一致，底栏高于窗口底边。
 - 资料库使用设备现有照片作为只读样本，滚到末尾后断言最后照片卡片底边不超过浮动 Tab 项顶边；截图人工确认末项完整可见。重复点击资料库后，首张照片恢复到原坐标。空图库只能验证空状态，不能作为末项避让的证据；本设备的照片分支已执行。
@@ -135,11 +217,13 @@ UI 测试采用窗口内选择器，每项及文字操作开始聚焦应用；�
 - 隔离数据库/Preferences 真机 Hypium 23/23，Failure 0、Error 0、Pass 23。新增测试覆盖首次创建无需预建角色、漫展上下文、最近计划选择、照片状态分组，以及新角色+计划、新装备+关联+打包项的失败回滚和批量照片失效记录全部回滚；验证库完成清理。
 - 最终 UI 6/6，Failure 0、Error 0、Pass 6：覆盖五页/二级分段、Sheet 取消与空值校验、同一新建计划内创建角色、准备/打包/照片切换、装备/物品上下文表单、批量选择与取消、照片详情返回保留任务视图，以及合并设置、三档几何和两种帮助 Sheet。测试未写业务记录，照片批量提交通过隔离数据测试验证。
 - 合并设置卡片截图已人工确认图标/控件对齐；计划标题分段不叠加第二份文字标题，打包项显示位置且已装包项在后。一次 UI 返回断言失败后未能继续后续用例；返回键前显式聚焦应用窗口，完整复测 6/6 通过，未修改产品返回逻辑。
-- 固定布局原有三项检查通过：九个二级视图的标题/分段/底栏固定，末张照片能滚到浮动栏上方，重复空值校验不移动表单。新增计划任务布局单项复测 1/1，Failure 0、Error 0、Pass 1：准备/打包/照片均保持 50% 标题分段和同一操作栏上下边界；打开可见照片进入独立详情，返回后保留照片任务视图和分段坐标。以上为分次验证，没有生成虚构的单次 4/4 报告。
+- 固定布局完整复测 4/4，Failure 0、Error 0、Pass 4：九个二级视图的标题/分段/底栏固定，末张照片能滚到浮动栏上方，重复空值校验不移动表单；准备/打包/照片均保持 50% 标题分段和同一操作栏上下边界。设备现有计划与照片分支已执行：打开可见照片进入独立详情，返回后保留照片任务视图、分段坐标与照片卡片四边位置。返回截图已人工核对，报告见 layout-api26-report.txt；复现 scripts/layout-test.sh。
 - 新增测试曾按不存在的重复标题遍历 null，随后又点击列表缓存中被固定栏遮住的照片；已修正空控件处理，并按可见中心坐标选择照片。`-s itName` 在当前运行器没有缩小执行范围，45 秒超时引发后续 UiTest 并发错误；改用 Hypium 支持的 `-s class Suite#case` 后单项复测通过。这些失败保留为测试调试记录，不算产品通过证据。
 - 最后消除照片分行和首页待办排序中的重复过滤/排序，正式包重新构建成功并安装。未修改结构、迁移或用户数据。
 
 报告：`validation/ux-native-api26-report.txt`、`validation/ux-ui-api26-report.txt`、`validation/ux-plan-layout-api26-report.txt`；布局用例调试记录为 `validation/ux-layout-before-fix-api26-report.txt`。API 23、大字体、多窗/大屏、真实图库与硬件感知仍按下列边界跟踪。
+
+公共确认弹窗已消除固定十六进制颜色，复用 Dashboard 的 diff_content / v3_accent_red 浅深色资源；取消与确认行为不变。正式和测试包构建成功，完整布局脚本已安装最新签名包。源文件再次核对：vibration、motion、safeUi 逐字相同，浅深色各 13 项同名颜色无差异。
 
 ## 验收边界
 
@@ -212,9 +296,66 @@ HDC_TARGET_ID=<device-id> ./scripts/layout-test.sh
 - **真机外观证据**：设置「雾蓝」后全应用立即切到 Dashboard 的深色资源（底色 #1A2B3C、表面 #182231、强调色 #4A9CE2、浅色文字），杀进程重启后仍为深色；切回「跟随系统」后恢复与系统一致的浅色。
 - 复核后重跑：SQL 9/9、真机 Hypium 23/23、UI 6/6、固定区域 4/4，Failure/Error 全 0。检查结束后已把真机偏好恢复为「跟随系统 / 灵动 / 轻柔 / 左手」。
 
+### 2026-10-07 设置页图标统一为 app.media
+
+- 设置页 `HdsListItemCard` 的图标此前混用了 `sys.media`（share / albums / remove / person_badge_waveform）与 `app.media`，观感与 Dashboard 不一致。现已全部改为 `app.media` 的浅/深两版 PNG：`user`（用户名、操作模式、华为账号）、`vibrate`、`immersive`、`light`、`trash`（清除缓存、清空本地数据）、`tutorial`（使用说明）、`privacy`（隐私协议）、`cloud`（云同步）、`export`（导出元数据 JSON）、`load`（从元数据备份恢复），行尾箭头改用以 Dashboard MoreRow 同款 `right`。
+- 新增/复制的资源：`cloud.png` / `export.png` / `load.png` 由用户提供（浅深各一版）；`tutorial.png` / `privacy.png` / `right.png` 从 Dashboard 的 `AppScope/resources/base|dark/media` 复制。删除了本次自建的 `cloud.svg`，避免与新增的 `cloud.png` 资源重名。
+- 真机浅色/深色各截图一次：深色下全部图标为白色描边，浅色下为黑色描边，深浅色成对生效；`跟随系统` 在系统夜间模式切换后也正确跟随。
+- 复核后重跑：真机 UI 6/6、固定区域 4/4（Failure/Error 全 0）；偏好恢复为「跟随系统 / 灵动 / 轻柔 / 左手」。
+
 ### 本轮验证边界
 
 - 以上为 API 26 单台手机、当前系统字号下的证据；API 23、大字体、多窗、折叠与平板分栏仍需设备验收。
 - 深色模式下天蓝/雾蓝的 `dark` 色值已写入资源并通过编译，但未在深色模式下逐档截图比对。
 - 振动、按压光场与转场动画只能人工感受，本轮只确认了调用路径与编译产物，未量化硬件触感。
 - 华为账号登录成功路径（AGC 已配置）未验证；云同步未实现。
+
+## 2026-10-07 · 视频参考 UX 革新
+
+本轮实现分类准备模板与任务、独立完成进度、角色/计划参考图、团队本机分工、实际花费明细/分类统计，以及日期待定/单日/多日、时间段、列表/日历和可选系统提醒。新增与编辑仍统一 bindSheet，参考图与花费统计压入覆盖主页的 HdsNavDestination；所有详情仍使用 HdsTabs 操作栏。
+
+- 正式包 `scripts/build.sh` 成功；SQL 关系检查 12/12。
+- API 26 原生领域/持久化/媒体 Hypium：47/47，Failure 0 / Error 0。验证原 v1→v3 和 v2→v3 增量迁移、旧打包/照片保留、新角色/计划/任务原子创建、重复模板保留已完成任务、分类跨计划保护、实际花费独立、参考图文件清理与备份路径信任、v1/v2/v3 备份兼容和无效恢复回滚。数据库及媒体均为测试专用 verification 资源，结束清理，不写用户 personal.db。
+- API 26 只读页面 Hypium：9/9，Failure 0 / Error 0。覆盖角色详情新路由、详情 HdsTabs、连续新建角色/计划取消、准备模板/关联衣柜/打包/照片返回、日期待定/多日表单、月历切换、照片导入计划选择取消、实际花费页面和记录弹层取消，以及合并后的操作模式与帮助 Sheet。
+- 首轮页面 6 项中 4 Pass / 2 Error：同一组件连续绑定两个 bindSheet 导致前一个入口失效；改为单个绑定、固定内容类型后修复。随后日历测试发现测试定位仍使用旧动作名，修正 ID 与动作文案后 9 项全过；失败报告保留用于说明修复原因。
+- 活动一级名称统一为「活动」，标题二级切换「列表 / 日历」，日期筛选只在列表显示，避免日历显示无效筛选条件；准备分类默认显示进度与下一项，展开后查看全部。
+
+报告：`validation/ux-revolution-native-api26-report.txt`、`validation/ux-revolution-ui-api26-report.txt`。修复前记录：`validation/ux-revolution-ui-before-sheet-fix-api26-report.txt`、`validation/ux-revolution-ui-before-calendar-test-fix-api26-report.txt`。布局报告：`validation/ux-revolution-layout-api26-report.txt`。
+
+提醒协调器已验证授权失败仍保存、数据库失败取消新提醒并保留旧提醒、请求未变不重复发布、编辑替换取消旧提醒；真实系统授权、后台定时投递与通知点击跳转尚未取得设备验收证据。页面存在与领域测试通过不代表真实提醒已送达。API 23、大字体、多窗、大屏、真实图库与跨设备备份仍按既有边界跟踪。
+
+补充最终复核：只读布局 Hypium 4/4，Failure 0 / Error 0，八个二级视图的标题/分段/底栏保持固定，照片末项避让、重复点击回顶、重复校验 Toast、计划任务与照片详情返回均通过。活动标题及关联提示统一使用活动。截图发现活动、成员与花费填写示例沿用角色文案，已改为各自语境，重新执行正式包构建成功；该修改仅涉及字段标签/示例，不改变持久化或控件行为。
+
+最新签名正式调试包已更新到当前连接手机（覆盖安装，保留业务数据）；本轮未验收的真实通知和其他设备形态继续由 ROADMAP 跟踪。
+
+
+## 2026-10-07 · 分段控件外侧阴影修复
+
+同步用户已在 Dashboard 真机确认的修复：单独裁剪 HdsMiniBarButton 的 HdsTabs 背景为胶囊形，背景不参与命中测试；HdsTitleBarSegment 显式使用 BlurStyle.NONE。保留本工程 Theme、全局视效开关、前景按压反馈与 V2 状态回调。`sh scripts/build.sh` 构建及签名成功，`git diff --check` 通过。本轮未安装 ElvaCos 修复包或执行真机截图验收，不能将 Dashboard 的验收结果视为本工程设备验证。
+
+## 2026-10-07 · 日历联动与账号问题
+
+新录屏逐秒查看约 13 秒：鞋子组、团队分工、自定义任务/分类、参考图、角色截止日期、活动日期/时间/备注/提醒。视频未展示账号/云空间实际报错。新增鞋子组和自定义分工；已有计划不自动生成新任务。
+
+设备日历采用 Calendar Kit 的系统确认页，无完整日历读写权限；应用先保存活动，再打开日历，取消日历不回滚活动。全天多日结束时间为最后一天之后本地零点；仅有开始时间时默认一小时，带入地点、备注和提醒，用户在系统页选择账户/修改。日历副本由系统独立管理，不宣称应用双向同步。
+
+- 正式与测试包构建通过；SQL 12/12；原生 Hypium 50/50，Failure 0 / Error 0。新增覆盖跨年全天末日、时间段/地点/备注/提醒映射、只标记开始时间和日期待定拒绝导出。
+- 第一轮页面 Hypium 9/9，Failure 0 / Error 0：待定时隐藏日历开关、多日显示开关、云同步说明 Sheet 和既有全流程。
+- 账号配置脚本在临时完整 manifest 副本中验证 4/4：拒绝错误包名、示例 ID、client secret，且不修改文件；真实格式公开 ID 保留既有权限/Ability 并新增 metadata/INTERNET。本轮没有给实际工程写入虚构 ID。
+- 账号新增缺失配置提示、随机 state 与登录/退出响应校验；Preferences 写入成功后才更新界面状态，处理中提示只属于账号请求。
+
+原生报告 `validation/calendar-native-api26-report.txt`。最终页面 Hypium 11/11，Failure 0 / Error 0；真实系统日历确认页与未配置账号前置阻断两项均通过。真正 AGC 登录成功、云端上传/账号隔离/跨设备同步、日历提醒后台投递均没有通过证据。当前云同步本就未实现，不能把修正状态说明与导出入口当成同步功能已经修复。接入步骤见 HUAWEI_ACCOUNT_SETUP.md；真实 Client ID/签名和用户报错仍待提供。
+
+最终设备复核（API 26）：日历确认页显示验证日程名称、杭州·公园、2027-01-03 09:00–11:00、30 分钟前提醒和日历账户选择；测试只按返回/放弃，API 返回取消，重新回到首页。未点击系统保存，没有创建真实日历或应用业务记录。账号测试取得当前 EntryAbility Context，确认缺少 Client ID 时返回未成功与明确提示，不拉起系统授权。
+
+报告：`validation/calendar-account-ui-api26-report.txt`；截图：`validation/device-calendar-confirm-api26.png`（仅包含未保存的测试日程）。最新正式包随页面测试安装，现有数据保留。系统确认成功取消不等于日历提醒已经在后台投递，后者继续待验收。
+
+## 2026-10-07 · 用户 Client ID 接入与真实登录复核
+
+用户确认公开 Client ID `6917618412076034516`，按完整字符串配置正式 entry metadata，并增加 INTERNET；没有推测 APP ID，没有保存 Client Secret。配置脚本支持省略 appId，保留既有 app_id 与其他 metadata。临时 manifest 检查 6/6：拒绝错误包名、占位符、数值 ID、secret 字段且不改文件；仅 Client ID 和完整公开 ID 两种有效配置均保留已有能力与权限。
+
+最终正式与测试包构建成功，覆盖安装成功，保留用户业务记录。显式账号集成测试经正式设置页点「登录」，真实 Account Kit 返回 1001502003 / `Invalid input parameter value. Invalid clientId or profile.`；Hypium 字段为 **Pass 0 / Failure 0 / Error 1**，因此账号登录尚未验收通过。最终失败来自真实账号配置校验，不能把它计为测试通过。提示已映射到应用 Client ID / 签名 Profile 的核对步骤；失败未写入本机登录成功状态。
+
+已检查签名 HAP 内 Client ID 完整一致；实际叶证书 SHA-256 与配置证书一致。SDK verify-app 验证整个签名包、代码签名、权限签名成功，Profile 在有效期内。Profile 包名为 top.rayawa.elvacos，app-identifier 为 6918744149341255159；仍待核对其与用户 AGC 应用的对应关系。中间证书与叶证书不是同一张证书，不能以两者指纹不同宣称 Profile 损坏或不匹配。
+
+报告：`validation/account-client-id-api26-report.txt`、`validation/account-signature-api26-report.txt`。账号失败不触发云数据上传；应用云同步仍未接入。接入步骤和当前公开指纹见 HUAWEI_ACCOUNT_SETUP.md。

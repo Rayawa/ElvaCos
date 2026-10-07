@@ -1,3 +1,6 @@
+import { ReferenceDetail } from '../features/project/ReferenceDetail';
+import { ExpenseSummary } from '../features/project/ExpenseSummary';
+import { ReferenceImage } from '../model/Planning';
 import { HdsNavigation, HdsNavDestination, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsNavigationMenuItemOptions, BlurStrategy, HdsNavDestinationTitleMode } from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
 import { AppState, applicationState } from '../common/AppState';
@@ -40,32 +43,24 @@ struct Index {
   private tabsController: HdsTabsController = new HdsTabsController();
   @Local tab: number = 0;
   @Local cosProjects: boolean = true;
+  @Local eventCalendar: boolean = false;
   @Local eventFilter: number = 0;
   @Local meSection: number = 0;
   @Local libraryPhotos: boolean = false;
   @Local outing: boolean = false;
+  @Local rootSheetKind: string = 'form';
   @Local importOpen: boolean = false;
   @Local formOpen: boolean = false;
   @Local draft: EditDraft = new EditDraft();
   @Local viewportWidth: number = 360;
   aboutToAppear(): void { if (!this.state.ready) { this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext); } }
-  onPageHide(): void { this.state.suspend(); }
-
-  /**
-   * 标题栏内分段按钮的宽度规划。
-   * - 标题为空（分段独立占据中间区域）时按内容取宽，最多不超过标题栏可用宽度的一半；
-   * - 标题非空时按标题文字长度预留左右空间，避免分段盖住标题或右侧菜单。
-   */
-  private segmentWidth(itemCount: number, titleLength: number): number {
-    const viewport = Math.max(320, this.viewportWidth);
-    // 每项 88vp 与 Dashboard 的 50% 结果一致（本机 378vp 宽时 2 项 ≈ 50%），
-    // 只有标题较长时才按标题字数收缩，避免分段压住标题或右侧菜单。
-    const naturalWidth = itemCount * 88 + 14;
-    const cap = Math.min(320, viewport * 0.5);
-    const titleReserve = titleLength > 0 ? Math.min(120, 56 + titleLength * 14) : 56;
-    const available = viewport - titleReserve * 2;
-    return Math.floor(Math.max(150, Math.min(naturalWidth, cap, available)));
+  @Monitor('state.ready', 'state.pendingEventId')
+  openPendingEvent(): void {
+    if (!this.state.ready || !this.state.pendingEventId) { return; }
+    const id = this.state.pendingEventId; this.state.pendingEventId = '';
+    if (this.state.events.some((e: CosEvent) => e.id === id)) { this.open('event', id); }
   }
+  onPageHide(): void { this.state.suspend(); }
 
   /** 二级页面返回：Dashboard AppDetailPage 的 closePage 语义 + 显式返回振动。 */
   private closeDetail(): void {
@@ -76,13 +71,13 @@ struct Index {
   private edit(kind: string, id: string = '', parent: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
     this.state.error = '';
-    this.draft = EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent); this.formOpen = true;
+    this.rootSheetKind = 'form'; this.draft = EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent); this.formOpen = true;
   }
   private async remove(kind: string, id: string): Promise<void> {
-    const messages = new Map<string, string>([['project', '计划、清单、照片记录与应用内照片副本将删除。系统相册原图保留。'], ['character', '角色及其版本将删除。仍有关联计划时无法删除。'], ['asset', '衣柜装备与所有计划关联将删除，清单会保留名称。'], ['event', '漫展将删除，关联计划会保留。'], ['photo', '照片记录与本地副本将删除，系统相册原图保留。'], ['variant', '角色版本将删除；仍被计划使用时无法删除。'], ['checklist', '此清单项将删除。']] );
+    const messages = new Map<string, string>([['project', '计划、清单、照片记录与应用内照片副本将删除。系统相册原图保留。'], ['character', '角色及其版本将删除。仍有关联计划时无法删除。'], ['asset', '衣柜装备与所有计划关联将删除，清单会保留名称。'], ['event', '活动将删除，关联计划会保留。'], ['photo', '照片记录与本地副本将删除，系统相册原图保留。'], ['variant', '角色版本将删除；仍被计划使用时无法删除。'], ['checklist', '此清单项将删除。'], ['preparation', '此准备任务将删除，打包清单保留。'], ['category', '此分类及其准备任务将删除，装备和打包清单保留。'], ['team', '此成员的本机分工记录将删除。'], ['expense', '此笔花费将删除，并从统计中移除。'], ['reference', '此参考图记录与应用内副本将删除。系统相册原图保留。']] );
     const accepted = await confirm(this.getUIContext(), '确认删除？', messages.get(kind) || '记录将删除。', '删除');
     if (accepted && await this.state.remove(kind, id)) {
-      if (kind === 'project' || kind === 'character') { this.detailStack.clear(); } else if (kind !== 'variant' && kind !== 'checklist') { this.detailStack.pop(); }
+      if (kind === 'project' || kind === 'character') { this.detailStack.clear(); } else if (!['variant', 'checklist', 'preparation', 'category', 'team', 'expense'].includes(kind)) { this.detailStack.pop(); }
     }
   }
   private async destructive(kind: string): Promise<void> {
@@ -90,6 +85,9 @@ struct Index {
     if (accepted) { if (kind === 'restore') { await this.state.restoreData(); } else { await this.state.clearData(); } this.detailStack.clear(); }
   }
 
+  @Builder rootSheet() {
+    if (this.rootSheetKind === 'form') { this.form() } else { this.importSheet() }
+  }
   @Builder form() {
     FormEditor({
       state: this.state, draft: this.draft,
@@ -105,6 +103,8 @@ struct Index {
         if ((param as ProjectRoute).section === 2) { PhotoGrid({ state: this.state, topInset: Theme.detailTopWithSegment, bottomInset: Theme.contentBottom, sidePadding: Theme.pagePadding, photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as ProjectRoute).id), open: (k: string, id: string) => this.open(k, id) }) }
         else { ProjectDetail({ state: this.state, route: param as ProjectRoute, topInset: Theme.detailTopWithSegment, project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) || new CosProject(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       }
+      else if (kind === 'reference') { ReferenceDetail({ state: this.state, reference: this.state.references.find((r: ReferenceImage) => r.id === (param as string)) || new ReferenceImage() }) }
+      else if (kind === 'expenseStats') { ExpenseSummary({ state: this.state, edit: (k: string, id: string, parent: string): void => this.edit(k, id, parent), remove: (k: string, id: string): void => { this.remove(k, id); } }) }
       else if (kind === 'asset') { AssetDetail({ state: this.state, asset: this.state.assets.find((a: Asset) => a.id === (param as string)) || new Asset(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       else if (kind === 'event') { EventDetail({ state: this.state, event: this.state.events.find((e: CosEvent) => e.id === (param as string)) || new CosEvent(), open: (k: string, id: string) => this.open(k, id), edit: (k: string, id: string, parent: string) => this.edit(k, id, parent), remove: (k: string, id: string) => this.remove(k, id) }) }
       else if (kind === 'photo') { PhotoDetail({ state: this.state, photo: this.state.photos.find((p: PhotoAsset) => p.id === (param as string)) || new PhotoAsset(), open: (k: string, id: string) => this.open(k, id), remove: (k: string, id: string) => this.remove(k, id) }) }
@@ -134,15 +134,24 @@ struct Index {
 
   private destinationTitle(kind: string, id: string): string {
     if (kind === 'settings') { return '设置'; }
+    if (kind === 'reference') { return '准备参考图'; }
+    if (kind === 'expenseStats') { return '花费统计'; }
     if (kind === 'character') { return this.state.characterName(id); }
     if (kind === 'project') { return this.state.projectName(id); }
-    if (kind === 'event') { return this.state.events.find((e: CosEvent) => e.id === id)?.name || '漫展'; }
+    if (kind === 'event') { return this.state.events.find((e: CosEvent) => e.id === id)?.name || '活动'; }
     if (kind === 'asset') { return this.state.assets.find((a: Asset) => a.id === id)?.name || '装备'; }
     return kind === 'projectPhotos' ? '计划照片' : '照片';
   }
   private chooseImport(): void {
     if (this.state.projects.length === 0) { this.edit('project'); this.state.reportNotice('先建立计划，再导入照片。'); }
-    else { this.importOpen = true; }
+    else { this.rootSheetKind = 'import'; this.importOpen = true; }
+  }
+  private async referenceCover(id: string): Promise<void> {
+    const r = this.state.references.find((r: ReferenceImage) => r.id === id); if (!r) { return; }
+    const characterId = r.characterId || this.state.projects.find((p: CosProject) => p.id === r.projectId)?.characterId || '';
+    const character = this.state.characters.find((c: Character) => c.id === characterId);
+    if (character?.cover && character.cover !== r.thumbnailPath && !(await confirm(this.getUIContext(), '替换角色封面？', '使用此参考图作为角色封面，原有图片保留。', '替换'))) { return; }
+    await this.state.referenceCover(r);
   }
   private async setCover(photo: PhotoAsset): Promise<void> {
     const project = this.state.projects.find((item: CosProject) => item.id === photo.projectId);
@@ -170,9 +179,9 @@ struct Index {
 
   private rootTools(index: number): ToolbarItem[] {
     if (index === 1) { return [{ value: this.cosProjects ? '新建计划' : '添加角色', icon: Icons.add, action: () => this.edit(this.cosProjects ? 'project' : 'character') }]; }
-    if (index === 2) { return [{ value: '记录漫展', icon: Icons.event, action: () => this.edit('event') }]; }
+    if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: () => this.edit('event') }]; }
     if (index === 3) { return [{ value: this.libraryPhotos ? '导入照片' : '添加装备', icon: this.libraryPhotos ? Icons.importPhoto : Icons.add, action: () => { if (this.libraryPhotos) { this.chooseImport(); } else { this.edit('asset'); } } }]; }
-    return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }, { value: '记漫展', icon: Icons.event, action: () => this.edit('event') }, { value: '导入照片', icon: Icons.importPhoto, action: () => this.chooseImport() }];
+    return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }, { value: '添加活动', icon: Icons.event, action: () => this.edit('event') }, { value: '导入照片', icon: Icons.importPhoto, action: () => this.chooseImport() }];
   }
   private rootMenus(index: number): HdsNavigationMenuItemOptions[] {
     if (index === 4) { return [{ content: { label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy, action: (): void => { this.open('settings', 'settings'); } } }]; }
@@ -187,8 +196,8 @@ struct Index {
         componentId: 'project-task-segment',
         items: this.buildSegmentItems(['准备', '打包', '照片']),
         selectedIndexes: [route.section],
-        normalWidth: this.taskSegmentWidth(),
-        experimentalWidth: this.taskSegmentWidth(),
+        normalWidth: Theme.titleSegmentWidth,
+        experimentalWidth: Theme.titleSegmentWidth,
         onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); },
         onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); },
       }).margin({ top: 8 })
@@ -198,6 +207,12 @@ struct Index {
   private detailTools(kind: string, param: Object): ToolbarItem[] {
     const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
     if (kind === 'settings') { return []; }
+    if (kind === 'expenseStats') { return [{ value: '记一笔', icon: Icons.add, action: () => this.edit('expense') }]; }
+    if (kind === 'reference') { return [
+      { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },
+      { value: '编辑说明', icon: Icons.edit, action: () => this.edit('reference', id) },
+      { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
+    ]; }
     if (kind === 'project') {
       const route = param as ProjectRoute;
       if (route.section === 2) { return [{ value: '导入照片', icon: Icons.importPhoto, action: () => this.state.importPhotos(id) }]; }
@@ -206,14 +221,14 @@ struct Index {
           { value: '常用物品', icon: Icons.check, action: () => this.state.generateChecklist(id) },
           { value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: () => { route.outing = !route.outing; if (route.outing) { this.state.resume(); } else { this.state.suspend(); } } }];
       }
-      return [{ value: '添加装备', icon: Icons.add, action: () => this.edit('asset', '', id) },
-        { value: '从衣柜', icon: Icons.library, action: () => { route.linking = true; } },
+      return [{ value: '准备任务', icon: Icons.add, action: () => { route.sheetKind = 0; route.preparing = true; } },
+        { value: '从衣柜', icon: Icons.library, action: () => { route.sheetKind = 1; route.linking = true; } },
         { value: '编辑', icon: Icons.edit, action: () => this.edit('project', id) },
         { value: '分享', icon: Icons.share, action: () => this.state.shareProject(id) },
         { value: '删除计划', icon: Icons.remove, action: () => this.remove('project', id) }];
     }
     if (kind === 'character') { return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }]; }
-    if (kind === 'event') { return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('eventProject', '', id) }, { value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }]; }
+    if (kind === 'event') { return [{ value: '设备日历', icon: Icons.event, action: () => { const event = this.state.events.find((event: CosEvent) => event.id === id); if (event) { this.state.addEventToCalendar(event); } } }, { value: '新建计划', icon: Icons.add, action: () => this.edit('eventProject', '', id) }, { value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }]; }
     if (kind === 'asset') { return [{ value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }]; }
     if (kind === 'projectPhotos') { return [{ value: '导入照片', icon: Icons.importPhoto, action: () => this.state.importPhotos(id) }]; }
     return [{ value: '选中照片', icon: Icons.check, action: () => { const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); if (photo) { this.state.setPhotoStatus(photo, PhotoStatus.SELECTED); } } }, { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => { const photo = this.state.photos.find((p: PhotoAsset) => p.id === id); if (photo) { this.setCover(photo); } } }, { value: '删除', icon: Icons.remove, action: () => this.remove('photo', id) }];
@@ -221,19 +236,14 @@ struct Index {
 
   private segmentLabels(index: number): string[] {
     if (index === 1) { return ['角色', '计划']; }
-    if (index === 2) { return ['即将', '过去', '想去']; }
+    if (index === 2) { return ['列表', '日历']; }
     if (index === 3) { return ['装备', '照片']; }
     return ['作品', '时间轴'];
   }
 
-  private segmentTitle(index: number): string {
-    const titles: string[] = ['首页', 'Cos', '漫展', '衣柜', '我的'];
-    return index >= 0 && index < titles.length ? titles[index] : '';
-  }
-
   private segmentSelection(index: number): number {
     if (index === 1) { return this.cosProjects ? 1 : 0; }
-    if (index === 2) { return this.eventFilter; }
+    if (index === 2) { return this.eventCalendar ? 1 : 0; }
     if (index === 3) { return this.libraryPhotos ? 1 : 0; }
     return this.meSection;
   }
@@ -248,25 +258,17 @@ struct Index {
     return new SegmentButtonV2Items(options);
   }
 
-  private taskSegmentWidth(): number {
-    return this.segmentWidth(3, 0);
-  }
-
-  private titleSegmentWidth(index: number): number {
-    return this.segmentWidth(this.segmentLabels(index).length, this.segmentTitle(index).length);
-  }
-
   @Builder titleSegment(index: number) {
     Column() {
       HdsTitleBarSegment({
         componentId: 'secondary-segment-' + index,
         items: this.buildSegmentItems(this.segmentLabels(index)),
         selectedIndexes: [this.segmentSelection(index)],
-        experimentalWidth: this.titleSegmentWidth(index),
-        normalWidth: this.titleSegmentWidth(index),
+        experimentalWidth: Theme.titleSegmentWidth,
+        normalWidth: Theme.titleSegmentWidth,
         onSelectedIndexChanged: (selected: number): void => {
           if (index === 1) { this.cosProjects = selected === 1; }
-          else if (index === 2) { this.eventFilter = selected; }
+          else if (index === 2) { this.eventCalendar = selected === 1; }
           else if (index === 3) { this.libraryPhotos = selected === 1; }
           else { this.meSection = selected; }
         },
@@ -292,7 +294,7 @@ struct Index {
       }
       else if (index === 0) { HomePage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.homeContentBottom, active: this.tab === index, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
       else if (index === 1) { CosPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, projects: this.cosProjects, selection: (projects: boolean) => { this.cosProjects = projects; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
-      else if (index === 2) { EventsPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, filter: this.eventFilter, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
+      else if (index === 2) { EventsPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, calendar: this.eventCalendar, filter: this.eventFilter, filterChanged: (filter: number): void => { this.eventFilter = filter; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
       else if (index === 3) { LibraryPage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, photos: this.libraryPhotos, selection: (photos: boolean) => { this.libraryPhotos = photos; }, open: (k: string, id: string) => this.open(k, id), add: (k: string, parent: string) => this.edit(k, '', parent) }) }
       else { MePage({ scroller: this.pageScrollers[index], state: this.state, topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index, section: this.meSection, open: (k: string, id: string) => this.open(k, id), destructive: (kind: string) => this.destructive(kind) }) }
       }.width('100%').height('100%')
@@ -303,7 +305,7 @@ struct Index {
       })
       .titleMode(HdsNavigationTitleMode.MINI).hideBackButton(true)
       // 外层 HdsTabs 已忽略安全区，内层 HdsNavigation 需要显式避让，标题才不会进入状态栏。
-      .titleBar(SystemCapability.titleBar(['首页', 'Cos', '漫展', '衣柜', '我的'][index], this.state.settings.effects, this.state.settings.materialLevel, index > 0 ? (): void => { this.titleSegment(index); } : undefined, this.rootMenus(index), true))
+      .titleBar(SystemCapability.titleBar(['首页', 'Cos', '活动', '衣柜', '我的'][index], this.state.settings.effects, this.state.settings.materialLevel, index > 0 ? (): void => { this.titleSegment(index); } : undefined, this.rootMenus(index), true))
       .hideToolBar(true)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%').height('100%').backgroundColor(Theme.bg)
@@ -313,10 +315,10 @@ struct Index {
         HdsTabs({ controller: this.tabsController, index: this.tab }) {
           TabContent() { this.mainNavigation(0) }.tabBar(new BottomTabBarStyle(Icons.home, '首页')).accessibilityText('首页标签页')
           TabContent() { this.mainNavigation(1) }.tabBar(new BottomTabBarStyle(Icons.cos, 'Cos')).accessibilityText('Cos标签页')
-          TabContent() { this.mainNavigation(2) }.tabBar(new BottomTabBarStyle(Icons.event, '漫展')).accessibilityText('漫展标签页')
+          TabContent() { this.mainNavigation(2) }.tabBar(new BottomTabBarStyle(Icons.event, '活动')).accessibilityText('活动标签页')
           TabContent() { this.mainNavigation(3) }.tabBar(new BottomTabBarStyle(Icons.library, '衣柜')).accessibilityText('衣柜标签页')
           TabContent() { this.mainNavigation(4) }.tabBar(new BottomTabBarStyle(Icons.me, '我的')).accessibilityText('我的标签页')
-        }.id('main-tabs').barPosition(BarPosition.End).barWidth(Math.min(360, this.viewportWidth - 32)).cachedMaxCount(5, TabsCacheMode.CACHE_LATEST_SWITCHED)
+        }.id('main-tabs').barPosition(BarPosition.End).barWidth(Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32))).cachedMaxCount(5, TabsCacheMode.CACHE_LATEST_SWITCHED)
           .scrollable(false).vertical(false).barOverlap(true)
           .blurStrategy(this.state.settings.effects ? BlurStrategy.ENABLE : BlurStrategy.DISABLE)
           .barFloatingStyle(SystemCapability.tabs(this.state.settings.effects, this.state.settings.materialLevel))
@@ -327,7 +329,7 @@ struct Index {
             }
           })
           .onChange((index: number) => { this.tab = index; this.outing = false; this.state.suspend(); HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel); })
-              .height(LayoutPolicy.matchParent).width('100%').ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM]).backgroundColor(Theme.bg).accessibilityText('首页、Cos、漫展、衣柜、我的五个标签页').onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
+              .height(LayoutPolicy.matchParent).width('100%').ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM]).backgroundColor(Theme.bg).accessibilityText('首页、Cos、活动、衣柜、我的五个标签页').onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
   }
 
   build() {
@@ -342,7 +344,6 @@ struct Index {
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-      .bindSheet(this.importOpen, this.importSheet(), appSheetOptions((): void => { this.importOpen = false; }))
-      .bindSheet(this.formOpen, this.form(), appSheetOptions((): void => { this.formOpen = false; }))
+      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; }))
   }
 }
