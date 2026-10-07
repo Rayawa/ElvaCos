@@ -1,0 +1,1176 @@
+> hvigor UP-TO-DATE :entry:default@PreBuild...  
+> hvigor Finished :entry:default@CreateModuleInfo... after 1 ms 
+> hvigor UP-TO-DATE :entry:default@GenerateMetadata...  
+> hvigor Finished :entry:default@ConfigureCmake... after 1 ms 
+> hvigor UP-TO-DATE :entry:default@MergeProfile...  
+> hvigor UP-TO-DATE :entry:default@CreateBuildProfile...  
+> hvigor Finished :entry:default@PreCheckSyscap... after 1 ms 
+> hvigor UP-TO-DATE :entry:default@GeneratePkgContextInfo...  
+> hvigor Finished :entry:default@GeneratePkgSdkInfo... after 1 ms 
+> hvigor Finished :entry:default@ProcessIntegratedHsp... after 1 ms 
+> hvigor Finished :entry:default@BuildNativeWithCmake... after 1 ms 
+> hvigor UP-TO-DATE :entry:default@MakePackInfo...  
+> hvigor Finished :entry:default@SyscapTransform... after 6 ms 
+> hvigor UP-TO-DATE :entry:default@ProcessProfile...  
+> hvigor UP-TO-DATE :entry:default@ProcessRouterMap...  
+> hvigor UP-TO-DATE :entry:default@ProcessShareConfig...  
+> hvigor Finished :entry:default@ProcessStartupConfig... after 1 ms 
+> hvigor Finished :entry:default@BuildNativeWithNinja... after 1 ms 
+> hvigor UP-TO-DATE :entry:default@ProcessResource...  
+> hvigor UP-TO-DATE :entry:default@GenerateLoaderJson...  
+> hvigor UP-TO-DATE :entry:default@ProcessLibs...  
+> hvigor UP-TO-DATE :entry:default@CompileResource...  
+> hvigor UP-TO-DATE :entry:default@DoNativeStrip...  
+> hvigor Finished :entry:default@BuildJS... after 2 ms 
+> hvigor UP-TO-DATE :entry:default@CacheNativeLibs...  
+> hvigor WARN: WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/pages/more/AppLogPage.ets:135:32
+ 'Function.bind' is not supported (arkts-no-func-bind)
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/component/PreferenceSettings.ets:55:97
+ 'Function.bind' is not supported (arkts-no-func-bind)
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/component/PreferenceSettings.ets:57:90
+ 'Function.bind' is not supported (arkts-no-func-bind)
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/pages/more/SettingsPage.ets:272:52
+ 'Function.bind' is not supported (arkts-no-func-bind)
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/pages/Dashboard.ets:313:39
+ 'Function.bind' is not supported (arkts-no-func-bind)
+
+WARN: ArkTS:WARN: For details about ArkTS syntax errors, see FAQs
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:11:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:12:97
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:22:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:38:35
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:48:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:51:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:57:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:23:67
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:23:103
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:33:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:38:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:40:29
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:41:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:47:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:48:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:59
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:90
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:55:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:60:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:60:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:64:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:84:92
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:102:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:102:56
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:25:43
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:26:54
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:31:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:35:32
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:42:54
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:15:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:27:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:31:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:40:50
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:7:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:8:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:8:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:10:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:10:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:18:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:21:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:32:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:40:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:43:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:57:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:65:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:68:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:82:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:88:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:93:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:96:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:99:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:101:74
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:102:77
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:6:81
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:6:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:7:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:7:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:26:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:29:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:38:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:47:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:50:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:63:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:69:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:73:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:76:46
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:90:74
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:92:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:24:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:25:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:25:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:27:80
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:27:92
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:37:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:39:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:53:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:60:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:62:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:73:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:75:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:84:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:91:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:93:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:104:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:106:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:122:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:164:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:166:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:182:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:198:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:209:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:211:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:234:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:242:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:244:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:255:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:257:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:268:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:275:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:277:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:288:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:290:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:303:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:310:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:338:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:340:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:349:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:355:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:363:43
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:365:19
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:372:12
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:399:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:13:66
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:29
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:36
+ The system capacity of this api 'HoldingHandStatus' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:54
+ The system capacity of this api 'LEFT_HAND_HELD' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:91
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:98
+ The system capacity of this api 'HoldingHandStatus' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:116
+ The system capacity of this api 'RIGHT_HAND_HELD' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:33:11
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:33:18
+ The system capacity of this api 'on' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:42:13
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:42:20
+ The system capacity of this api 'off' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/ShareService.ets:16:49
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:41:47
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:43:23
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:48:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:64:51
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:66:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:56
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:126
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:169
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:70:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:73:52
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:75:28
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:76:39
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:76:76
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:77:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:77:78
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:82
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:126
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:170
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:80:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:17:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:18:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:18:65
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:24:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:27:29
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:33:32
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:38:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/component/HdsTitleBarSegment.ets:29:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/component/HdsTitleBarSegment.ets:46:45
+ Function may throw exceptions. Special handling is required.
+
+
+> hvigor Finished :entry:default@CompileArkTS... after 2 s 169 ms 
+> hvigor UP-TO-DATE :entry:default@GeneratePkgModuleJson...  
+> hvigor Finished :entry:default@ProcessCompiledResources... after 1 ms 
+> hvigor Finished :entry:default@PackageHap... after 384 ms 
+> hvigor Finished :entry:default@PackingCheck... after 3 ms 
+> hvigor Finished :entry:default@SignHap... after 758 ms 
+> hvigor Finished :entry:default@CollectDebugSymbol... after 1 ms 
+> hvigor Finished :entry:assembleHap... after 1 ms 
+> hvigor BUILD SUCCESSFUL in 4 s 603 ms 
+
+33 tasks in total: 17 executed, 16 up-to-date
+> hvigor UP-TO-DATE :entry:ohosTest@PreBuild...  
+> hvigor Finished :entry:ohosTest@CreateModuleInfo... after 1 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@GenerateMetadata...  
+> hvigor Finished :entry:ohosTest@ConfigureCmake... after 1 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@MergeProfile...  
+> hvigor UP-TO-DATE :entry:ohosTest@CreateBuildProfile...  
+> hvigor Finished :entry:ohosTest@PreCheckSyscap... after 1 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@GeneratePkgContextInfo...  
+> hvigor Finished :entry:ohosTest@GeneratePkgSdkInfo... after 1 ms 
+> hvigor Finished :entry:ohosTest@ProcessIntegratedHsp... after 1 ms 
+> hvigor Finished :entry:ohosTest@BuildNativeWithCmake... after 1 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@MakePackInfo...  
+> hvigor Finished :entry:ohosTest@SyscapTransform... after 5 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@ProcessProfile...  
+> hvigor UP-TO-DATE :entry:ohosTest@ProcessRouterMap...  
+> hvigor UP-TO-DATE :entry:ohosTest@ProcessShareConfig...  
+> hvigor Finished :entry:ohosTest@ProcessStartupConfig... after 1 ms 
+> hvigor Finished :entry:ohosTest@BuildNativeWithNinja... after 1 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@ProcessResource...  
+> hvigor UP-TO-DATE :entry:ohosTest@GenerateLoaderJson...  
+> hvigor UP-TO-DATE :entry:ohosTest@ProcessLibs...  
+> hvigor Finished :entry:ohosTest@CompileResource... after 152 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@DoNativeStrip...  
+> hvigor Finished :entry:ohosTest@OhosTestBuildJS... after 2 ms 
+> hvigor UP-TO-DATE :entry:ohosTest@CacheNativeLibs...  
+> hvigor WARN: WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:11:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:12:97
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:22:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:38:35
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:48:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:51:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/database/Database.ets:57:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:23:67
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:23:103
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:33:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:38:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:40:29
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:41:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:47:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:48:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:59
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:50:90
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:55:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:60:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:60:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:64:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:84:92
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:102:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/media/MediaRepository.ets:102:56
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:25:43
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:26:54
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:31:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:35:32
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/DemoDataRepository.ets:42:54
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:6:81
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:6:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:7:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:7:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:26:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:29:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:38:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:47:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:50:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:63:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:69:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:73:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:76:46
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:90:74
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PreparationRepository.ets:92:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:24:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:25:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:25:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:27:80
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:27:92
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:37:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:39:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:53:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:60:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:62:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:73:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:75:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:84:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:91:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:93:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:104:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:106:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:122:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:164:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:166:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:182:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:198:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:209:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:211:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:234:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:242:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:244:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:255:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:257:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:268:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:275:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:277:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:288:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:290:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:303:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:310:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:338:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:340:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:349:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:355:70
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:363:43
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:365:19
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:372:12
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/Repositories.ets:399:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:7:17
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:8:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:8:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:10:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:10:95
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:18:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:21:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:32:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:40:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:43:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:57:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:65:45
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:68:21
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:82:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:88:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:93:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:96:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:99:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:101:74
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/PlanningRepository.ets:102:77
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:41:47
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:43:23
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:48:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:64:51
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:66:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:56
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:83
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:126
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:67:169
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:70:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:73:52
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:75:28
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:76:39
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:76:76
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:77:41
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:77:78
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:82
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:126
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:78:170
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/data/repository/MetadataBackupRepository.ets:80:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/ohosTest/ets/test/DemoData.test.ets:28:35
+ 'createModuleContext' has been deprecated.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:15:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:27:33
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:31:31
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/EventReminderService.ets:40:50
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:13:66
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:29
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:36
+ The system capacity of this api 'HoldingHandStatus' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:54
+ The system capacity of this api 'LEFT_HAND_HELD' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:91
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:98
+ The system capacity of this api 'HoldingHandStatus' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:29:116
+ The system capacity of this api 'RIGHT_HAND_HELD' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:33:11
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:33:18
+ The system capacity of this api 'on' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:42:13
+ The system capacity of this api 'motion' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/GripService.ets:42:20
+ The system capacity of this api 'off' is not supported on all devices
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/ShareService.ets:16:49
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:17:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:18:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:18:65
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:24:27
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:27:29
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:33:32
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/main/ets/common/BackupService.ets:38:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: /Users/raychen/Develop/ElvaCos/entry/src/ohosTest/ets/test/Structure.test.ets:59:41
+ 'createModuleContext' has been deprecated.
+
+
+> hvigor Finished :entry:ohosTest@OhosTestCompileArkTS... after 1 s 611 ms 
+> hvigor Finished :entry:ohosTest@OhosTestCopyMockConfigJson... after 1 ms 
+> hvigor Finished :entry:ohosTest@GeneratePkgModuleJson... after 1 ms 
+> hvigor Finished :entry:ohosTest@ProcessCompiledResources... after 1 ms 
+> hvigor Finished :entry:ohosTest@PackageHap... after 270 ms 
+> hvigor Finished :entry:ohosTest@PackingCheck... after 3 ms 
+> hvigor Finished :entry:ohosTest@SignHap... after 762 ms 
+> hvigor Finished :entry:ohosTest@CollectDebugSymbol... after 1 ms 
+> hvigor Finished :entry:assembleHap... after 1 ms 
+> hvigor BUILD SUCCESSFUL in 4 s 203 ms 
+
+34 tasks in total: 20 executed, 14 up-to-date
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/default/entry-default-signed.hap msg:install bundle successfully. 
+AppMod finish
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap msg:install bundle successfully. 
+AppMod finish
+force stop process successfully.
+
+OHOS_REPORT_SUM: 7
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=monthlyExpensesCrossYearAndPreserveCents
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=monthlyExpensesCrossYearAndPreserveCents
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=4
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=photoDistributionCountsEveryStatusExactlyOnce
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=photoDistributionCountsEveryStatusExactlyOnce
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=2
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portfolioFiltersOnlyFinalAndPublishedPhotos
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portfolioFiltersOnlyFinalAndPublishedPhotos
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=0
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=countdownAndCaptionShareHorizontalCenter
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=countdownAndCaptionShareHorizontalCenter
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=391
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portfolioSelectorRefreshesVisiblePhotos
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=portfolioSelectorRefreshesVisiblePhotos
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=11812
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=calendarAndButtonPressFeedbackRenders
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=calendarAndButtonPressFeedbackRenders
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=4296
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=expenseTrendSelectsMonth
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=7
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=expenseTrendSelectsMonth
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=5511
+
+
+OHOS_REPORT_STATUS: class=UiPolishAndCharts
+OHOS_REPORT_STATUS: suiteconsuming=22016
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 7, Failure: 0, Error: 0, Pass: 7, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=22016
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.
+OHOS_REPORT_RESULT: stream=Tests run: 7, Failure: 0, Error: 0, Pass: 7, Ignore: 0

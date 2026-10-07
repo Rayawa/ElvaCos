@@ -1,6 +1,10 @@
 # 首版架构与实施设计
 
-日期：2026-10-05。产品定位：本地、单用户的 Coser Personal OS，离线即可完整使用。
+版本基线：**1.0.0-beta.1（10000001）**；文档核对：2026-10-08。现状与历史证据；最终构建、签名与交付结论见 [打包记录](RELEASE.md)。
+
+本文是工程现状与历史取舍的参考，不是后续任务的固定规程。以用户当前要求和实际代码为准；已有结构、实现方式、参数与检查范围可以随任务调整。
+
+初版设计：2026-10-05；现状核对：2026-10-08。产品定位：本地、单用户的 Coser Personal OS，离线即可完整使用。
 
 ## 已检查的工程
 
@@ -14,7 +18,9 @@ Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。�
 
 二级切换仍使用 titleBar.stackBuilder 内居中的 HdsTitleBarSegment / TabSegmentButtonV2。一级动作通过 HDS 标题菜单提供；按 2026-10-06 用户要求，详情使用 HdsTabs 浮动操作栏替代原生 toolbar，动作点击通过 onContentWillChange 拦截内容切换，继续显示当前详情。新增角色、版本、项目、装备、漫展、清单项和编辑均使用 bindSheet，关联装备与照片导入项目选择也使用 Sheet；删除继续使用确认 Dialog。
 
-设置覆盖主页，第一组直接复用 Dashboard SettingsPanel，其余组统一 HdsListItemCard 的图标、文本、控件列与帮助入口。材质等级成为视效唯一选择：流畅关闭视效，轻柔/精美开启对应等级；外观沿用最新三档设置；单手操作三档为左手/智感握持/右手，只有中间档开启感知权限与检测。旧独立开关通过 Preferences v2 显式转换，业务数据库不变。
+设置覆盖主页，第一组直接复用 Dashboard SettingsPanel，其余组统一 HdsListItemCard 的图标、文本、控件列与帮助入口。材质等级成为视效唯一选择：流畅关闭视效，轻柔/精美开启对应等级；外观提供浅色/跟随系统/深色，主题配色独立提供五组；单手操作三档为左手/智感握持/右手，只有中间档开启感知权限与检测。旧独立开关通过 Preferences v2 显式转换，业务数据库不变。
+
+以上为当前实现。下一轮体验重构（一级入口按目的重组、收录原语、今天模式、在途三态、角色履历与作品卡，以及 `entries` / 预算标记 / 在途 / 拍摄清单四项增量迁移）已整理为可执行规格，见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md)；**尚未实施**，本文的现状描述在实施前保持有效。
 
 ## 实体关系
 
@@ -22,11 +28,11 @@ Character 1—N CharacterVariant；Character/Variant 1—N CosProject；Event 1�
 CosProject N—M Asset，通过 project_assets 关联，复用同一资产。
 CosProject 1—N ChecklistItem；CosProject 1—N PhotoAsset；PhotoAsset 1—N PhotoVersion。
 DiaryEntry 记录项目生命周期。照片保留项目、角色上下文，P1 增加 Shoot/PhotoSet 关系。
-Purchase、BudgetItem、Shoot、Collaborator、MakeupLook、Location、PublishRecord 属于 P1 扩展；不在 P0 建空实现。
+当前以 expenses 和 team_members 保存实际花费与本机团队分工；采购/分期、独立拍摄/照片集、在线协作、妆造地点库与平台发布记录仍属扩展，不建空实现。
 
 ## 数据库
 
-RDB 保存结构化元数据，Preferences 仅保存主题、触觉、单手偏好和视效开关。数据库 v1：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。
+RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v3，增量加入准备分类/任务、团队、花费和参考图；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。
 
 照片导入默认仅导入用户选中的图片，一份沙箱原文件 + 一份低分辨率缩略图；保留 source_uri 作来源标识，不依赖临时 URI 权限。图片列表只展示缩略图，详情才读取原图；不修改系统相册原文件。PhotoVersion 保存编辑参数和派生路径，与 PhotoAsset 独立。首版编辑器不扩展到重型修图。
 
@@ -40,7 +46,7 @@ entry/src/main/ets/
 - pages/main/：五个一级业务页面
 - pages/detail/：角色、计划、装备、活动、照片、参考图详情
 - pages/more/：SettingsPage、ExpenseSummaryPage、AppLogPage、LocalHtmlPage
-- component/：复用的 HDS 导航/卡片/设置、表单字段、照片网格与活动日历
+- component/：复用的 HDS 导航/卡片/设置、表单字段、照片网格、活动日历与 charts 下的 Canvas 图表
 - common/：appState 公共存储边界、constants 公共常量、types、主题/日期/反馈、偏好和系统能力
 - model/：ApplicationState、实体、领域规则、ProjectRoute 与 EditDraft
 - data/database/：schema、递增迁移、连接和事务
@@ -53,16 +59,16 @@ entry/src/main/ets/
 
 @ObservedV2 / @Trace 应用状态承担异步状态与 UI 刷新；实体使用明确 ArkTS 类型。不使用 any、动态属性或解构逃避 ArkTS 检查。
 
-## 分阶段验证
+## 首版实施过程（历史）
 
 1. 先确认 SDK 和 API，写本设计及能力矩阵（已完成）。
 2. 数据模型、RDB 迁移、领域规则：通过编译及 SQLite 关系测试。
-3. 角色/版本/项目/资产复用/漫展/清单闭环：每个阶段构建 HAP。
+3. 当时逐步完成角色/版本/项目/资产复用/漫展/清单闭环，并构建 HAP。
 4. PhotoPicker、沙箱媒体、缩略图、工作流状态、作品集。
 5. 设置、导出恢复、清空确认、深色/大屏/无障碍、系统分享及原生反馈。
 6. 单元/设备测试、构建记录、真机验收清单和首版交付。
 
-P0 是本轮交付目标。P1/P2 在 ROADMAP 中单独管理；未经设备验证的硬件能力不标记为验收通过。
+以上为首版的实施顺序，不作为以后任务的执行模板。后续方向与已知问题见 ROADMAP。
 
 ## 2026-10-06 初轮 UX 落地
 
@@ -76,10 +82,10 @@ P0 是本轮交付目标。P1/P2 在 ROADMAP 中单独管理；未经设备验�
 ## 2026-10-06 全局一致性修正
 
 - 安全区：外层 HdsNavigation、每个 Tab 的内层 HdsNavigation 与 HdsNavDestination 统一 `ignoreLayoutSafeArea(SYSTEM, TOP|BOTTOM)`，标题栏 `avoidLayoutSafeArea`；内容顶部留白按页面级别分档（一级 `contentTop`=100vp，二级 `detailTop`=100vp，标题栏含分段时 `detailTopWithSegment`=112vp），底部留白 96/110vp，均以滚动内容内的 `Blank()` 实现，页面不依赖 padding。
-- 主题：`common/Theme.ets` 由静态类改为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace`，颜色值全部是 Dashboard 的同名资源。外观三档 **天蓝=浅色 / 雾蓝=深色 / 跟随系统**，实现为 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，由 `dark` 资源目录解析深浅色；`SettingsService.load/save` 负责从 Preferences 读取并应用，`EntryAbility` 不再强制 NOT_SET。业务页面不直接引用 `app.color.*`。
+- 主题：`common/Theme.ets` 为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace Resource`。`ThemePalettes` 提供蓝、绿、粉、橙、红五组成对资源；蓝色仍引用 Dashboard 原同名资源。配色 themeColor 与外观 appearance 分别持久化，外观浅色 / 深色 / 跟随系统使用 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，系统解析 base / dark。`SettingsService.load/save` 负责读取、保存与应用，根 `WithTheme` 同步原生控件强调色；业务页面只消费 Theme，不直接引用 `app.color.*`。
 - 安全区分级：内层 HdsNavigation 的标题栏 `avoidLayoutSafeArea: true`，HdsNavDestination 为 `false`（HDS 已自行避让，再开一次会把标题栏下移一个状态栏高度）。
 - 偏好：仍在单一 `app_storage`。新增 `appearance`（sky/mist/system）与 `hand` 两个 key（`getAppearance/setAppearance`、`getHand/setHand`），`hand` 同时同步旧的 `holdCheckON` / `buttonPositionRIGHT`，旧数据由 `SettingsMigration` 显式转换。华为账号只持久化 OpenID / UnionID / 展示名 / 登录时间，不保存 authorizationCode 与 idToken。
-- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `component/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Index`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
+- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `component/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Dashboard`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
 - 华为账号：`common/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。
 
 ## 2026-10-07 · 准备与活动领域扩展
@@ -100,7 +106,7 @@ EventSaveCoordinator 先尝试发布新提醒，再保存活动与提醒 ID，�
 
 ## 2026-10-07 · 系统日历单向添加
 
-DeviceCalendarDraft 是纯领域映射，DeviceCalendarService 仅负责 Calendar Kit 系统确认页。使用编辑页面创建系统管理的日程，不查询/改动其他日历数据，不保存或恢复系统日历 ID，因此无关系迁移。活动新建保存成功后必须把生成的 ID 写回 EditDraft，才能在刷新后取得正确活动并打开日历；取消新建表单不进入系统页。
+DeviceCalendarDraft 是纯领域映射，DeviceCalendarService 仅负责 Calendar Kit 系统确认页。使用编辑页面创建系统管理的日程，不查询/改动其他日历数据，不保存或恢复系统日历 ID，因此无关系迁移。活动新建保存成功后将生成的 ID 写回 EditDraft，以便刷新后取得正确活动并打开日历；取消新建表单不进入系统页。
 
 系统日历与应用代理提醒独立；日历默认提前 30 分钟，可在系统页修改，应用代理提醒仍需明确选择。应用保存、日历确认和后续系统管理的边界在界面注明。
 
@@ -110,8 +116,18 @@ AccountService 先核对模块 client_id 配置，再发送带随机 state 的�
 
 目录与状态边界以 Dashboard 为参考，独立保留 ElvaCos 的 model/data 层。common/appState 是 Ability 与根页面共享状态的唯一入口，通过 AppStorageV2.connect 保存 @ObservedV2 AppState；Dashboard 使用 V1 公有存储，本工程不把 V2 领域对象直接塞入 V1。页面显式注入 @Require @Param state，局部筛选、弹层、Scroller 与 NavPathStack 不持久化。Preferences 的磁盘 key 和迁移保持不变；PreferenceSettings 与 SettingsPanel 使用 @StorageLink，明确 Builder 桥接到 V2 控件，保存经原有持久化方法。
 
-EntryAbility 先读取一次偏好并应用 ColorMode，再加载 pages/Dashboard。根页面 onPageShow 延后一轮事件循环加载 RDB；成功后延时执行媒体孤立文件收集和代理提醒核对。失败通过 loading/error 和重试入口报告；硬件/提醒失败不取消已保存的业务数据。onPageHide/aboutToDisappear 取消排队 Timer 并停止握姿，异步完成后检查可见性/请求代次。dispose 等待初始化、业务操作和偏好保存，再等待 RdbStore.close 的 Promise 完成后释放上下文。DetailDestination 与 Sheet 的显示生命周期继续复用已有动效工具。
+EntryAbility 先读取一次偏好并应用 ColorMode，再加载 pages/Dashboard。根页面 onPageShow 延后一轮事件循环加载 RDB；成功后延时执行媒体孤立文件收集和代理提醒核对。失败通过 loading/error 和重试入口报告；硬件/提醒失败不取消已保存的业务数据。onPageHide/aboutToDisappear 取消排队 Timer 并停止握姿，异步完成后检查可见性/请求代次。dispose 等待初始化、业务操作和偏好保存，再等待 RdbStore.close 的 Promise 完成后释放上下文。DetailDestination 与 Sheet 的显示生命周期继续复用已有动效工具；设置目的地共享根页面 MainEntranceSession，仅首次打开播放，缓存返回或重建直接显示完整内容。原生设置行及其内部控件不再绑定额外按压处理。
 
 AppLogPage 从 constants 的 APP_LOG 读取版本说明；LocalHtmlPage 从 rawfile/privacy.html 读取 UTF-8 正文，过滤源文件隐藏模板和脚本，用原生 Text/Scroll 阅读，不维护第二份正文，不执行脚本或加载网络内容。读取支持 loading/error/retry，离开后取消排队任务并忽略过期结果。阅读与统计内容宽度上限 840vp，普通列表/详情上限 1440vp；短横屏首页/设置改为单列整体滚动。
 
 ExpenseSummary 使用原生 Linear Progress 构成横向分类条形图，分为最小金额单位，占比基于当前计划范围的总花费，零总额返回 0；点击分类筛选明细，再次点击或取消筛选恢复全部，切换计划清除旧分类。Theme 同名资源提供深浅色，图形与金额/占比文字共同呈现，读屏播报类别/金额/占比/选中状态。保留备份、RDB 迁移和媒体所有权逻辑；本轮关系结构不变。
+
+更新日志筛选保存在 AppLogPage 的 @Local 状态，@Computed 派生列表；该页面自行配置公共 DetailDestination 的三个原生标题菜单，不嵌套导航目的地。日志发布类型与构建号属于 ReleaseNote，正式/测试发布标识与空列表按真实数据呈现。
+
+## 2026-10-08 · Beta 最终结构
+
+主题新增 themeColor 偏好及 ThemePalettes，根 WithTheme 同步原生强调色；蓝色保持原资源，其他配色分别定义 brand / accent。model/Statistics 提供整数分的月度支出聚合和互斥照片状态分布，component/charts 移植 Dashboard Canvas 绘制，花费分类仍用原生 Progress。PhotoGrid 稳定 IDataSource 并在筛选/选择/列数变化时通知刷新。
+
+DemoDataRepository 管理离线追加示例及 demo_data_state 首次检查标记；它是内部加载标记，不升级业务 schema 或备份格式。BuildProfile.DEBUG 控制空库自动载入，Release 保持空白；手动载入保留已有记录，存在示例 ID 时整批跳过，不重新补回已编辑或删除的示例。媒体导入失败清理本次新增文件，数据写入事务回滚。
+
+本次仅补齐版本日志、打包模式与公开描述/vendor；业务数据库仍为 v3、便携备份仍为 v3。打包脚本支持工程级 assembleApp，Release 编译不等于发行签名。具体产物和测试证据以 RELEASE / VALIDATION 为准。

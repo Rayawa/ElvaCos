@@ -1,0 +1,5 @@
+> hvigor BUILD SUCCESSFUL in 5 s 42 ms 
+
+Source-backed settings lifecycle: 8/8 checks passed (first show, hide cleanup, cached return, rebuild, new launch, normal details, standalone host, managed host).
+Five native settings component sources and list group containers are free of extra PressFeedback/clickEffect/onTouch overrides.
+Uses actual session and lifecycle methods with an animation stub; does not claim native touch or device animation acceptance.

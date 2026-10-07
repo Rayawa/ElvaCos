@@ -1,0 +1,10 @@
+2026-10-08 / 1.0.0-beta.1 (10000001)
+HAP: Release compilation, debug=false; signing Profile type=debug.
+Application development certificate SHA-256: 3F:0E:3F:76:46:D3:43:AA:F1:38:87:A9:1D:9F:56:0B:72:AB:7B:65:BB:3B:9D:55:EE:17:88:AC:1F:35:EC:7B
+Historical DF:21:...:3A:37 fingerprint identifies the root certificate, not the application certificate.
+Profile CMS verification successful; validity checked against 2026-10-08.
+Profile bundle matches top.rayawa.elvacos; no release signing profile was supplied.
+10-08 02:16:36.248  INFO - verify codesign success
+10-08 02:16:36.307  INFO - verify permission sign success.
+10-08 02:16:36.309  INFO - verify: Verify success
+10-08 02:16:36.309  INFO - verify-app success

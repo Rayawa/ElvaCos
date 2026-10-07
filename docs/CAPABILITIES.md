@@ -1,6 +1,10 @@
 # HarmonyOS 能力核验
 
-核验时间 2026-10-05。以华为官方文档 + 本机 Release SDK 的 @since / @syscap / @permission 声明为依据，target 26 并不等于运行设备 API 26。
+版本基线：**1.0.0-beta.1（10000001）**；文档核对：2026-10-08。现状与历史证据；最终构建、签名与交付结论见 [打包记录](RELEASE.md)。
+
+本文是工程现状与历史取舍的参考，不是后续任务的固定规程。以用户当前要求和实际代码为准；已有结构、实现方式、参数与检查范围可以随任务调整。
+
+初始 API 核验 2026-10-05；本次以实际 Release 包核对版本、权限和能力入口。以华为官方文档 + 本机 Release SDK 的 @since / @syscap / @permission 声明为依据，target 26 并不等于运行设备 API 26。
 
 | 能力 | 起始版本/限制 | API 23 基线策略 |
 |---|---|---|
@@ -14,7 +18,7 @@
 | PhotoAccessHelper.PhotoViewPicker | 10；FileManagement.PhotoAccessHelper.Core | 用户选择无需全图库读取权限；异步复制选中照片，保留来源 URI |
 | CoreFileKit fileUri.getUriFromPath | 9；FileManagement.AppFileService；无需额外权限 | MediaRepository 将沙箱文件路径转为 Image 使用的 file URI；ManagedImage 统一加载和失败状态 |
 | CoreFileKit DocumentViewPicker | 9（设备 Phone/Tablet 12+、2in1 13+）；无需文件广泛访问权限 | 显式用户选择导出/恢复位置 |
-| UI Design Kit Press Shadow / Point Light | 20；UIDesign.HDSComponent.Core；Stage | 通过 canIUse 检查，在统一卡片封装；主卡片少量静态光，不做持续动画 |
+| UI Design Kit Press Shadow / Point Light | 20；UIDesign.HDSComponent.Core；Stage | 公共 PressFeedback 按实际按压状态绑定 pointLight / compositingFilter；取消及释放后复位 |
 | ArkUI Navigation systemMaterial | 26；NavigationTitleOptions 新属性 | 当前未调用；统一采用 API 23 HDS 自适应材质 |
 | 触觉 vibrator.startVibration / getVibratorInfoSync | 9 / 19；Sensors.MiscDevice；VIBRATE 权限 | 直接复用 Dashboard：关闭/灵动/硬朗、硬件及预置缓存、返回去重 |
 | uiEffect.Filter.hdrBrightnessRatio | 24；Graphics.Drawing；HDR_BRIGHTNESS；需 HDR 硬件/管线 | 复制 Dashboard 光场隔离：仅高亮按压尝试；API 23 退回明亮，失败保留普通光场 |
@@ -25,7 +29,7 @@
 | 应用接续 | 分布式能力、设备及权限约束 | P2，不在首版要求同步或账户 |
 | 系统 BackupExtensionAbility | 工程已有；应用沙箱由系统备份 | 保留，核对 include 配置；手工 RDB 备份标明媒体限制 |
 
-核心目标为 Phone；module 已声明 tablet/2in1。UI/数据 API 能在这些类型上使用，但握姿、触觉、近场分享必须依据 SysCap 和硬件实际返回，不仅判断 deviceType。
+核心目标为 Phone；module 已声明 tablet/2in1。UI/数据 API 能在这些类型上使用，但当前握姿、触觉、近场分享根据 SysCap 和硬件返回判断支持情况，不单凭 deviceType。
 
 ## 官方来源
 
@@ -43,7 +47,7 @@
 
 HDS 导航不是把 Navigation 简单改名：titleBar.content/style、HdsNavigationTitleMode 与 HdsTabsFloatingStyle 均按真实 SDK 声明使用；详情 HdsActionTabs 使用 ToolbarItem 的动作、图片/原生 Symbol 描述；HdsTabs.onContentWillChange 拦截内容切换，onTabBarClick 执行动作。两者本机 SDK since 20、syscap UIDesign.HDSComponent.Core、Stage、无新增权限，兼容 API 23。页面覆盖使用主 NavPathStack 与标准 HdsNavDestination，依据上述 Navigation 官方来源。
 
-安全区：Window.setWindowLayoutFullScreen / getWindowAvoidArea / avoidAreaChange（since 9，SystemCapability.WindowManager.WindowManager.Core，无权限）读取状态栏、挖孔和手势区；窗口保留原生避让，根 Tabs 扩展背景，HDS 标题 avoidLayoutSafeArea（since 20）负责标题避让。详情覆盖主 Tabs，只显示本页的 HdsTabs 操作栏，滚动内容底部留白避让。参见 UI_STYLE.md 的官方依据。
+安全区：当前不再维护无消费的 WindowInsets 监听。根 HdsNavigation / HdsTabs 与覆盖目的地协调背景扩展和标题避让，内层 titleBar 开启避让，覆盖 HdsNavDestination 由 HDS 自行处理，避免重复下移。详情覆盖主 Tabs，只显示本页的 HdsTabs 操作栏，滚动内容底部留白避让。参见 UI_STYLE.md 的官方依据。
 
 - [Image 加载沙箱图片 URI](https://developer.huawei.com/consumer/cn/doc/doccenter-dev-faq/faqs-arkui-903)
 
@@ -89,6 +93,12 @@ Calendar Kit：getCalendarManager since 10，editEvent since 12，syscap SystemC
 
 公共状态采用 Dashboard 的集中访问范式并适配已有 V2 领域对象，参考[华为状态管理 V2 与 MVVM](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V14/arkts-mvvm-v2-V14)与[AppStorageV2](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-new-appstoragev2)。设置仍使用 Dashboard 的 V1 Preferences/AppStorage/@StorageLink 通道，桥接组件显式声明 Builder；不混用 V1 装饰器观察 V2 对象。
 
-图表方案对照 Dashboard 的自绘图表、ArkUI 原生 Progress 与[华为 Canvas 说明](https://developer.huawei.com/consumer/cn/doc/doccenter-atomic-service/faqs-canvas-api-problem)。本轮只有金额分类比较，选择原生 Linear Progress + 金额/占比文字 + 点击筛选，减少画布尺寸/重绘/命中测试维护；未引入需要 WebView 的图表库或业务依赖。[Progress 官方指南](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/arkts-common-components-progress-indicator)已通过浏览器阅读完整正文，核对 value/total/type、宽高自适应和动态更新；SDK progress.d.ts 核对版本与无权限要求。金额按整数分汇总，零总额返回 0，分类按金额排序，计划切换重置分类。未来确有饼图/趋势交互需求时再评估 Canvas 方案，当前不创建空图表页。
+图表方案对照 Dashboard 的自绘图表、ArkUI 原生 Progress 与[华为 Canvas 说明](https://developer.huawei.com/consumer/cn/doc/doccenter-atomic-service/faqs-canvas-api-problem)。2026-10-07 结构重构阶段只有金额分类比较，选择原生 Linear Progress + 金额/占比文字 + 点击筛选，减少画布尺寸/重绘/命中测试维护；未引入需要 WebView 的图表库或业务依赖。[Progress 官方指南](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/arkts-common-components-progress-indicator)已通过浏览器阅读完整正文，核对 value/total/type、宽高自适应和动态更新；SDK progress.d.ts 核对版本与无权限要求。金额按整数分汇总，零总额返回 0，分类按金额排序，计划切换重置分类。该阶段未增加 Canvas 图表；2026-10-08 已按实际需求接入月度趋势与照片状态分布，现状见后节。
 
-本轮新增颜色仅为 base/dark 同值 transparent（#00000000），替代组件中的透明色字面量；分段背景及其异常回退也通过 Theme 资源，不维护硬编码 RGBA 配色。
+本轮新增 base/dark 同值 transparent（#00000000），替代组件中的透明色字面量；更新日志正式版标识另复用 Dashboard 的 v3_accent_orange 浅深色资源。分段背景及其异常回退也通过 Theme 资源，不维护硬编码 RGBA 配色。
+
+## 2026-10-08 · 最终包核对
+
+Release HAP 清单为 API 23→26，仅包含 EntryAbility 与非导出 EntryBackupAbility；权限为 PUBLISH_AGENT_REMINDER、VIBRATE、HDR_BRIGHTNESS、DETECT_GESTURE、INTERNET。没有全相册读取、日历读写或广泛文件权限。debug=false，BuildProfile.DEBUG=false；离线示例与 privacy.html 随包提供，无测试 Ability / TestRunner。
+
+五组主题及 Canvas 月度趋势/照片分布已在当前代码中使用；本节补充现状，不将此前「以后评估 Canvas」的阶段取舍视为仍未实现。新增交付脚本不引入系统 API。目标版本、编译成功和 SysCap 声明不替代 API 23、真实大屏、提醒送达及硬件验收。

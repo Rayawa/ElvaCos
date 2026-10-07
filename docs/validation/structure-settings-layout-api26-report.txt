@@ -1,0 +1,191 @@
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=1
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=phoneAndNarrowUseOneScrollableColumnWithReachableLastRows
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=86039
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=2
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=wideFixesInformationAndScrollsOnlyTheRightHandSettings
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=8350
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=3
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=24216
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=4
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=22569
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=5
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=largeFontActuallyScalesAndSettingsRemainInsideTheirCards
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=103555
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=sharedPressFeedbackKeepsClicksAndSliderDraggingFunctional
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=6
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=sharedPressFeedbackKeepsClicksAndSliderDraggingFunctional
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=13190
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=cachedDestinationAndEverySheetOpenReplayEntrance
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=7
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=cachedDestinationAndEverySheetOpenReplayEntrance
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=13606
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=8
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=shortWideWindowKeepsOverviewAndLastSettingsReachableInOneScroll
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=8
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=shortWideWindowKeepsOverviewAndLastSettingsReachableInOneScroll
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=16642
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=9
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=expenseChartShowsCorrectRatiosAndFiltersRecordsAtEveryWidth
+OHOS_REPORT_STATUS_CODE: 1
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: current=9
+OHOS_REPORT_STATUS: id=JS
+OHOS_REPORT_STATUS: numtests=9
+OHOS_REPORT_STATUS: stream=
+OHOS_REPORT_STATUS: test=expenseChartShowsCorrectRatiosAndFiltersRecordsAtEveryWidth
+OHOS_REPORT_STATUS_CODE: 0
+OHOS_REPORT_STATUS: consuming=29071
+
+
+OHOS_REPORT_STATUS: class=SettingsReplicaLayout
+OHOS_REPORT_STATUS: suiteconsuming=317238
+
+
+OHOS_REPORT_RESULT: stream=Tests run: 9, Failure: 0, Error: 0, Pass: 9, Ignore: 0
+OHOS_REPORT_CODE: 0
+OHOS_REPORT_STATUS: taskconsuming=317238
+
+TestFinished-ResultCode: 0
+TestFinished-ResultMsg: your test finished!!!
+user test finished.
+OHOS_REPORT_RESULT: stream=Tests run: 9, Failure: 0, Error: 0, Pass: 9, Ignore: 0
+force stop process successfully.
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/default/entry-default-signed.hap msg:install bundle successfully. 
+AppMod finish
+[Info]App install path:/Users/raychen/Develop/ElvaCos/entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap msg:install bundle successfully. 
+AppMod finish

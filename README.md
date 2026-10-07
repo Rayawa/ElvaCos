@@ -1,79 +1,108 @@
 # 绮秀 / ElvaCos
 
-HarmonyOS 原生、离线优先的 Coser 个人管理应用。首版聚焦从角色灵感到项目准备、出展清单和照片归档的闭环，核心业务不依赖账号或服务器；华为账号为可选本机身份入口，云同步尚未实现。
+HarmonyOS 原生、离线优先的 Coser 个人管理应用。从角色灵感、Cos 计划、准备与打包，到活动日程、照片归档和实际花费，核心业务可在本机完成。
 
-当前版本 **1.0.0-beta.1**，构建号 **10000001**；目标 API 26，最低兼容 API 23。
+当前版本 **1.0.0-beta.1**，构建号 **10000001**，包名 `top.rayawa.elvacos`。目标 API 26，最低兼容 API 23；以手机为主要验证设备，清单同时声明 Tablet / 2in1。
 
-## 首版功能
+2026-10-08 已完成 Release 清理构建与包内容核验。当前签名为 **开发调试 Profile**；产物适用于获授权设备的 Beta 测试，应用市场发行仍需发行证书/Profile。完整结果、产物指纹和已知边界见 [Beta 打包记录](docs/RELEASE.md)。
 
-- 主页 HdsTabs 五个入口，各 Tab 独立 HdsNavigation / NavPathStack；外层路由承载覆盖主页的 HdsNavDestination 详情与设置。Tab 内二级使用原生 Segment Buttons，详情使用独立 HdsTabs 操作栏，新增与编辑统一 bindSheet。
-- 连续新建 Cos 计划：选择已有角色或一起创建新角色，保存后进入准备页；角色版本、装备衣柜与漫展的搜索、关联、编辑和删除确认。
-- 准备模板可选任务，支持自定义分类、任务截止日期/备注；准备完成与装备可用、装包确认独立。准备 / 打包 / 照片三个任务视图；装备跨计划复用和就地创建，自动生成打包项；装备可用率与打包确认分开显示，未装包物品优先并显示存放位置。
-- 系统 PhotoPicker 导入选中照片；一份沙箱原图与缩略图；待选 / 已选 / 待修 / 成片筛选，批量选片与状态更新；角色封面与作品集。
-- 首页优先显示最近有日期的未完成计划，打包与选片直接进入对应视图；Cos 默认计划列表并按状态筛选。
-- 准备参考图、角色参考图与封面；本机团队姓名/分工/备注；逐笔实际花费、分类/计划统计与预计预算对比。
-- 活动支持待定/单日/多日及时间段，月历和当天活动；主动选择提醒后申请系统通知授权，失败仍保存活动；可带入设备日历确认页选择账户与提醒，不请求日历读写权限。
-- 项目时间轴；加密 RDB、v1→v2→v3 增量迁移、事务；便携备份 v3 兼容 v1/v2。
-- 直接复用 dashboard-HarmonyOS 的浅/深色配色、HDS 浮动底栏与 titleBar 分段、按压光场、HDR 版本隔离、软/硬触觉和弹簧动效；可选智感握姿带权限、设备降级和防抖。
-- 应用外观提供天蓝（浅色）/ 跟随系统 / 雾蓝（深色）三档，复用 Dashboard 的同名颜色资源，切换即时生效并持久化；设置页自上而下为图标中英文、分割线、华为账号（登录与云同步状态）、数据与备份、设置组、帮助与版本信息。华为账号使用 Account Kit 登录，云空间同步仍在路线图中。
-- 新增更新日志与隐私政策阅读页，统一使用覆盖式 HdsNavDestination；隐私正文唯一来源为 `entry/src/main/resources/rawfile/privacy.html`，由原生文本组件显示。
-- 首页与设置按实际容器宽高切换单列/分栏；短横屏恢复完整滚动，详情限制内容宽度，花费分类条形图显示金额与占比并支持筛选；所有颜色沿用同名浅深色资源。
-- 启动先水合偏好、首帧后加载业务数据，再执行媒体与提醒维护；定时器、握姿监听及过期异步回写有取消守卫，数据库销毁等待进行中的操作。新增控件、筛选状态、图表与阅读内容提供中文无障碍标签。
-- Share Kit 系统分享项目摘要与版本化业务对象附加数据。
-- 华为账号登录（Account Kit）：本机可离线使用的 OpenID / UnionID，不保存访问令牌；未开通 AGC 时按错误码提示，云同步不提供假入口。
-- 便携元数据导出/验证恢复、本地清空；系统 BackupExtension 注册用于完整沙箱备份。
+## 已实现功能
 
-名称和图标配置在 AppScope 与资源中；业务代码不绑定品牌。碰一碰、ShareExtension、重型图片编辑、跨设备同步及更多 P1 功能在路线图中单独管理。
+- **角色与计划**：角色/版本、连续新建计划、准备模板、自定义分类/任务、截止日期与备注；准备完成、装备可用和装包确认分别记录。装备可跨计划复用，也可在计划内创建并生成打包项。
+- **活动与出行**：待定/单日/多日、时间段、列表/月历、关联计划；用户主动开启系统提醒后申请通知授权。可添加到设备日历确认页，账户和提醒由系统管理。
+- **照片与参考资料**：系统 PhotoPicker 导入选中图片，保存沙箱原图及缩略图；筛选、多选、批量状态更新、角色封面、参考图及作品集。作品集仅显示最终作品和已发布照片，「已发布」是本机状态记录。
+- **团队与花费**：本机姓名/分工/备注、逐笔实际付款、预算对比、计划/分类筛选、分类金额条形图、近半年月度趋势，以及全部照片的处理状态环形分布。衣柜价格不会自动记成实际支出。
+- **导航与外观**：首页 / Cos / 活动 / 衣柜 / 我的五个 HdsTabs；各 Tab 独立导航，详情覆盖主页，表单和关联使用 Sheet。蓝、薄荷绿、樱花粉、杏橙、珊瑚红五组配色；浅色 / 跟随系统 / 深色独立持久化。首页与设置根据容器宽高切换单列/分栏，照片网格适配宽度。
+- **设置与系统能力**：材质、触觉、单手/可选智感握姿、设置首次入场、原生列表触摸；更新日志支持 Beta / RC / 正式版筛选，本地隐私正文使用原生阅读页；Share Kit 分享项目摘要及版本化业务对象。
+- **数据保护**：加密 RDB v3、v1→v2→v3 增量迁移、事务、便携元数据备份 v3 兼容 v1/v2，系统 BackupExtension 已注册。
+- **离线示例**：16 个角色、24 个计划、84 件装备、12 个活动及配套任务、花费和图片。调试构建首次空库自动加载；Release 构建不自动填充，可从设置手动追加。详见 [示例数据](docs/DEMO_DATA.md)。
 
-## 构建
+账号为可选身份入口。已接入 Account Kit 并配置公开 Client ID，但此前真实登录返回 `1001502003`，尚未验收成功；应用云同步未实现。本机团队记录不包含在线协作。
 
-DevEco Studio 26.0.0，内置 Release SDK 26.0.0.105；compatible API 23，target 26；Phone 优先，声明 Tablet / 2in1。ArkTS / ArkUI / Stage，无业务三方依赖。
+## 构建与打包
 
-新检出先将 `build-profile.example.json5` 复制为 `build-profile.json5`。后者被忽略，因为 DevEco 自动签名配置包含本机路径与私钥配置。通过 DevEco 配置自己的调试签名，勿将签名密码和证书纳入版本控制。
+本机工具链：DevEco Studio 26.0.0，内置 Release SDK 26.0.0.105；ArkTS / ArkUI / Stage。无业务第三方依赖，Hypium / Hamock 仅用于测试。
+
+新检出先复制 `build-profile.example.json5` 为 `build-profile.json5`。示例不含签名引用，可用于未签名构建；需要设备安装或发行时，通过 DevEco 配置自己的签名。`build-profile.json5`、证书、私钥及密码保持在版本控制之外。
 
 ```sh
+# 开发 HAP（默认 debug）
 ./scripts/build.sh
-python3 scripts/test_schema.py
-./scripts/device-test.sh
-./scripts/ui-test.sh
-./scripts/layout-test.sh
-./scripts/settings-layout-test.sh
+# 测试 feature
+./scripts/build.sh assembleHap ohosTest
+# Release 全量 HAP / APP
+./scripts/build.sh clean default release
+./scripts/build.sh assembleApp default release
+# 仅生成 Release HAP
+./scripts/build.sh assembleHap default release
 ```
 
-脚本默认 DevEco 在 `~/Applications/DevEco-Studio.app`，可用 `DEVECO_HOME` 指向 app 或 Contents。HAP 在 `entry/build/default/outputs/default/`。`device-test.sh` 需要签名配置与已连接的鸿蒙设备，可用 `HDC_TARGET_ID` 指定设备；测试使用模块 Context，无需启动前台页面；使用独立临时加密数据库，完成后删除，不写用户的 personal.db。
+脚本参数为 `[task] [target] [debug|release]`；assembleApp 使用工程模式，其余任务使用模块模式。默认 DevEco 在 `~/Applications/DevEco-Studio.app`，`DEVECO_HOME` 可指向 app 或 Contents。
 
-`settings-layout-test.sh` 验证首页与设置的组件布局，使用临时主模块和内存数据；包含两倍应用字号、短横屏和花费图表比例/筛选检查，结束自动恢复正式包及测试包，不改变系统字号。手机中缩放的宽屏画布仅用于验证布局，不代替真实平板、多窗与系统安全区验收。
+HAP 输出到 `entry/build/default/outputs/default/`，APP 输出到 `build/outputs/default/`。此次交付副本与 SHA-256 清单在 `build/releases/1.0.0-beta.1/`（构建目录不入库）。**Release 编译模式与发行签名是两回事**，勿将自动调试签名包当作市场发行包。
 
-## 架构与维护
+## 验证
 
-[统一风格与复用来源](docs/UI_STYLE.md)、[架构与数据关系](docs/ARCHITECTURE.md)、[能力版本矩阵](docs/CAPABILITIES.md)、[路线图](docs/ROADMAP.md)、[验证记录](docs/VALIDATION.md)。
+```sh
+# 基础确认（开发期默认，不需要设备）
+./scripts/build.sh
+python3 scripts/test_schema.py
+python3 scripts/test_theme_colors.py
 
-工程目录采用 Dashboard 的 `ability / common / component / pages` 形式，ElvaCos 的成熟领域与持久化继续独立保留：
+# 设备套件（仅用户要求或发布候选；已连接且解锁，可用 HDC_TARGET_ID 选择设备）
+./scripts/device-test.sh
+./scripts/ui-test.sh
+./scripts/demo-test.sh
+# 修改相关布局/主题时选用
+./scripts/layout-test.sh
+./scripts/settings-layout-test.sh
+./scripts/theme-test.sh
+./scripts/ui-polish-test.sh
+
+# 发布候选：核对交付产物
+python3 scripts/check_release.py --hap build/releases/1.0.0-beta.1/ElvaCos-1.0.0-beta.1-release-signed.hap --app build/releases/1.0.0-beta.1/ElvaCos-1.0.0-beta.1-release-signed.app
+```
+
+**默认只做基础确认**：一次 `build.sh` 加上按改动类型选择的 Python 检查（不需要设备）。设备套件每个脚本都会重新构建主包与测试包、覆盖安装并在真机跑用例，`theme-test.sh` 还会克隆工程做多次构建与还原安装；连续跑多个套件等于把同一份源码构建多遍，耗时是改动本身的数倍。所以只在明确要求或发布候选收口时跑，且一次只选直接相关的一个。
+
+设备脚本串行执行（`device_test_lock.py` 排队等待），Hypium 以 Pass / Failure / Error / Ignore 判断；脚本里硬编码的 `Tests run: N` 是当前用例数，数字不匹配时先确认是期望值过时还是真的失败，不要反复重跑。领域与示例测试使用独立加密数据库及媒体目录，布局/主题宿主使用内存数据或独立 Preferences。测试不清空用户 `personal.db`。多数脚本生成调试主包，若需要恢复本次 Release HAP，安装已保存的交付副本；最终打包检查使用 Release 主包复测，结果见 [验证记录](docs/VALIDATION.md)。
+
+手机中的宽屏画布只验证组件布局，不代替真实 Tablet / 2in1、多窗、折叠及系统安全区验证。API 23 真机、系统字号/读屏人工体验、系统跨设备完整备份、提醒实际后台送达及部分硬件能力仍缺少完整证据。
+
+## 结构与数据
 
 ```text
 entry/src/main/ets/
-├── ability/          # entry、backup 生命周期入口
-├── common/           # appState、constants、types、偏好和系统能力、主题/反馈工具
-├── component/        # 复用 UI、表单、照片网格、HDS 导航封装
+├── ability/          # Stage / 系统备份生命周期
+├── common/           # appState、偏好、Theme、图标与系统能力
+├── component/        # 导航、设置、表单、网格、Canvas 图表
 ├── pages/
-│   ├── Dashboard.ets # 五页导航与启动任务
+│   ├── Dashboard.ets # 五页导航与启动调度
 │   ├── main/         # 首页、Cos、活动、衣柜、我的
-│   ├── detail/       # 角色、计划、装备、活动、照片、参考图详情
-│   └── more/         # 设置、花费统计、AppLog、LocalHtml
-├── model/            # ApplicationState、实体、领域规则、路由与表单
+│   ├── detail/       # 角色、计划、装备、活动、照片、参考图
+│   └── more/         # 设置、花费、更新日志、隐私阅读
+├── model/            # ApplicationState、实体、领域规则与统计
 └── data/             # database、repository、media
 ```
 
-UI → ApplicationState/领域规则 → Repository → RDB。MediaRepository 管理 Picker 与沙箱媒体，公共常量位于 `common/constants.ets`。数据库仍为 v3，既有 v1→v2→v3 SQL、备份格式和业务约束保持兼容，本轮没有关系结构变更。
+UI → ApplicationState/领域规则 → Repository → RDB。`common/appState.ets` 通过 AppStorageV2 提供共享 V2 状态；设置经 Preferences / DiskStorage / AppStorage 持久化并由 StorageLink 绑定。页面局部维护筛选、弹层、滚动与导航上下文。分阶段启动与取消守卫避免过期异步回写，销毁等待操作及数据库关闭。
 
-采用 Dashboard 的公共存储访问边界：Ability 与根页面统一通过 `common/appState.ets` 获取共享状态；保留 ElvaCos 的 `@ObservedV2 / @Trace`，以官方 `AppStorageV2.connect` 管理同一实例。设置使用原有 Preferences → DiskStorage → AppStorage 通道，由 `@StorageLink` 绑定；V1 偏好组件通过明确的 Builder 与 V2 页面衔接。临时筛选、弹层与导航上下文保持页面局部。移除重复状态实例、无消费的窗口监听、废弃偏好/动画辅助入口及注释中的旧设置 UI。照片网格继续使用 LazyForEach，元数据查询分批读取。
+元数据 JSON **不含图片**，恢复是验证后的事务替换，失败保留原数据。本机匹配媒体可复用，跨设备完整媒体迁移需系统备份并另行验证。删除应用副本不删除系统相册原图。
 
-## 数据说明
+## 文档导航
 
-元数据导出 JSON 是便携交换文件，非应用存储格式；它不包含照片。恢复前有确认；验证格式与字段后在事务中替换，失败保留原数据。本机仍存在的匹配照片会继续使用，其他照片显示待恢复。完整媒体迁移请使用系统备份，并在目标设备验证恢复结果。
+| 文档 | 内容 |
+| --- | --- |
+| [打包记录](docs/RELEASE.md) | 本次构建、产物、签名、交付边界 |
+| [架构](docs/ARCHITECTURE.md) | 状态、数据库、媒体、生命周期 |
+| [能力矩阵](docs/CAPABILITIES.md) | API / SysCap / 权限与降级 |
+| [界面参考](docs/UI_STYLE.md) | Dashboard 来源、交互、响应式与反馈 |
+| [主题](docs/THEMES.md) | 五组资源、持久化与可读性 |
+| [示例数据](docs/DEMO_DATA.md) | 数据数量、来源、加载规则与隔离测试 |
+| [华为账号](docs/HUAWEI_ACCOUNT_SETUP.md) | 公开 ID、证书、登录问题与云空间边界 |
+| [验证记录](docs/VALIDATION.md) | 最新结果和历史证据 |
+| [路线图](docs/ROADMAP.md) | 当前能力、已知问题、可选方向 |
+| [视频参考](docs/UX_REFERENCE.md) | 历史观察与已落地范围 |
+| [体验重构规格 v2](docs/UX_RESTRUCTURE_PLAN.md) | 未执行的设计规格：硬约束、导航与路由、数据口径、迁移与阶段 |
 
-未运行过 API 23 真机、多窗/折叠设备、系统跨设备备份、真实握姿和近场分享的能力，不作为已通过验收宣称。
-
-华为账号已配置用户提供的 Client ID，真机登录仍需解决 AGC / 签名 Profile 校验错误（1001502003）；接入与实测见 [账号与云空间配置](docs/HUAWEI_ACCOUNT_SETUP.md)。云同步尚未实现，元数据导出与设备日历的系统云同步分别说明，不能代替计划/照片同步。
-
-隐私政策页面忠实读取提供的本地文件；其中云端服务、账号注销和撤回同意描述与当前离线能力仍有差异，正文未另行改写。发布前需由维护者核对，见 ROADMAP / VALIDATION。
+文档说明现状和取舍，历史方案与测试清单不自动约束后续任务。隐私正文唯一来源仍为 `entry/src/main/resources/rawfile/privacy.html`；其中云端服务、注销和撤回描述与当前离线能力有差异，本次记录该问题，尚未修订政策正文。正式对外发布前需核对实际能力与图片使用授权。

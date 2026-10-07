@@ -1,6 +1,50 @@
 # 首版验证记录
 
-更新：2026-10-07。范围为需求中 P0 垂直切片；P1/P2 在 ROADMAP.md 单独跟踪。
+## 2026-10-08 · 1.0.0-beta.1 最终打包检查
+
+Release 清理构建 HAP / APP 成功（42/42 任务实际执行），包清单、rawfile 与源码一致，debug=false；交付副本、大小和 SHA-256 见 [打包记录](RELEASE.md)。本次无 schema / 备份格式升级，未清空 personal.db。
+
+| 本次检查 | 结果 |
+| --- | --- |
+| SQLite 关系/迁移/约束 | 12/12 通过 |
+| 主题资源 | 3/3 通过 |
+| 当前源码原生 Hypium | Pass 55 / Failure 0 / Error 0 / Ignore 0 |
+| Release HAP / APP 包结构和资源 | 通过 |
+| SDK 验签、Profile CMS / 有效期 | 通过；实际 Profile 为 debug |
+| Release 安装 | 成功，保留用户数据 |
+| 修正前 Release UI | Pass 1 / Failure 0 / Error 10 / Ignore 0，未通过 |
+| 滚动定位修正后的 UI | 测试 HAP 构建成功；设备断开，复测未完成 |
+
+首轮 UI 首个错误为设置首屏未找到用户名；当前设置已先显示品牌、账号与数据备份，旧用例仍假定用户名在首屏。已改为 settings-scroll 的 scrollSearch，并以 scrollToBottom 检查版本；保留原可见性、布局和业务断言。后续错误受停留设置页影响，修正编译成功不等于整套页面通过。失败原文保留，未删除或改写成成功。
+
+证据：[原生 55 项](validation/beta1-native-api26-report.txt)、[修正前页面报告](validation/beta1-release-ui-before-scroll-fix-api26-report.txt)、[包核对](validation/beta1-package-check-report.txt)、[签名摘要](validation/beta1-signature-report.txt)、[构建收尾](validation/beta1-final-build-report.txt)。原生回归使用 debug 主包与隔离数据；页面检查覆盖安装本次 Release 主包。此前示例/主题/布局专项没有全部重复运行，不能把旧报告合并为本次全部通过。
+
+**签名证据更正：** 2026-10-07 account-signature-api26-report.txt 与旧说明标为「Actual leaf certificate」的 DF:21:…:3A:37 实际是 Huawei CBG Root CA G2 根证书。2026-10-08 从最终 Profile development-certificate 核验应用证书为 3F:0E:…:EC:7B；当前 HUAWEI_ACCOUNT_SETUP 已更正，旧报告保留此纠正说明。签名包有效不证明 AGC 登录或市场发行就绪。
+
+本次界面复测未完全通过，加上开发 Profile、政策差异、图片授权与既有设备/账号边界，不能宣称发布已全绿；下一步具体复测命令和发行条件见 RELEASE。
+
+版本基线：**1.0.0-beta.1（10000001）**；文档核对：2026-10-08。现状与历史证据；最终构建、签名与交付结论见 [打包记录](RELEASE.md)。
+
+## 2026-10-08 主题提亮与图标粉色
+
+- 蓝色资源与原生控件默认风格保留；粉色参考 app icon 的樱花粉，绿色改为薄荷绿，橙色与红色分别调整为杏橙、珊瑚红。图形填充采用 brand，强调文字采用 accent，按钮前景针对填充保持至少 4.5:1 对比度。
+- 主包、测试包构建通过；配对资源 / 蓝色锚点 / 对比度与明度层次检查 3/3。API 26 隔离真机切换 3/3、强制结束进程后恢复 1/1，Failure / Error 均为 0，覆盖十种组合、跟随系统独立选择及 320vp 两倍字号。
+- [最新真机参考图](validation/theme-palettes-api26.png)与[40 个渲染色值核对](validation/theme-rendered-colors-api26.txt)已更新；[切换报告](validation/theme-switch-api26-report.txt)和[恢复报告](validation/theme-restore-api26-report.txt)为本轮复测证据。截图允许 RGB 单通道 ±1。
+- 测试使用唯一 Preferences，不打开 personal.db；结束后正式主包与测试包均恢复成功。
+
+## 2026-10-07 五组成对主题
+
+- 保留蓝色原资源，新增绿 / 粉 / 橙 / 红的 base / dark 资源；主题配色与深浅色独立保存。
+- 主包与 ohosTest 构建成功；`test_theme_colors.py` 3 项通过，覆盖配对资源、蓝色锚点、明度层次和文字对比度。
+- API 26 隔离真机主题测试：`Tests run: 3, Failure: 0, Error: 0, Pass: 3, Ignore: 0`。验证缺少 themeColor 的旧偏好保留蓝色与浅色、十种即时切换组合、跟随系统选择独立、320vp 两倍字号五个色块不越界。
+- 强制停止进程后启动独立恢复入口：`Tests run: 1, Failure: 0, Error: 0, Pass: 1, Ignore: 0`，恢复红色与深色选择。
+- 当时核对 30 个真机背景 / 卡片 / 强调色锚点，与资源一致（RGB 单通道 ±1）；同名参考图与报告已由 2026-10-08 调色后的复测证据更新。
+- 测试仅使用唯一 Preferences 及生产偏好控件宿主，不打开 personal.db；结束后主包与测试包均恢复成功。系统设置本身未改动，未验证 API 23 设备或整页导航的所有叠层。
+
+
+这里按时间保存当时的验证证据与失败原因，旧结果不代表当前代码全部通过，也不要求后续任务重复这些检查。测试范围由当前改动和风险决定，以用户当次要求为准。
+
+当前核对：2026-10-08。下文按各节日期保留当时范围与 P0/P1/P2 语境，不覆盖最新打包结论。
 
 ## 2026-10-07 设置滑块保存与外观顺序
 
@@ -147,7 +191,7 @@
 
 最新正式和测试 HAP 编译成功，已安装。UI 测试覆盖五 Tab、漫展三个过滤分段、Cos/资料库/我的二级分段、标题菜单、滚动后固定区域不动、独立设置与系统返回、设置末项可滚到浮动栏上方、Toast 不改变表单位置、取消表单不写数据。截图人工检查首页、角色、项目列表、漫展、衣柜、照片、作品/时间轴、设置顶部/底部、表单；另查看真实项目、角色及照片详情。新增只读详情分支：存在角色/照片时进入详情，断言 toolbar 内至少 2 / 1 个可见 Symbol、toolbar 高于固定底栏、照片原图已加载，然后返回；本设备已有数据，两个分支已执行通过，截图确认原生加号与封面 Symbol 可见。
 
-UI 测试采用窗口内选择器，每项及文字操作开始聚焦应用；内容滚动手势从中部发起，避免误触浮动底栏。测试脚本安装后停止旧应用进程，确保验证本次包；报告必须检查 Failure / Error / Pass，不能只看 aa test 退出码。最新报告保存于 `validation/ui-api26-report.txt`（3 / 3）和 `validation/native-api26-report.txt`（17 / 17），两者 Failure / Error 均为 0。
+UI 测试采用窗口内选择器，每项及文字操作开始聚焦应用；内容滚动手势从中部发起，避免误触浮动底栏。测试脚本安装后停止旧应用进程，确保验证本次包；当时通过 Failure / Error / Pass 判断结果，aa test 退出码不能单独证明通过。最新报告保存于 `validation/ui-api26-report.txt`（3 / 3）和 `validation/native-api26-report.txt`（17 / 17），两者 Failure / Error 均为 0。
 
 材质与深色通过真实设置界面临时切换并人工检查，标题和底栏位置保持不变。检查后恢复原有“跟随系统 / 原生视效关闭 / 自动单手 / 握姿关闭”，已通过 UI 属性回读确认。材料绘制遵循现有开关及等级；颜色相同不意味着在不同设置下材质画面相同。
 
@@ -155,7 +199,7 @@ UI 测试采用窗口内选择器，每项及文字操作开始聚焦应用；�
 
 公共 InteractiveCard 的按压缩放由 0.975 调整为参考 HdsMiniBarButton / AppsPage 的 0.985，保留相同 130ms、springMotion(0.35, 0.9) 与复用光场工具；最终正式包编译通过。详情覆盖路由及加宽底栏由后续 UX 调整继续验收，以下初次 250vp 底栏几何为历史参考。
 
-严格对齐验收项：
+当时核验的项目：
 
 | 用户要求 | 本轮证据 | 范围 |
 |---|---|---|
@@ -384,12 +428,51 @@ HDC_TARGET_ID=<device-id> ./scripts/layout-test.sh
 
 正式包与测试包需同版本覆盖安装。device-test/ui-test/layout-test/settings-layout-test 均检查安装成功，再检查 Hypium 的 Tests run / Pass / Failure / Error / Ignore 字段；aa test 的返回码不能作为通过依据。关系测试使用临时加密库，媒体测试使用隔离目录，布局宿主只使用内存数据；未清空 personal.db。源码比对确认迁移 SQL 与提供的 privacy.html 均未改动，base/dark 颜色 key 一致；未修改 build-profile.json5、local.properties 或证书。
 
-初轮页面复测在进入设置时发生 class constructor cannot called without new，定位为匿名 BuilderParam 回调直接构造 PreferenceSettings。改为明确的 @Builder 绑定后，设备日志完整记录页面套件 Pass 11 / Failure 0 / Error 0；最终脚本报告在收尾复测后记录。原生回归新增共享实例、本地文档可见正文/隐藏模板/实际 rawfile 及销毁等待用例，已完整运行 Pass 55 / Failure 0 / Error 0；SQL 关系检查 12/12 通过。
+初轮页面复测在进入设置时发生 class constructor cannot called without new，定位为匿名 BuilderParam 回调直接构造 PreferenceSettings。改为明确的 @Builder 绑定后，设备日志完整记录页面套件 Pass 11 / Failure 0 / Error 0；最终脚本报告在收尾复测后记录。最终原生回归（含异步数据库关闭调整）Pass 55 / Failure 0 / Error 0 / Ignore 0，覆盖共享实例、本地文档可见正文/隐藏模板/实际 rawfile、销毁等待及既有领域/迁移/媒体；SQL 关系检查 12/12 通过。报告 validation/structure-native-api26-report.txt。
 
 初轮隔离布局报告 Pass 7 / Failure 1 / Error 1，新增短横屏与图表用例通过；默认行高受 TestKit 可见区域截取影响，改为让完整行进入视口后测量。随后默认行高检查通过，大字体窄屏的材质行滚动定位继续专项复测；设备组件树确认 HDS 自定义卡片的行 ID 未进入 TestKit 树，改为按文字逐段滚动并处理空查询结果，保持原高度、字体缩放及完整文本检查。最终两倍字体专项 Pass 1 / Failure 0 / Error 0；不以专项通过代替完整套件。初轮失败报告保留为 validation/structure-initial-settings-layout-api26-report.txt。
+
+最终完整隔离布局 Hypium **Pass 9 / Failure 0 / Error 0 / Ignore 0**，包含窄/手机/宽屏、两倍字体、短横屏、任务路由、左右滚动隔离、按钮/滑块、缓存详情与 Sheet 生命周期、分类金额比例与筛选。正式与测试包已自动覆盖恢复，用户数据保留。报告 validation/structure-settings-layout-api26-report.txt；字体专项报告 validation/structure-large-font-api26-report.txt。遵循本轮收尾要求，不扩大无关逐项测试；既有只读布局 4 项不重复运行，其旧报告不计为本轮新代码的设备验收。
 
 ### 验收边界
 
 当前连接设备为 BRA-AL00 / API 26。同一手机上的 320、378、920vp 与短横屏画布只验证组件布局、滚动、字号和交互；真实 Tablet/2in1/折叠、多窗安全区、API 23 真机、系统字体跟随与读屏人工操作继续列为未验收。真实账号登录、云同步、代理提醒送达与 HDR/握姿硬件观感保留原未验收记录。
 
 privacy.html 是提供的唯一正文源；其云端服务、服务器、账号注销与撤回同意描述与当前离线实现有差异。正文未改写，未增加对应假功能；本轮完成的是阅读页及内容来源验证，发布前仍需维护者核对政策与实际能力。
+
+
+### 收尾调整与 Dashboard 交互补齐
+
+更新日志补齐 Dashboard 的 Beta / RC / 正式版三个独立标题栏开关、开启/关闭图标、Toast 与触觉、无结果提示、正式版标识和卡片公共按压反馈；设置入口使用 app_log 图标。日志的构建号归属各条记录，避免以后历史版本显示当前构建号。根路由仍只生成一个 HdsNavDestination，筛选保持页面局部，不增加应用共享状态。已有页面冒烟用例补入 Beta 关闭/恢复与另外两个筛选入口检查，没有增加套件或逐项设备循环。
+
+筛选补齐后的最终正式包 scripts/build.sh 编译/签名成功；构建仍有已有弃用 API 与异常处理提示，不宣称零警告。原生 55/55 与隔离布局 9/9 的报告对应筛选补齐之前的业务/布局版本，本轮没有再重复这两套设备回归。
+
+正式页面整套冒烟收尾时，原设备 MJE0223906038678 已断开：构建成功，安装报 Device not found or connected，未执行该轮页面测试，不计为通过，也未向其他新连接设备安装。此前 Builder 修复后的完整页面日志为 Pass 11 / Failure 0 / Error 0；它不代替新增日志筛选的真机交互验证。按照当次任务的优先级，继续完成重构、性能、页面缺失和文档，未扩大设备排查。
+
+AGENTS、README、架构、风格、能力、UX 与账号说明明确为现状/参考；ROADMAP 整理为当前能力、已知问题和可选方向。旧规范不自动成为后续任务的强制流程，验证记录也不要求后续重复整张清单。关系兼容、用户数据隔离和签名私密配置仍作为具体实现考虑保留。
+
+最终 ohosTest 测试包也编译/签名成功；正式与测试构建及断开设备的记录见 validation/structure-final-build-report.txt。没有把新增筛选的测试编译计为设备交互通过。
+
+
+### 设置首次入场与原生列表触摸
+
+按当前用户要求，设置目的地与五个主页共享根页面的 MainEntranceSession。首次显示领取 SettingsPage 的启动会话记录并播放；离开时取消定时器且完成到最后一组，缓存返回和弹出后重新创建直接显示完整内容。新的应用启动建立新的会话。其他业务详情仍按每次显示重播，Sheet 打开行为保留。
+
+SettingsActionRow / SettingsValueRow / SettingsPreferenceRow / SettingsPanel / SettingsChoiceSlider 移除额外 PressFeedback、clickEffect 及分组容器的按压绑定，避免覆盖 HdsListItemCard 或行内原生控件的触摸处理；设置操作、确认、持久化和触觉回调保留。帮助 Sheet 独立按钮继续使用公共反馈。
+
+scripts/build.sh 编译/签名成功。直接转译实际会话和生命周期方法，使用动画桩完成 8/8 逻辑检查：首次显示、退出清理、缓存返回、组件重建、新启动、普通详情、独立设置宿主和导航托管宿主。另核对五个设置组件及列表容器无额外触摸覆盖。报告 validation/settings-once-native-touch-report.txt；这是源码逻辑与编译证据，不替代设备动画或原生触摸观感，本轮没有再启动完整设备套件。
+
+日志筛选使用实际 getter 和菜单方法完成八种开关组合检查，图标、中文状态文案、反馈调用及切换恢复正确；报告 validation/log-filter-source-check-report.txt。当前实现核对未发现旧目录导入、动态类型、业务硬编码颜色，浅深色资源 key 一致，提供的 privacy.html 与重构前逐字节相同，版本与构建号保持 1.0.0-beta.1 / 10000001。
+
+
+## 2026-10-08 · 布局、照片筛选、光效与图表
+
+修正首页下一场活动倒计时居中、长标题约束与当天状态文案；照片/作品卡片增加说明区留白并保持图片裁剪。作品只提供全部作品、成片、已发布筛选。PhotoGrid 维持稳定的 IDataSource，并在筛选、照片集合、批量选择和列数变化时通知 onDataReloaded，修复下拉框已更新但懒加载照片仍显示旧结果的问题。
+
+按钮光效的实机问题定位为 AttributeUpdater 更新 HDS visualEffect 不生效：现有 PressFeedback 节点改为直接绑定 @ObservedV2 按压状态的 visualEffect / compositingFilter，updater 保留触摸与缩放。轻点保留最短 140ms、取消立即复位。日历日期表面承接点光源，移除额外 pressShadow，保持 Dashboard 光场实现。实际长按截图确认「今天」按钮与日期格点光源及附近格子的受光效果。
+
+新增近半年花费折线和照片处理分布环形图，来源为 Dashboard InteractiveLineChart / DistributionPanel 的 Canvas 画法。适配 V2、Theme、资源色、入场动画和选点/图例，环境变化后主动重绘；首尾月份标签完整显示。月份聚合先累计整数分、跨年和空月补零；照片分组互斥，包含已归档。
+
+最终正式包与 ohosTest 构建、签名及覆盖安装成功。API 26 实机专项 **Pass 7 / Failure 0 / Error 0 / Ignore 0**，覆盖跨年/金额精度、照片状态合计、作品筛选规则、倒计时居中、实际筛选后照片刷新、日历按钮操作、花费折线选月。领域计算使用内存对象，界面回归只切换临时选择；没有写入或清空 personal.db。保留既有构建警告，不宣称零警告。
+
+运行脚本：scripts/ui-polish-test.sh。报告：[ui-polish-api26-report.txt](validation/ui-polish-api26-report.txt)；截图：[日历日期按压](validation/ui-polish-calendar-pressed-api26.jpeg)、[月度花费折线](validation/ui-polish-expenses-api26.png)。已人工查看照片说明区、作品筛选结果与两处图表；未扩展为完整设备或字号矩阵验证。

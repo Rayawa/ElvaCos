@@ -1,0 +1,2 @@
+Earlier complete UI count from application hilog; before final log-filter changes.
+10-07 18:32:33.617 32758 32758 I A03D00/top.rayawa.elvacos/JSAPP: OHOS_REPORT_RESULT: stream=Tests run: 11, Failure: 0, Error: 0, Pass: 11, Ignore: 0

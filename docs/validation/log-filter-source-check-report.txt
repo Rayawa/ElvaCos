@@ -1,0 +1,2 @@
+Source-backed log filter check: 8/8 combinations passed; each menu toggles and restores; icons, Chinese state labels and feedback checked.
+Runs actual getter and methods with platform feedback stubs; does not claim native rendering or device interaction.

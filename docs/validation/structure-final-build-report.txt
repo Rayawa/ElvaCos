@@ -1,0 +1,10 @@
+Final main build
+> hvigor BUILD SUCCESSFUL in 5 s 568 ms 
+
+Final test build
+> hvigor BUILD SUCCESSFUL in 5 s 460 ms 
+
+UI attempt on disconnected original device
+> hvigor BUILD SUCCESSFUL in 703 ms 
+> hvigor BUILD SUCCESSFUL in 5 s 504 ms 
+[Fail][E001005] Device not found or connected

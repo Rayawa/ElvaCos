@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0-beta.1",
+  "build": 10000001,
+  "mode": "release",
+  "debug": false,
+  "compatible_api": 23,
+  "target_api": 26,
+  "demo_files": 34,
+  "permissions": [
+    "ohos.permission.PUBLISH_AGENT_REMINDER",
+    "ohos.permission.VIBRATE",
+    "ohos.permission.HDR_BRIGHTNESS",
+    "ohos.permission.DETECT_GESTURE",
+    "ohos.permission.INTERNET"
+  ],
+  "artifacts": [
+    {
+      "name": "ElvaCos-1.0.0-beta.1-release-signed.hap",
+      "bytes": 4407668,
+      "sha256": "b6beff9247b0d50cf2986b429f25f23b46d0d216b9496a1abbce0ada1b69fe6f"
+    },
+    {
+      "name": "ElvaCos-1.0.0-beta.1-release-signed.app",
+      "bytes": 3247786,
+      "sha256": "c006a61dff6ab793e2bf30adfbc58cadde3a0e1f2ca9e18b0dbebd8e96bfc916"
+    }
+  ]
+}
+PASS: version, Release mode, APIs, permissions, abilities, raw resources and APP contents
