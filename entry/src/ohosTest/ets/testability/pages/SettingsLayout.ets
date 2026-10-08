@@ -8,6 +8,7 @@ import { appSheetOptions } from '../../../../main/ets/common/sheet';
 import { AppState } from '../../../../main/ets/model/ApplicationState';
 import { SettingsPage } from '../../../../main/ets/pages/more/SettingsPage';
 import { ExpenseSummary } from '../../../../main/ets/pages/more/ExpenseSummaryPage';
+import { today } from '../../../../main/ets/common/format';
 import { Expense } from '../../../../main/ets/model/Planning';
 import { HomePage } from '../../../../main/ets/pages/main/HomePage';
 import { Character, CosProject, CosEvent, ChecklistItem, PhotoAsset } from '../../../../main/ets/model/Entities';
@@ -38,7 +39,7 @@ function homeFixture(): AppState {
 
 function expenseFixture(): AppState {
   const state = new AppState();
-  const project = new CosProject(); project.name = '统计验证计划'; project.budgetCents = 500;
+  const project = new CosProject(); project.name = '统计验证计划'; project.budgetCents = 500; project.budgetConfigured = true;
   const second = new CosProject(); second.name = '第二份统计计划';
   state.projects = [project, second];
   const clothing = new Expense(); clothing.id = 'chart-clothing'; clothing.projectId = project.id;
@@ -47,6 +48,7 @@ function expenseFixture(): AppState {
   photo.name = '摄影记录'; photo.category = '摄影'; photo.amountCents = 100;
   const zero = new Expense(); zero.id = 'chart-zero'; zero.projectId = project.id;
   zero.name = '零值记录'; zero.category = '其他'; zero.amountCents = 0;
+  for (const expense of [clothing, photo, zero]) { expense.date = today(); }
   state.expenses = [clothing, photo, zero];
   return state;
 }

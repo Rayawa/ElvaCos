@@ -1,3 +1,5 @@
+import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
+import { LedgerRoute } from './LedgerRoute';
 import { CollectedEntry, entryFromText } from './CollectedEntry';
 import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
@@ -303,6 +305,10 @@ export class AppState {
     if (scopes.includes('entries')) { this.entries = snapshot.entries; }
     this.localDate = today();
   }
+  @Computed
+  get monthLedger(): LedgerSummary { return buildLedgerSummary(this.expenses, this.readinessPlans, new LedgerRoute(), this.localDate); }
+  @Computed
+  get monthSpendingCents(): number { return this.monthLedger.totalCents; }
   @Computed
   get readinessPlans(): PlanReadiness[] {
     return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate));

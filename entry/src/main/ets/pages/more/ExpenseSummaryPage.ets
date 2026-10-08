@@ -1,4 +1,6 @@
 import { LedgerRoute } from '../../model/LedgerRoute';
+import { LedgerSummary, LedgerCategory, buildLedgerSummary } from '../../model/LedgerSummary';
+import { DateField } from '../../component/DateField';
 import { PressFeedback } from '../../common/pressFeedback';
 import { AppState } from '../../model/ApplicationState';
 import { READING_MAX_WIDTH } from '../../common/constants';
@@ -6,18 +8,13 @@ import { Theme } from '../../common/Theme';
 import { vibration } from '../../common/vibration';
 import { scrollByAxis } from '../../common/scroll';
 import { CosProject } from '../../model/Entities';
-import { Expense, expenseTotal } from '../../model/Planning';
+import { Expense } from '../../model/Planning';
 import { SectionHeading, EmptyState } from '../../component/Surfaces';
 import { pageTransition, StaggerEntrance } from '../../common/motion';
-import { today } from '../../common/format';
-import { monthlyExpenses } from '../../model/Statistics';
-import { InteractiveLineChart, LineChartPoint } from '../../component/charts/InteractiveLineChart';
+import { InteractiveLineChart, ChartViewportState } from '../../component/charts/InteractiveLineChart';
 
-interface ExpenseCategory {
-  name: string;
-  amount: number;
-  percent: number;
-}
+const RANGES: string[] = ['month', 'year', 'custom', 'all'];
+const RANGE_LABELS: string[] = ['本月', '本年', '自定义日期', '全部日期'];
 
 @ComponentV2
 export struct ExpenseSummary {
@@ -29,47 +26,83 @@ export struct ExpenseSummary {
   @Event remove: (kind: string, id: string) => void = () => {};
   @Param route: LedgerRoute = new LedgerRoute();
 
-  aboutToAppear(): void { if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
-  aboutToDisappear(): void { if (!this.entrance.managed) { this.entrance.reset(); } }
-
-  @Computed
-  private get records(): Expense[] {
-    return this.state.expenses.filter((expense: Expense): boolean => !this.route.projectId || expense.projectId === this.route.projectId);
+  private restoreTimer: number = -1;
+  private restoring: boolean = true;
+  aboutToAppear(): void {
+    if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); }
+    this.restoreTimer = setTimeout((): void => {
+      this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false }); this.restoring = false;
+    }, 0);
   }
-
-  @Computed
-  private get visibleRecords(): Expense[] {
-    return this.records.filter((expense: Expense): boolean => !this.route.category || expense.category === this.route.category);
+  aboutToDisappear(): void {
+    if (!this.entrance.managed) { this.entrance.reset(); }
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; }
+  }
+  @Monitor('route.projectId', 'route.category', 'route.range', 'route.startDate', 'route.endDate')
+  private filterChanged(): void {
+    this.route.offset = 0; this.route.chartZoom = 1; this.route.chartPan = 0;
+    if (!this.restoring) { this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false }); }
   }
   @Computed
-  private get trend(): LineChartPoint[] { return monthlyExpenses(this.records, today()); }
-
+  private get summary(): LedgerSummary {
+    if (this.route.range === 'month' && !this.route.projectId && !this.route.category) { return this.state.monthLedger; }
+    return buildLedgerSummary(this.state.expenses, this.state.readinessPlans, this.route, this.state.localDate);
+  }
   @Computed
-  private get categories(): ExpenseCategory[] {
-    const categories: ExpenseCategory[] = [];
-    const total = expenseTotal(this.records);
-    for (const expense of this.records) {
-      const category = categories.find((item: ExpenseCategory): boolean => item.name === expense.category);
-      if (category) { category.amount += expense.amountCents; }
-      else { categories.push({ name: expense.category, amount: expense.amountCents, percent: 0 }); }
+  private get categoryNames(): string[] { return Array.from(new Set(this.state.expenses.map((expense: Expense) => expense.category))).sort(); }
+  private categoryOptions(): SelectOption[] {
+    const options: SelectOption[] = [{ value: '全部分类' }];
+    return options.concat(this.categoryNames.map((name: string): SelectOption => ({ value: name })));
+  }
+  private chooseRange(index: number): void {
+    if (RANGES[index] === 'custom') {
+      if (!this.route.startDate) { this.route.startDate = this.summary.range.start || this.state.localDate; }
+      if (!this.route.endDate) { this.route.endDate = this.summary.range.end || this.state.localDate; }
     }
-    for (const category of categories) { category.percent = total > 0 ? category.amount * 100 / total : 0; }
-    return categories.sort((a: ExpenseCategory, b: ExpenseCategory): number => b.amount - a.amount);
+    this.route.range = RANGES[index];
   }
-
-  private budget(): number {
-    return this.state.projects.filter((project: CosProject): boolean => (!this.route.projectId || project.id === this.route.projectId) && project.budgetConfigured === true)
-      .reduce((sum: number, project: CosProject): number => sum + project.budgetCents, 0);
+  private clearFilters(): void { this.route.range = 'all'; this.route.projectId = ''; this.route.category = ''; }
+  private sourceLabel(): string {
+    if (!this.route.sourceProjectId) { return '从全局花费统计进入'; }
+    const project = this.state.projects.find((item: CosProject) => item.id === this.route.sourceProjectId);
+    return project ? '来源计划 · ' + project.name + '（进入时为全部日期）' : '来源计划已不存在';
   }
-
-  private budgetSummary(): string {
-    const count = this.state.projects.filter((project: CosProject) => (!this.route.projectId || project.id === this.route.projectId) && project.budgetConfigured === true).length;
-    return count ? '已设置预算 ¥' + (this.budget() / 100).toFixed(2) + ' · 覆盖 ' + count + ' 份计划' : '当前范围无明确预算';
+  @Builder rangeControls() {
+    Text(this.sourceLabel()).fontSize(14).fontColor(Theme.muted)
+    Select(RANGE_LABELS.map((label: string): SelectOption => ({ value: label }))).id('expense-range')
+      .value(RANGE_LABELS[RANGES.indexOf(this.route.range)]).onSelect((index: number): void => { this.chooseRange(index); })
+      .accessibilityText('花费日期范围')
+    if (this.route.range === 'custom') {
+      DateField({ label: '开始日期（含当天）', value: this.route.startDate, change: (value: string): void => { this.route.startDate = value; } })
+      DateField({ label: '结束日期（含当天）', value: this.route.endDate, change: (value: string): void => { this.route.endDate = value; } })
+    }
+    Select(new Array<SelectOption>({ value: '全部计划' }).concat(this.state.projects.map((project: CosProject): SelectOption => ({ value: project.name }))))
+      .id('expense-project').value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
+      .onSelect((index: number): void => { vibration.dotVibration(); this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id; })
+      .accessibilityText('花费所属计划')
+    Select(this.categoryOptions()).id('expense-category-filter').value(this.route.category || '全部分类')
+      .onSelect((index: number): void => { this.route.category = index === 0 ? '' : this.categoryNames[index - 1]; })
+      .accessibilityText('花费分类筛选')
+    Text(this.summary.range.label + ' · ' + (this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划') + ' · ' + (this.route.category || '全部分类'))
+      .fontSize(14).fontColor(Theme.ink).id('expense-scope')
+  }
+  @Builder moneySummary() {
+    Column({ space: 8 }) {
+      Text('已记录支出 ¥' + (this.summary.totalCents / 100).toFixed(2)).fontSize(24).fontColor(Theme.accent)
+        .accessibilityText('当前范围已记录支出 ' + (this.summary.totalCents / 100).toFixed(2) + ' 元')
+      Text(this.summary.budgetText).fontSize(14).fontColor(Theme.muted)
+      if (this.summary.canCompareBudget) {
+        Text('明确预算的 ' + this.summary.budgetCount + ' 份计划累计支出 ¥' + (this.summary.budgetSpentCents / 100).toFixed(2) +
+          (this.summary.budgetSpentCents > this.summary.budgetCents ? ' · 超出预算 ¥' + ((this.summary.budgetSpentCents - this.summary.budgetCents) / 100).toFixed(2) : ' · 剩余预算 ¥' + ((this.summary.budgetCents - this.summary.budgetSpentCents) / 100).toFixed(2)))
+          .fontSize(14).fontColor(Theme.ink)
+      } else if (this.summary.budgetCount) { Text('预算属于计划整体；查看全部日期和全部分类可比较累计支出。').fontSize(14).fontColor(Theme.muted) }
+      Text('按费用记录日期统计；复用衣柜装备不会自动计费。').fontSize(14).fontColor(Theme.muted)
+    }.padding(18).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).alignItems(HorizontalAlign.Start)
   }
 
   @Builder categoryChart() {
     SectionHeading({ title: '分类统计', trailing: '点击分类查看明细' })
-    ForEach(this.categories, (category: ExpenseCategory) => {
+    ForEach(this.summary.categories, (category: LedgerCategory) => {
       Column({ space: 8 }) {
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center }) {
           Text(category.name).fontColor(Theme.ink)
@@ -89,41 +122,42 @@ export struct ExpenseSummary {
         .visualEffect(this.feedback.effect('expense-category:' + category.name, true))
         .compositingFilter(this.feedback.filter('expense-category:' + category.name, true))
         .attributeModifier(this.feedback.control('expense-category:' + category.name, true))
-    }, (category: ExpenseCategory): string => category.name)
+    }, (category: LedgerCategory): string => category.name)
   }
 
   @Builder expenseRecords() {
-    SectionHeading({ title: '花费明细', trailing: this.visibleRecords.length + ' 笔' })
+    SectionHeading({ title: '花费明细', trailing: this.summary.records.length + ' 笔' })
     if (this.route.category) {
-      Button('显示全部分类').fontColor(Theme.accent).backgroundColor(Theme.tint)
+      Button('显示全部分类').constraintSize({ minHeight: 48 }).fontColor(Theme.accent).backgroundColor(Theme.tint)
         .onClick((): void => { vibration.dotVibration(); this.route.category = ''; })
         .accessibilityText('取消花费分类筛选').visualEffect(this.feedback.effect('clear-category')).compositingFilter(this.feedback.filter('clear-category')).attributeModifier(this.feedback.control('clear-category'))
     }
-    ForEach(this.visibleRecords, (expense: Expense) => {
+    ForEach(this.summary.records, (expense: Expense) => {
       Row({ space: 8 }) {
         Column({ space: 5 }) {
           Text(expense.name + ' · ¥' + (expense.amountCents / 100).toFixed(2)).fontColor(Theme.ink)
           Text(expense.date + ' · ' + expense.category + ' · ' + this.state.projectName(expense.projectId))
-            .fontSize(12).fontColor(Theme.muted)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Start).enabled(!this.state.busy)
+            .fontSize(14).fontColor(Theme.muted)
+        }.layoutWeight(1).constraintSize({ minHeight: 48 }).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start).enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.edit('expense', expense.id, expense.projectId); })
           .accessibilityGroup(true).accessibilityRole(AccessibilityRoleType.BUTTON)
           .accessibilityText('编辑花费 ' + expense.name + '，' + (expense.amountCents / 100).toFixed(2) + ' 元，' + expense.date)
           .visualEffect(this.feedback.effect('edit-expense:' + expense.id))
           .compositingFilter(this.feedback.filter('edit-expense:' + expense.id))
           .attributeModifier(this.feedback.control('edit-expense:' + expense.id))
-        Button('−').backgroundColor(Theme.bg).fontColor(Theme.muted).enabled(!this.state.busy)
+        Button('−').constraintSize({ minWidth: 48, minHeight: 48 }).backgroundColor(Theme.bg).fontColor(Theme.muted).enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('expense', expense.id); })
           .accessibilityText('删除花费 ' + expense.name).visualEffect(this.feedback.effect('remove-expense:' + expense.id)).compositingFilter(this.feedback.filter('remove-expense:' + expense.id)).attributeModifier(this.feedback.control('remove-expense:' + expense.id))
       }.id('expense-record:' + expense.id).padding(14).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (expense: Expense): string => expense.id)
-    if (this.records.length === 0) {
-      EmptyState({
-        title: '记下这次的实际花费', message: '服装、妆造、摄影、门票和交通可以分别记录。',
-        button: '＋ 添加花费', action: (): void => this.edit('expense', '', this.route.projectId),
-      })
-    } else if (this.visibleRecords.length === 0) {
-      Text('此分类暂无花费记录，可显示全部分类。').fontColor(Theme.muted).accessibilityText('此分类暂无花费记录，可显示全部分类')
+    if (!this.summary.records.length) {
+      if (!this.state.expenses.length) {
+        EmptyState({ title: '记下这次的实际花费', message: '服装、妆造、摄影、门票和交通可以分别记录。',
+          button: '＋ 记一笔', action: (): void => { this.edit('expense', '', this.route.projectId); } })
+      } else {
+        EmptyState({ title: '当前范围没有花费记录', message: '可以调整日期、计划或分类，再查看已有记录。',
+          button: '清除筛选', action: (): void => { this.clearFilters(); } })
+      }
     }
   }
 
@@ -132,34 +166,28 @@ export struct ExpenseSummary {
       Column({ space: Theme.sectionSpacing }) {
         Blank().height(Theme.detailTop).accessibilityLevel('no')
         Column({ space: Theme.sectionSpacing }) {
-          Select(new Array<SelectOption>({ value: '全部计划' }).concat(this.state.projects.map((project: CosProject): SelectOption => ({ value: project.name }))))
-            .id('expense-project').value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
-            .onSelect((index: number): void => {
-              vibration.dotVibration();
-              this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
-              this.route.category = '';
-            })
-            .accessibilityText('花费所属计划').visualEffect(this.feedback.effect('expense-project')).compositingFilter(this.feedback.filter('expense-project')).attributeModifier(this.feedback.control('expense-project'))
-          Column({ space: 8 }) {
-            Text('实际花费 ¥' + (expenseTotal(this.records) / 100).toFixed(2)).fontSize(24).fontColor(Theme.accent)
-              .accessibilityText('实际花费 ' + (expenseTotal(this.records) / 100).toFixed(2) + ' 元')
-            Text(this.budgetSummary()).fontSize(14).fontColor(Theme.muted)
-              .accessibilityText(this.budgetSummary())
-            Text('只统计已记录的花费，复用衣柜装备不会自动计费。').fontSize(12).fontColor(Theme.muted)
-              .accessibilityText('只统计已记录的花费，复用衣柜装备不会自动计费')
-          }.padding(18).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
-            .alignItems(HorizontalAlign.Start).visualEffect(this.feedback.effect('expense-total', true)).compositingFilter(this.feedback.filter('expense-total', true)).attributeModifier(this.feedback.control('expense-total', true))
+          this.rangeControls()
+          if (this.summary.range.error) { Text(this.summary.range.error).id('expense-range-error').fontSize(16).fontColor(Theme.accent) }
+          else { this.moneySummary() }
         }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(1))
-        Column({ space: Theme.sectionSpacing }) {
-          InteractiveLineChart({ title: '近半年花费趋势', unit: '元', points: this.trend,
-            lineColor: Theme.brand, paletteId: Theme.paletteId, chartHeight: 220, responsiveAxisFont: true })
-          this.categoryChart()
-          this.expenseRecords()
-        }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(2))
+        if (!this.summary.range.error) {
+          Column({ space: Theme.sectionSpacing }) {
+            this.categoryChart()
+            this.expenseRecords()
+            if (this.summary.months.length) {
+              InteractiveLineChart({ title: '当前范围 · 有记录月份支出', unit: '元', points: this.summary.months,
+                viewport: { zoom: this.route.chartZoom, panRatio: this.route.chartPan },
+                onViewportChange: (value: ChartViewportState): void => { this.route.chartZoom = value.zoom; this.route.chartPan = value.panRatio; },
+                lineColor: Theme.brand, paletteId: Theme.paletteId, chartHeight: 220, responsiveAxisFont: true })
+              Text('仅显示当前筛选中有记录的月份；金额与上方明细一致。').fontSize(14).fontColor(Theme.muted)
+            }
+          }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(2))
+        }
         Blank().height(Theme.contentBottom).accessibilityLevel('no')
       }.width('100%').constraintSize({ maxWidth: READING_MAX_WIDTH }).alignItems(HorizontalAlign.Start)
         .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
     }.id('expense-scroll').width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).transition(pageTransition())
       .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
+      .onDidScroll((): void => { if (!this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
   }
 }

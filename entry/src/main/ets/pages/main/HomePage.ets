@@ -65,7 +65,7 @@ export struct HomePage {
     }
     if (this.state.untriagedEntries.length) { Button('收录箱 · 未归位 ' + this.state.untriagedEntries.length + ' 条').id('home-inbox').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); }) }
     Row({ space: 8 }) {
-      Button('花费统计').id('home-expenses').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('expenseStats', 'all'); })
+      Button('本月已记录支出 ¥' + (this.state.monthSpendingCents / 100).toFixed(2) + ' · 花费统计').fontSize(14).layoutWeight(1).id('home-expenses').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('expenseStats', 'all'); })
       Button('角色库').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('characters', 'all'); })
     }
   }

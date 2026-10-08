@@ -33,6 +33,8 @@ const day = require(root + '/model/DayMode.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
 const { EventSaveCoordinator } = require(root + '/common/EventSaveCoordinator.ets');
 const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/model/TaskQueue.ets');
+const { LedgerRoute } = require(root + '/model/LedgerRoute.ets');
+const { ledgerRange, buildLedgerSummary } = require(root + '/model/LedgerSummary.ets');
 const { PlanListRoute, filterPlanList } = require(root + '/model/PlanListRoute.ets');
 const { PreparationTask } = require(root + '/model/Preparation.ets');
 const { Expense } = require(root + '/model/Planning.ets');
@@ -243,6 +245,58 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(distribution.reduce((sum, g) => sum + g.value, 0), 8); assert.equal(photoStage(photos, 4).length, 2);
     assert.equal(photoStage(photos, 5)[0].status, PhotoStatus.RETOUCHED); assert.equal(photoStage(photos, 6)[0].status, PhotoStatus.ARCHIVED);
     assert.equal(portfolioStage(photos, 1).length, 2); assert.equal(portfolioStage(photos, 2)[0].status, PhotoStatus.PUBLISHED);
+  });
+  await test('ledger periods use local calendar boundaries, inclusive endpoints and reject invalid custom ranges', () => {
+    const route = new LedgerRoute();
+    assert.equal(ledgerRange(route, '2024-02-08').end, '2024-02-29');
+    assert.equal(ledgerRange(route, '2026-12-31').end, '2026-12-31');
+    route.range = 'year';
+    assert.equal(ledgerRange(route, '2026-12-31').start, '2026-01-01');
+    route.range = 'custom'; route.startDate = '2026-12-31'; route.endDate = '2027-01-01';
+    assert.equal(ledgerRange(route, '2026-12-31').error, '');
+    route.endDate = '2026-12-30'; assert.match(ledgerRange(route, '2026-12-31').error, /不能早于/);
+    route.endDate = '2026-02-30'; assert.match(ledgerRange(route, '2026-12-31').error, /有效/);
+    assert.equal(buildLedgerSummary(expenses, [read()], route, '2026-12-31').records.length, 0);
+    route.range = 'all'; assert.equal(ledgerRange(route, 'invalid').error, '');
+  });
+  await test('ledger summary, classification, recorded-month chart and rows share the same project/date/category set', () => {
+    const make = (id, projectId, date, category, amountCents) => Object.assign(new Expense(), { id, projectId, date, category, amountCents });
+    const records = [make('first', 'p', '2026-01-01', '服装', 101), make('last', 'p', '2026-01-31', '摄影', 202), make('next', 'p', '2026-02-01', '服装', 303), make('other', 'other', '2026-01-11', '服装', 404), make('undated', 'other', '', '交通', 505), make('previous', 'p', '2025-12-31', '服装', 606)];
+    const route = new LedgerRoute();
+    const find = () => buildLedgerSummary(records, [], route, '2026-01-15');
+    const agree = summary => {
+      assert.equal(summary.totalCents, summary.records.reduce((sum, item) => sum + item.amountCents, 0));
+      assert.equal(summary.totalCents, summary.categories.reduce((sum, item) => sum + item.amount, 0));
+      assert.equal(summary.totalCents, Math.round(summary.months.reduce((sum, item) => sum + item.value, 0) * 100));
+    };
+    let summary = find(); assert.equal(summary.totalCents, 707); agree(summary);
+    route.projectId = 'p'; summary = find(); assert.equal(summary.totalCents, 303); agree(summary);
+    route.category = '服装'; summary = find(); assert.equal(summary.totalCents, 101); agree(summary);
+    assert.deepEqual(summary.records.map(item => item.id), ['first']); assert.equal(summary.categories[0].percent, 100);
+    route.category = ''; route.range = 'custom'; route.startDate = '2026-01-31'; route.endDate = '2026-02-01';
+    summary = find(); assert.equal(summary.totalCents, 505); agree(summary);
+    route.range = 'year'; route.projectId = ''; summary = find(); assert.equal(summary.totalCents, 1010); agree(summary);
+    route.range = 'all'; summary = find(); assert.equal(summary.totalCents, 2121); agree(summary);
+    assert.equal(summary.months.find(item => item.label === '未记录日期').value, 5.05);
+    route.category = 'missing'; summary = find(); assert.equal(summary.totalCents, 0); assert.deepEqual(summary.categories, []);
+    assert.equal(records.length, 6); assert.equal(records[0].date, '2026-01-01');
+  });
+  await test('ledger budget comparison covers only explicitly budgeted plans and never compares a month or category to lifetime budgets', () => {
+    const make = (id, budgetConfigured, budgetCents) => Object.assign(new CosProject(), { id, budgetConfigured, budgetCents });
+    const projects = [make('p', true, 100), make('zero', true, 0), make('unset', false, 0), make('unknown', undefined, 0)];
+    const records = projects.map((project, i) => Object.assign(new Expense(), { projectId: project.id, amountCents: 20 + 10 * i, date: '2026-01-15' }));
+    const plans = projects.map(p => buildPlanReadiness(p, [], [], [], [], [], records, [], '2026-01-15'));
+    const route = new LedgerRoute(); const readLedger = () => buildLedgerSummary(records, plans, route, '2026-01-15');
+    let summary = readLedger(); assert.equal(summary.canCompareBudget, false);
+    route.range = 'all'; summary = readLedger();
+    assert.equal(summary.totalCents, 140); assert.equal(summary.budgetCount, 2); assert.equal(summary.budgetCents, 100); assert.equal(summary.budgetSpentCents, 50); assert.equal(summary.canCompareBudget, true);
+    route.category = '服装'; assert.equal(readLedger().canCompareBudget, false);
+    route.category = ''; route.projectId = 'zero'; summary = readLedger();
+    assert.equal(summary.budgetCount, 1); assert.equal(summary.budgetCents, 0); assert.equal(summary.canCompareBudget, true); assert.match(summary.budgetText, /0.00/);
+    route.projectId = 'unknown'; summary = readLedger(); assert.equal(summary.canCompareBudget, false); assert.match(summary.budgetText, /历史预算未明确/);
+    route.projectId = 'unset'; assert.match(readLedger().budgetText, /未设置预算/);
+    route.offset = 350; route.chartZoom = 2; route.chartPan = 0.4;
+    readLedger(); assert.equal(route.offset, 350); assert.equal(route.chartZoom, 2);
   });
   await test('unknown, unset and explicit zero budget have distinct labels', () => {
     assert.equal(budgetLabel(undefined, 0), '历史预算未明确'); assert.equal(budgetLabel(false, 0), '未设置预算'); assert.equal(budgetLabel(true, 0), '预算 ¥0.00');

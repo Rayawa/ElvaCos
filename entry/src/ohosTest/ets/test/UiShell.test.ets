@@ -217,7 +217,12 @@ export default function uiShellTest(): void {
       await tap('首页');
     });
     it('expenseSummaryUsesCoveringRouteAndCancelableRecordSheet', 0, async () => {
-      await tap('首页'); await tap('home-expenses'); await present('花费统计'); await detailActions(); await present('花费明细');
+      await tap('首页'); await tap('home-expenses'); await present('花费统计');
+      expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
+      await present('expense-range'); await present('expense-scope');
+      await (await driver.findComponent(ON.id('expense-scroll').inWindow(bundle))).scrollSearch(ON.text('花费明细').inWindow(bundle));
+      await present('花费明细');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-expenses.png');
       await tap('记一笔'); await present('添加花费'); await present('实际花费（元） *'); await present('付款日期 *');
       await tap('sheet-close'); await present('花费统计'); await back(); await present('新建计划');

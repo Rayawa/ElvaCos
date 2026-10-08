@@ -90,14 +90,20 @@ export default function uiPolishTest(): void {
       await driver.delayMs(200);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-calendar.png');
     });
-    it('expenseTrendSelectsMonth', 0, async () => {
+    it('expenseRecordedMonthChartKeepsSelectionsReadable', 0, async () => {
       await tap('首页');
       await (await driver.findComponent(ON.id('home-expenses').inWindow(bundle))).click(); await driver.delayMs(900);
-      const detail = await driver.findComponent(ON.id('line-chart-detail:近半年花费趋势').inWindow(bundle));
-      expect(!!detail).assertTrue(); const before = await detail.getText();
-      await (await driver.findComponent(ON.id('line-chart-canvas:近半年花费趋势').inWindow(bundle))).click();
+      await (await driver.findComponent(ON.id('expense-range').inWindow(bundle))).click(); await tap('全部日期');
+      const expenses = await driver.findComponent(ON.id('expense-scroll').inWindow(bundle));
+      await expenses.scrollSearch(ON.id('line-chart-canvas:当前范围 · 有记录月份支出').inWindow(bundle));
+      const detail = await driver.findComponent(ON.id('line-chart-detail:当前范围 · 有记录月份支出').inWindow(bundle));
+      expect(!!detail).assertTrue();
+      await (await driver.findComponent(ON.id('line-chart-canvas:当前范围 · 有记录月份支出').inWindow(bundle))).click();
       await driver.delayMs(250);
-      expect((await detail.getText()) !== before).assertTrue();
+      const after = await detail.getText();
+      expect(after.includes('¥')).assertTrue();
+      expect(after.includes('笔')).assertTrue();
+      expect(/^(\d{4}-\d{2}|未记录日期) · ¥\d+\.\d{2} · \d+ 笔$/.test(after)).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-expenses.png');
       await driver.pressBack(); await driver.delayMs(400);
     });

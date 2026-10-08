@@ -97,7 +97,18 @@ export default function planningTest(): void {
       const saved = await backup.exportMetadata(); const doc = JSON.parse(saved) as BackupDocument; doc.version = 2; doc.tables = doc.tables.slice(0, 12);
       const projectTable = doc.tables.find((t: BackupTable) => t.name === 'projects');
       if (!projectTable) { throw new Error('Missing projects table'); }
-      for (const row of projectTable.rows) { delete row['budget_configured']; }
+      projectTable.rows = projectTable.rows.map((current: relationalStore.ValuesBucket): relationalStore.ValuesBucket => {
+        const row: relationalStore.ValuesBucket = {};
+        for (const key of Object.keys(current)) { if (key !== 'budget_configured') { row[key] = current[key]; } }
+        return row;
+      });
+      const taskTable = doc.tables.find((t: BackupTable) => t.name === 'preparation_tasks');
+      if (!taskTable) { throw new Error('Missing preparation table'); }
+      taskTable.rows = taskTable.rows.map((current: relationalStore.ValuesBucket): relationalStore.ValuesBucket => {
+        const row: relationalStore.ValuesBucket = {};
+        for (const key of Object.keys(current)) { if (key !== 'waiting_on' && key !== 'waiting_until') { row[key] = current[key]; } }
+        return row;
+      });
       const eventTable = doc.tables.find((t: BackupTable) => t.name === 'events');
       if (!eventTable) { throw new Error('Missing event table'); }
       const rows: relationalStore.ValuesBucket[] = [];

@@ -130,7 +130,10 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
     if (kind === 'characters') { this.detailStack.pushPathByName('characters', new PlanListRoute()); return; }
     if (kind === 'tasks') { this.detailStack.pushPathByName('tasks', new TaskRoute(id === 'all' ? '' : id)); return; }
-    if (kind === 'expenseStats') { this.detailStack.pushPathByName('expenseStats', new LedgerRoute(id === 'all' ? '' : id)); return; }
+    if (kind === 'expenseStats') {
+      const route = new LedgerRoute(id === 'all' ? '' : id); if (route.projectId) { route.range = 'all'; }
+      this.detailStack.pushPathByName('expenseStats', route); return;
+    }
     if (kind === 'inbox' && id.startsWith('project|')) {
       const projectId = id.slice(8); const current = this.detailStack.size() > 0 ? this.detailStack.getParamByIndex(this.detailStack.size() - 1) as ProjectRoute : undefined;
       if (current && current.id === projectId && this.detailStack.getAllPathName()[this.detailStack.size() - 1] === 'project') { current.contextSheet = 'entries'; }
@@ -375,7 +378,7 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'characters') {
       CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.contentBottom,
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
-    } else if (kind === 'project') {
+    } else if (kind === 'project' || kind === 'expenseStats') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
       TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
@@ -421,7 +424,7 @@ import { EmptyState } from '../component/Surfaces';
           this.state.settings.effects,
           this.state.settings.materialLevel,
           kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
-          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
+          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
@@ -571,7 +574,6 @@ import { EmptyState } from '../component/Surfaces';
     const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
     if (kind === 'settings') { return []; }
     if (kind === 'developer') { return []; }
-    if (kind === 'expenseStats') { return [{ value: '记一笔', icon: Icons.add, action: () => this.edit('expense', '', (param as LedgerRoute).projectId) }]; }
     if (kind === 'reference') {
       return [
         { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },

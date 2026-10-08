@@ -317,11 +317,13 @@ export default function settingsLayoutTest(): void {
         const viewport = await scroll.getBounds();
         expect(bounds.left >= viewport.left && bounds.right <= viewport.right).assertTrue();
         await category.click(); await driver.delayMs(300);
-        await scroll.scrollToBottom(1000); await driver.delayMs(500);
+        await scroll.scrollSearch(ON.id('expense-record:chart-clothing').inWindow(bundle)); await driver.delayMs(500);
         expect(((await driver.findComponents(ON.id('expense-record:chart-clothing').inWindow(bundle)))?.length || 0)).assertEqual(1);
         expect(((await driver.findComponents(ON.id('expense-record:chart-photo').inWindow(bundle)))?.length || 0)).assertEqual(0);
+        await scroll.scrollSearch(ON.text('显示全部分类').inWindow(bundle));
         await (await required(ON.text('显示全部分类'), 'clear filter')).click();
         await driver.delayMs(300);
+        await scroll.scrollSearch(ON.id('expense-record:chart-photo').inWindow(bundle));
         expect(((await driver.findComponents(ON.id('expense-record:chart-photo').inWindow(bundle)))?.length || 0)).assertEqual(1);
         await scroll.scrollSearch(ON.id('expense-category:其他').inWindow(bundle));
         expect(await (await required(ON.text('¥0.00 · 0.0%'), 'zero ratio')).getText()).assertEqual('¥0.00 · 0.0%');
