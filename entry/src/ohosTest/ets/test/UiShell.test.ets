@@ -133,6 +133,28 @@ export default function uiShellTest(): void {
       await present('作品集展示 · 成片与已发布');
       await tap('首页');
     });
+    it('globalSearchRestoresItsQueryAndOffersTheExistingObjectHomes', 0, async () => {
+      await tap('首页');
+      await (await driver.findComponent(ON.id('home-scroll').inWindow(bundle))).scrollSearch(ON.id('home-search').inWindow(bundle));
+      await tap('home-search'); await present('全局搜索'); await present('search-segment'); await present('global-search-input');
+      await tap('search-role-library'); await present('添加角色'); await back(); await present('全局搜索');
+      const role = getApplicationState().characters[0];
+      if (role) {
+        await tap('角色'); await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).inputText(role.name); await driver.delayMs(400);
+        await driver.pressBack(); await driver.delayMs(350); await present('search-segment');
+        const resultId = 'search-result:character:' + role.id;
+        await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id(resultId).inWindow(bundle)); await tap(resultId);
+        await present('character-detail-segment'); await back(); await present('search-segment');
+        await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id('global-search-input').inWindow(bundle));
+        expect(await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).getText()).assertEqual(role.name);
+        await present(resultId);
+      }
+      await tap('资源'); await tap('search-resource-filter'); await tap('照片'); await present('search-resource-filter');
+      await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).inputText('ElvaCos-没有此名称-搜索边界'); await driver.delayMs(350);
+      await driver.pressBack(); await driver.delayMs(350); await present('当前范围没有匹配结果'); await tap('清除搜索'); await present('打开角色库');
+      expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
+      await back(); await present('home-search');
+    });
     it('fixedChromeAndIndependentSettingsRespectSafeAreas', 0, async () => {
       await tap('衣柜');
       const before = await tabBounds();

@@ -1,3 +1,5 @@
+import { SearchPage } from './more/SearchPage';
+import { SearchRoute, SearchHit, globalSearch, searchRows, SEARCH_SECTIONS } from '../model/GlobalSearch';
 import { ProjectPhotoHeader } from '../component/ProjectPhotoHeader';
 import { CharacterRoute } from '../model/CharacterRoute';
 import { AssetRoute } from '../model/AssetRoute';
@@ -155,6 +157,7 @@ import { EmptyState } from '../component/Surfaces';
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
+    if (kind === 'search') { this.detailStack.pushPathByName('search', new SearchRoute()); return; }
     if (kind === 'asset') { this.openAsset(id); return; }
     if (kind === 'character') {
       const top = this.detailStack.size() - 1;
@@ -197,6 +200,32 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
 
+  private openSearchResult(route: SearchRoute, hit: SearchHit): void {
+    const results = searchRows(globalSearch(this.state, route.query), route);
+    const current = results.find((result: SearchHit) => result.key() === hit.key());
+    if (!current) { route.feedback = '结果已更新，请查看当前匹配项。'; route.restoreVersion++; return; }
+    route.anchorKey = current.key();
+    if (current.kind === 'photo') {
+      const viewer = new PhotoViewerRoute(current.id, 'search', new PhotoCollectionRoute(), this.state.photos);
+      viewer.visibleIds = results.filter((result: SearchHit) => result.kind === 'photo').map((result: SearchHit) => result.id);
+      this.openPhoto(viewer); return;
+    }
+    if (current.kind === 'character') {
+      this.state.suspend(); this.detailStack.pushPathByName('character', new CharacterRoute(current.id, current.variantId)); return;
+    }
+    if (current.kind === 'entry') {
+      if (current.ownerKind === 'global') {
+        const inbox = new InboxRoute(); inbox.kind = current.entryKind; this.detailStack.pushPathByName('inbox', inbox);
+      } else {
+        if (current.ownerKind === 'asset') {
+          this.state.suspend(); this.detailStack.pushPathByName('asset', new AssetRoute(current.ownerId, 'collection', '', this.tab), false);
+        }
+        this.open('inbox', current.ownerKind + '|' + current.ownerId);
+      }
+      return;
+    }
+    this.open(current.kind, current.id);
+  }
   private openAsset(id: string, from: string = '', projectId: string = ''): void {
     const top = this.detailStack.size() - 1;
     const name = top >= 0 ? this.detailStack.getAllPathName()[top] : '';
@@ -491,7 +520,9 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   @Builder destinationBody(kind: string, param: Object, entrance: StaggerEntrance) {
-    if (kind === 'characters') {
+    if (kind === 'search') {
+      SearchPage({ state: this.state, route: param as SearchRoute, open: (hit: SearchHit): void => { this.openSearchResult(param as SearchRoute, hit); }, library: (): void => { this.open('characters', 'all'); } })
+    } else if (kind === 'characters') {
       CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.contentBottom,
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
     } else if (kind === 'album') {
@@ -541,12 +572,13 @@ import { EmptyState } from '../component/Surfaces';
           kind === 'project' || kind === 'album' || kind === 'character' || kind === 'asset' && this.assetSegmented(param as AssetRoute) ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'asset' ? (param as AssetRoute).id : param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
-          kind === 'character' ? (): void => { this.characterSegment(param as CharacterRoute); } : kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
+          kind === 'search' ? (): void => { this.searchSegment(param as SearchRoute); } : kind === 'character' ? (): void => { this.characterSegment(param as CharacterRoute); } : kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
           kind === 'character' ? this.characterMenus(param as CharacterRoute) : kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
         shown: (): void => {
+          if (kind === 'search') { (param as SearchRoute).restoreVersion++; }
           if (kind === 'characters') { (param as PlanListRoute).restoreVersion++; }
           if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }
           if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
@@ -568,6 +600,7 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private destinationTitle(kind: string, id: string): string {
+    if (kind === 'search') { return '全局搜索'; }
     if (kind === 'album') { return '相册'; }
     if (kind === 'characters') { return '角色库'; }
     if (kind === 'privacy') { return '隐私政策'; }
@@ -670,6 +703,10 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
+  @Builder searchSegment(route: SearchRoute) {
+    HdsTitleBarSegment({ componentId: 'search-segment', items: this.buildSegmentItems(SEARCH_SECTIONS), selectedIndexes: [route.section], minimumTargetHeight: 48,
+      onSelectedIndexChanged: (section: number): void => { route.setSection(section); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
+  }
   @Builder characterSegment(route: CharacterRoute) {
     HdsTitleBarSegment({ componentId: 'character-detail-segment', items: this.buildSegmentItems(['资料', '履历', '参考图']), selectedIndexes: [route.section], minimumTargetHeight: 48,
       onSelectedIndexChanged: (section: number): void => { route.section = section; } })

@@ -154,6 +154,52 @@ const expenses = [Object.assign(new Expense(), { projectId: 'p', amountCents: 12
 const photos = Object.values(PhotoStatus).map(status => Object.assign(new PhotoAsset(), { projectId: 'p', status }));
 const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], photos, expenses, [event], '2026-12-31');
 (async () => {
+  const { globalSearch, searchRows, SearchRoute } = require(root + '/model/GlobalSearch.ets');
+  function searchFixture() {
+    const state = new AppState();
+    state.characters = [Object.assign(new entities.Character(), { id: 'role-search', name: '雪', workName: 'SNOW', description: '旅行' })];
+    state.variants = [Object.assign(new entities.CharacterVariant(), { id: 'red', characterId: 'role-search', name: '红装', notes: '丝绸' }), Object.assign(new entities.CharacterVariant(), { id: 'blue', characterId: 'role-search', name: '蓝装' })];
+    state.events = [Object.assign(new CosEvent(), { id: 'event-search', name: '秋日场', date: '2026-10-08', city: '上海', venue: '展馆', eventType: '漫展' })];
+    state.projects = [Object.assign(new CosProject(), { id: 'plan-search', name: '旅行计划', characterId: 'role-search', variantId: 'red', eventId: 'event-search', status: ProjectStatus.ARCHIVED })];
+    state.assets = [Object.assign(new Asset(), { id: 'shared-id', name: '旅行帽', location: '上海家中', brand: 'SNOW' })];
+    state.photos = [Object.assign(new PhotoAsset(), { id: 'shared-id', projectId: 'plan-search', caption: '旅行合影', status: PhotoStatus.PUBLISHED }), Object.assign(new PhotoAsset(), { id: 'orphan', projectId: 'missing', caption: '旅行孤立照片' })];
+    const { CollectedEntry } = require(root + '/model/CollectedEntry.ets');
+    state.entries = [Object.assign(new CollectedEntry(), { id: 'filed', scopeKind: 'project', scopeId: 'plan-search', text: '车票旅行', kind: 'ticket' }), Object.assign(new CollectedEntry(), { id: 'loose', text: '旅行灵感', kind: 'idea' }), Object.assign(new CollectedEntry(), { id: 'broken', scopeKind: 'asset', scopeId: 'missing', text: '旅行无效归属' })];
+    state.references = [{ id: 'private-ref', caption: '仅参考区的标记' }];
+    return state;
+  }
+  await test('global search matches every term case-insensitively and includes archived plans with shared dates', () => {
+    const data = searchFixture(), result = globalSearch(data, '  snow  红装  ');
+    assert.equal(result.sections[0][0].id, 'plan-search'); assert.match(result.sections[0][0].detail, /2026-10-08/);
+    assert.equal(globalSearch(data, '上海 展馆').sections[2][0].id, 'event-search');
+    assert.equal(globalSearch(data, '上海 不存在').sections.flat().length, 0);
+    assert.equal(globalSearch(data, '仅参考区的标记').sections.flat().length, 0);
+  });
+  await test('role search carries a uniquely matching version and never selects an unrelated version', () => {
+    const data = searchFixture(); assert.equal(globalSearch(data, '雪 丝绸').sections[1][0].variantId, 'red');
+    assert.equal(globalSearch(data, 'snow').sections[1][0].variantId, '');
+    assert.equal(globalSearch(data, '蓝装').sections[1][0].variantId, 'blue');
+  });
+  await test('resource search shares source IDs, filters kinds, preserves entry ownership and omits dangling records', () => {
+    const data = searchFixture(), result = globalSearch(data, '旅行'), route = new SearchRoute(); route.setQuery('旅行'); route.setSection(3);
+    const rows = searchRows(result, route); assert.deepEqual(new Set(rows.map(hit => hit.key())), new Set(['asset:shared-id', 'photo:shared-id', 'entry:filed', 'entry:loose']));
+    assert.equal(rows.find(hit => hit.id === 'filed').ownerKind, 'project'); assert.equal(rows.find(hit => hit.id === 'filed').ownerId, 'plan-search');
+    assert.equal(rows.find(hit => hit.id === 'loose').ownerKind, 'global');
+    route.setResourceKind('photo'); assert.deepEqual(searchRows(result, route).map(hit => hit.id), ['shared-id']); assert.equal(searchRows(result, route)[0].ownerId, 'plan-search');
+  });
+  await test('search return retains query, section and nearby position after a result leaves the range', () => {
+    const data = searchFixture(), route = new SearchRoute(); route.setQuery('旅行'); route.offsets[0] = 130; route.setSection(3); route.offsets[3] = 260;
+    route.anchorKey = 'photo:shared-id'; data.photos = []; route.reconcile(searchRows(globalSearch(data, route.query), route));
+    assert.equal(route.query, '旅行'); assert.equal(route.section, 3); assert.equal(route.offsets[3], 260); assert.match(route.feedback, /离开当前范围/);
+    route.setSection(0); assert.equal(route.offsets[0], 130); route.setSection(NaN); assert.equal(route.section, 0);
+    route.setResourceKind('photo'); assert.equal(route.offsets[3], 0); assert.equal(route.offsets[0], 130);
+    route.setQuery('新关键词'); assert.deepEqual(route.offsets, [0, 0, 0, 0]); assert.equal(route.anchorKey, '');
+  });
+  await test('blank global search produces guidance rather than an unbounded list and never mutates source arrays', () => {
+    const data = searchFixture(), before = JSON.stringify(data.projects.concat(data.characters, data.variants, data.assets, data.photos, data.entries));
+    assert.equal(globalSearch(data, '  ').sections.flat().length, 0); globalSearch(data, '旅行');
+    assert.equal(JSON.stringify(data.projects.concat(data.characters, data.variants, data.assets, data.photos, data.entries)), before);
+  });
   const dayEvent = Object.assign(new CosEvent(), { id: 'day', date: '2026-10-08', dateMode: 'multiple', endDate: '2026-10-10' });
   const time = value => new Date(value).getTime();
   await test('day entry opens at local eve 20:00 and ends after the entire last day', () => {

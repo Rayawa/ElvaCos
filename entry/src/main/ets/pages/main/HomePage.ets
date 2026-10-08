@@ -146,6 +146,7 @@ export struct HomePage {
     Column({ space: 8 }) {
       Row({ space: 8 }) {
         Text('最近').fontSize(15).fontWeight(FontWeight.Medium).fontColor(Theme.muted)
+        Button('搜索').id('home-search').constraintSize({ minWidth: 48, minHeight: 48 }).fontSize(14).fontColor(Theme.accent).backgroundColor(Theme.bg).onClick((): void => { this.open('search', 'all'); }).accessibilityText('打开全局搜索')
         Button('本月已记录支出 ¥' + (this.state.monthSpendingCents / 100).toFixed(2) + ' · 花费统计').fontSize(14).layoutWeight(1).id('home-expenses').constraintSize({ minHeight: 48 }).fontColor(Theme.accent).backgroundColor(Theme.bg).onClick((): void => { this.open('expenseStats', 'all'); })
       }.width('100%')
       if (this.recent()) { WorkCard({ work: this.recent()!, compact: true, open: (): void => { this.open('project', this.recent()?.value.projectId || ''); } }) }
@@ -169,7 +170,10 @@ export struct HomePage {
         Blank().height(this.topInset).width('100%')
         if (!this.state.projects.length && !this.state.events.length && !this.state.assets.length && !this.state.characters.length && !this.state.entries.length) {
           EmptyState({ title: '从一次想出的角色开始', message: '建立计划，添加准备任务，再安排活动和整理照片。', button: '新建计划', action: (): void => { this.add('project', ''); } })
-          Button('先收录一个想法').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
+          Row({ space: 12 }) {
+            Button('先收录一个想法').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
+            Button('搜索').id('home-search').constraintSize({ minWidth: 48, minHeight: 48 }).onClick((): void => { this.open('search', 'all'); }).accessibilityText('打开全局搜索')
+          }
         } else { this.next(); Blank().height(8); this.tasks(); Blank().height(8); this.recentSection() }
         Blank().height(this.bottomInset).width('100%')
       }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start)

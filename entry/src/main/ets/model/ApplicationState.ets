@@ -1,3 +1,4 @@
+import { SearchData } from './GlobalSearch';
 import { ProjectShot } from './Shot';
 import { ShotRepository } from '../data/repository/ShotRepository';
 import { CharacterSummary, buildCharacterSummaries } from './CharacterLibrary';
@@ -95,7 +96,7 @@ class DataSnapshot {
 const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary', 'shots'];
 
 @ObservedV2
-export class AppState {
+export class AppState implements SearchData {
   @Trace operationScope: string = '';
   @Trace lastOperation: OperationResult = { status: 'ok' };
   @Trace staleScopes: string[] = [];
