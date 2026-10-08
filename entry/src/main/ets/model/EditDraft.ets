@@ -12,6 +12,49 @@ export class FormIssue {
   constructor(field: string, message: string) { this.field = field; this.message = message; }
 }
 
+interface FormDraftSnapshot {
+  creationId: string;
+  creationCharacterId: string;
+  kind: string;
+  id: string;
+  parentId: string;
+  name: string;
+  work: string;
+  notes: string;
+  characterId: string;
+  variantId: string;
+  eventId: string;
+  date: string;
+  city: string;
+  venue: string;
+  url: string;
+  location: string;
+  brand: string;
+  size: string;
+  money: string;
+  budgetEdited: boolean;
+  status: string;
+  type: string;
+  ticket: boolean;
+  deviceCalendar: boolean;
+  newCharacter: boolean;
+  characterName: string;
+  advanced: boolean;
+  dateMode: string;
+  endDate: string;
+  timeMode: string;
+  startTime: string;
+  endTime: string;
+  reminderMinutes: number;
+  referenceId: string;
+  categoryId: string;
+  waitingOn: string;
+  waitingUntil: string;
+  preparationMode: number;
+  preparationExpanded: boolean;
+  preparationKeys: string[];
+}
+
 @ObservedV2
 export class EditDraft {
   @Trace creationId: string = newId();
@@ -168,46 +211,50 @@ export class EditDraft {
     return d;
   }
   serialize(): string {
-    const value: EditDraft = new EditDraft();
-    value.creationId = this.creationId; value.creationCharacterId = this.creationCharacterId;
-    value.kind = this.kind;
-    value.id = this.id;
-    value.parentId = this.parentId;
-    value.name = this.name;
-    value.work = this.work;
-    value.notes = this.notes;
-    value.characterId = this.characterId;
-    value.variantId = this.variantId;
-    value.eventId = this.eventId;
-    value.date = this.date;
-    value.city = this.city;
-    value.venue = this.venue;
-    value.url = this.url;
-    value.location = this.location;
-    value.brand = this.brand;
-    value.size = this.size;
-    value.money = this.money;
-    value.status = this.status;
-    value.type = this.type;
-    value.characterName = this.characterName;
-    value.dateMode = this.dateMode;
-    value.endDate = this.endDate;
-    value.timeMode = this.timeMode;
-    value.startTime = this.startTime;
-    value.endTime = this.endTime;
-    value.referenceId = this.referenceId;
-    value.categoryId = this.categoryId;
-    value.waitingOn = this.waitingOn;
-    value.waitingUntil = this.waitingUntil;
-    value.budgetEdited = this.budgetEdited;
-    value.ticket = this.ticket;
-    value.deviceCalendar = this.deviceCalendar;
-    value.newCharacter = this.newCharacter;
-    value.advanced = this.advanced;
-    value.preparationExpanded = this.preparationExpanded;
-    value.reminderMinutes = this.reminderMinutes;
-    value.preparationMode = this.preparationMode;
-    value.preparationKeys = this.preparationKeys.slice();
+    // Observed fields are accessors on device. Persist an undecorated value
+    // object instead of enumerating an ObservedV2 instance.
+    const value: FormDraftSnapshot = {
+      creationId: this.creationId,
+      creationCharacterId: this.creationCharacterId,
+      kind: this.kind,
+      id: this.id,
+      parentId: this.parentId,
+      name: this.name,
+      work: this.work,
+      notes: this.notes,
+      characterId: this.characterId,
+      variantId: this.variantId,
+      eventId: this.eventId,
+      date: this.date,
+      city: this.city,
+      venue: this.venue,
+      url: this.url,
+      location: this.location,
+      brand: this.brand,
+      size: this.size,
+      money: this.money,
+      budgetEdited: this.budgetEdited,
+      status: this.status,
+      type: this.type,
+      ticket: this.ticket,
+      deviceCalendar: this.deviceCalendar,
+      newCharacter: this.newCharacter,
+      characterName: this.characterName,
+      advanced: this.advanced,
+      dateMode: this.dateMode,
+      endDate: this.endDate,
+      timeMode: this.timeMode,
+      startTime: this.startTime,
+      endTime: this.endTime,
+      reminderMinutes: this.reminderMinutes,
+      referenceId: this.referenceId,
+      categoryId: this.categoryId,
+      waitingOn: this.waitingOn,
+      waitingUntil: this.waitingUntil,
+      preparationMode: this.preparationMode,
+      preparationExpanded: this.preparationExpanded,
+      preparationKeys: this.preparationKeys.slice()
+    };
     return JSON.stringify(value);
   }
   fingerprint(): string {
@@ -216,7 +263,7 @@ export class EditDraft {
     return value.serialize();
   }
   static fromJSON(payload: string): EditDraft {
-    const source = JSON.parse(payload) as EditDraft; const value = new EditDraft();
+    const source = JSON.parse(payload) as FormDraftSnapshot; const value = new EditDraft();
     if (!source || typeof source !== 'object') { throw new Error('草稿格式无法读取'); }
     if (typeof source.creationId !== 'string' || !source.creationId || source.creationId.length > 80 || typeof source.creationCharacterId !== 'string' || !source.creationCharacterId || source.creationCharacterId.length > 80) { throw new Error('草稿记录标识无法读取'); }
     value.creationId = source.creationId; value.creationCharacterId = source.creationCharacterId;

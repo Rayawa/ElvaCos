@@ -350,6 +350,33 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const broken = JSON.parse(draft.serialize()); broken.notes = 4;
     assert.throws(() => EditDraft.fromJSON(JSON.stringify(broken)), /草稿字段/);
   });
+  await test('draft snapshots and initial FormSession work when observed fields are non-enumerable accessors', () => {
+    const observed = global.ObservedV2;
+    try {
+      global.ObservedV2 = Original => class extends Original {
+        constructor(...args) {
+          super(...args);
+          for (const key of Object.keys(this)) {
+            let current = this[key];
+            Object.defineProperty(this, key, { get: () => current, set: value => { current = value; }, enumerable: false, configurable: true });
+          }
+        }
+      };
+      const observedModule = new Module(root + '/model/EditDraft.ets', module);
+      observedModule.filename = root + '/model/EditDraft.ets';
+      require.extensions['.ets'](observedModule, observedModule.filename);
+      const NativeDraft = observedModule.exports.EditDraft, draft = new NativeDraft();
+      assert.equal(Object.keys(draft).length, 0);
+      const session = new FormSession(draft, new FormDraftStore({ read: async () => '', write: async () => {} }));
+      assert.equal(session.dirty, false);
+      draft.kind = 'shot'; draft.parentId = 'plan'; draft.name = '特写'; draft.referenceId = 'reference'; draft.preparationKeys = ['test'];
+      const snapshot = JSON.parse(draft.serialize());
+      assert.equal(snapshot.creationId, draft.creationId); assert.equal(snapshot.creationCharacterId, draft.creationCharacterId);
+      assert.equal(snapshot.name, '特写'); assert.equal(snapshot.referenceId, 'reference'); assert.deepEqual(snapshot.preparationKeys, ['test']);
+      const restored = NativeDraft.fromJSON(draft.serialize());
+      assert.equal(restored.fingerprint(), draft.fingerprint()); assert.equal(session.dirty, true);
+    } finally { global.ObservedV2 = observed; }
+  });
   await test('form validation identifies exact schedule fields and rejects stale owners without creating replacements', async () => {
     const state = new AppState(); state.projects = [project];
     const missing = EditDraft.make(state, 'project', 'deleted');

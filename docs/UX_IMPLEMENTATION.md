@@ -208,3 +208,12 @@ E 继续：衣柜搜索 / 类型 / 状态 / 位置筛选、装备资料 / 使用
 验证：无签名主包 `./scripts/build.sh` 构建成功（33 tasks）；`./scripts/build.sh assembleHap ohosTest` 测试包编译成功（34 tasks，不是 Hypium 运行）；`python3 scripts/test_schema.py` 19/19；DevEco Node 执行 `scripts/test_ux_models.cjs` 93/93；`git diff --check` 通过。新增证据覆盖 v6 增量迁移保持原数据、独立计数与今天显隐、真实隔离 SQLite 中 CRUD / 条件勾选 / 引用约束 / 级联 / 写入回滚、提交后刷新失败只读重载、草稿兼容与 v7 / 旧备份替换。观察装饰器和原生服务为主机桩，不证明原生响应性、键盘、读屏或触控；未操作 personal.db，没有颜色资源变化。
 
 下一阶段 H：切换首页 / 计划 / 日程 / 衣柜 / 相册，各根页统一设置入口，为旧角色 / 作品 / 时间轴 / 我的功能提供明确替代，并同步导航与布局断言。导航现状仍是旧五入口，不能按目标结构描述为已经完成；全方案保持进行中。
+
+
+## 启动白屏修复：原生草稿快照（2026-10-08）
+
+- 用户报告真机白屏后读取已安装包的启动日志并复现：Dashboard 构造默认 FormSession 时，EditDraft.fingerprint 调用 fromJSON 抛出“草稿记录标识无法读取”，ArkUI 随后报告根组件创建失败。Git 核对显示 codex/uxfix 的共同基线确为原仓库 master 的 38e97f6；本次定位到代码错误，未发现需要重建 worktree 的依据。
+- EditDraft.serialize 原先先复制到另一个 ObservedV2 实例再 JSON.stringify；真机的 Trace 字段不是普通可枚举存储字段，导致标识没有进入 JSON。改为显式读取字段并构造无装饰器的 FormDraftSnapshot 普通对象；正式数据 / Preferences 格式与业务字段保持兼容，不放松损坏草稿校验、不清理用户草稿。
+- 新增主机检查使用不可枚举访问器重现该边界，验证初始 FormSession、稳定创建标识、完整快照、指纹及恢复。已有原生持久化用例补入真实 ObservedV2 的构造 / 序列化断言；本轮只编译该用例，没有运行 Hypium 套件。
+
+验证：主包构建通过（33 tasks），测试包编译通过（34 tasks），主机业务 / 备份检查 94/94，git diff --check 通过。使用用户配置的本机签名覆盖安装修复包，保留应用数据；真机界面树确认首页三区块与旧五 Tab 可见，新建计划表单能打开，并可关闭返回首页；启动日志不再出现该草稿错误或根组件创建失败。本次仅启动 / 打开未改动表单 / 关闭的定向检查，未保存业务记录、未清空 personal.db、未跑完整设备套件。H 导航收口仍待实施。

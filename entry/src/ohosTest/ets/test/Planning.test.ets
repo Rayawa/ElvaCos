@@ -1,5 +1,8 @@
 import { ShotRepository } from '../../../main/ets/data/repository/ShotRepository';
 import { ProjectShot } from '../../../main/ets/model/Shot';
+import { EditDraft } from '../../../main/ets/model/EditDraft';
+import { FormSession } from '../../../main/ets/model/FormSession';
+import { FormDraftStore } from '../../../main/ets/model/FormDraftStore';
 import { makePreparation, preparationKeys } from '../../../main/ets/model/Preparation';
 import { PreparationRepository } from '../../../main/ets/data/repository/PreparationRepository';
 import { common } from '@kit.AbilityKit';
@@ -30,6 +33,11 @@ export default function planningTest(): void {
     beforeAll(async () => { if (!TestContext.value) { throw new Error('Test context unavailable'); } context = TestContext.value; await db.open(context); await projects.save(project, '', role, makePreparation(project.id, preparationKeys(2))); });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('nativeV2MigrationKeepsIndependentPreparationAndLegacyActivity', 0, async () => {
+      // Dashboard constructs this session before opening any form. Verify the
+      // real ObservedV2 runtime rather than only the host decorator stubs.
+      const draft = new EditDraft(); const session = new FormSession(draft, new FormDraftStore({ read: async (): Promise<string> => '', write: async (_value: string): Promise<void> => {} }));
+      expect(session.dirty).assertFalse(); draft.kind = 'shot'; draft.name = 'Native draft'; draft.referenceId = 'reference';
+      const restored = EditDraft.fromJSON(draft.serialize()); expect(restored.creationId).assertEqual(draft.creationId); expect(restored.name).assertEqual('Native draft'); expect(restored.referenceId).assertEqual('reference'); expect(session.dirty).assertTrue();
       const oldName = 'verification-v2-' + newId() + '.db'; const upgraded = new Database(oldName);
       const legacy = await relationalStore.getRdbStore(context, { name: oldName, securityLevel: relationalStore.SecurityLevel.S3, encrypt: true });
       try {
