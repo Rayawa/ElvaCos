@@ -1,6 +1,7 @@
 import { EventRoute, EventReturnPath } from '../model/EventRoute';
 import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
 import { LedgerRoute } from '../model/LedgerRoute';
+import { PlanListRoute } from '../model/PlanListRoute';
 import { TasksPage } from './more/TasksPage';
 import { dayTitle } from '../model/DayMode';
 import { InboxPage } from './more/InboxPage';
@@ -67,7 +68,7 @@ import { EmptyState } from '../component/Surfaces';
   private pageScrollers: Scroller[] = [new Scroller(), new Scroller(), new Scroller(), new Scroller(), new Scroller()];
   private tabsController: HdsTabsController = new HdsTabsController();
   @Local tab: number = 0;
-  @Local cosProjects: boolean = true;
+  @Local planListRoute: PlanListRoute = new PlanListRoute();
   @Local eventCalendar: boolean = false;
   @Local eventFilter: number = 0;
   @Local meSection: number = 0;
@@ -127,7 +128,7 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
-    if (kind === 'characters') { this.cosProjects = false; this.tab = 1; this.tabsController.changeIndex(1); return; }
+    if (kind === 'characters') { this.detailStack.pushPathByName('characters', new PlanListRoute()); return; }
     if (kind === 'tasks') { this.detailStack.pushPathByName('tasks', new TaskRoute(id === 'all' ? '' : id)); return; }
     if (kind === 'expenseStats') { this.detailStack.pushPathByName('expenseStats', new LedgerRoute(id === 'all' ? '' : id)); return; }
     if (kind === 'inbox' && id.startsWith('project|')) {
@@ -371,7 +372,10 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   @Builder destinationBody(kind: string, param: Object, entrance: StaggerEntrance) {
-    if (kind === 'project') {
+    if (kind === 'characters') {
+      CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.contentBottom,
+        open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
+    } else if (kind === 'project') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
       TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
@@ -417,7 +421,7 @@ import { EmptyState } from '../component/Surfaces';
           this.state.settings.effects,
           this.state.settings.materialLevel,
           kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
-          kind === 'project' ? this.projectMenus(param as ProjectRoute) : [], false,
+          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
@@ -436,6 +440,7 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private destinationTitle(kind: string, id: string): string {
+    if (kind === 'characters') { return '角色库'; }
     if (kind === 'privacy') { return '隐私政策'; }
     if (kind === 'settings') { return '设置'; }
     if (kind === 'developer') { return DEVELOPER_PAGE_TITLE; }
@@ -498,7 +503,7 @@ import { EmptyState } from '../component/Surfaces';
 
   private rootTools(index: number): ToolbarItem[] {
     if (index === 1) {
-      return [{ value: this.cosProjects ? '新建计划' : '添加角色', icon: Icons.add, action: () => this.edit(this.cosProjects ? 'project' : 'character') }];
+      return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }];
     }
     if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: () => this.edit('event') }]; }
     if (index === 3) {
@@ -598,14 +603,14 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private segmentLabels(index: number): string[] {
-    if (index === 1) { return ['角色', '计划']; }
+    if (index === 1) { return ['进行中', '已完成', '全部']; }
     if (index === 2) { return ['列表', '日历']; }
     if (index === 3) { return ['装备', '照片']; }
     return ['作品', '时间轴'];
   }
 
   private segmentSelection(index: number): number {
-    if (index === 1) { return this.cosProjects ? 1 : 0; }
+    if (index === 1) { return this.planListRoute.section; }
     if (index === 2) { return this.eventCalendar ? 1 : 0; }
     if (index === 3) { return this.libraryPhotos ? 1 : 0; }
     return this.meSection;
@@ -629,7 +634,7 @@ import { EmptyState } from '../component/Surfaces';
         selectedIndexes: [this.segmentSelection(index)],
         experimentalWidth: Theme.titleSegmentWidth,
         onSelectedIndexChanged: (selected: number): void => {
-          if (index === 1) { this.cosProjects = selected === 1; }
+          if (index === 1) { this.planListRoute.status = ''; this.planListRoute.section = selected; }
           else if (index === 2) { this.eventCalendar = selected === 1; }
           else if (index === 3) { this.libraryPhotos = selected === 1; }
           else { this.meSection = selected; }
@@ -700,8 +705,7 @@ import { EmptyState } from '../component/Surfaces';
             topInset: Theme.contentTop,
             bottomInset: Theme.contentBottom,
             active: this.tab === index,
-            projects: this.cosProjects,
-            selection: (projects: boolean) => { this.cosProjects = projects; },
+            route: this.planListRoute,
             open: (k: string, id: string) => this.open(k, id),
             add: (k: string, parent: string) => this.edit(k, '', parent)
           })

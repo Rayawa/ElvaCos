@@ -12,7 +12,7 @@ Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。�
 
 ## 信息架构与导航
 
-保留五个一级入口：首页、Cos、活动、衣柜、我的。首页按照目标日期或关联漫展日期选择最近的未结束计划，有未来日期优先，逾期计划次之，未定日期最后；打包和选片入口携带对应任务视图。Cos 默认计划，切换角色资料/计划并筛选状态；衣柜切换装备/照片；我的聚合作品和时间轴，标题菜单进入独立设置页，不创建尚未实现的 People/Location/Pose 空页面。
+当前五个一级入口仍是首页、Cos、活动、衣柜、我的，最终切换在 UX 阶段 H。首页采用接下来 / 在途与待办 / 最近三区块；打包、选片与任务入口携带视图、筛选或焦点项。Cos 根页只承载计划，标题栏为进行中 / 已完成 / 全部，日期与具体状态独立筛选，归档从全部段的状态筛选可达。角色库由计划页首部与首页文字入口进入覆盖目的地，保留来源页；角色详情仍承担角色编辑。衣柜暂保留装备 / 照片切换；我的暂保留作品 / 时间轴，标题菜单通往独立设置页。
 
 主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、计划、装备、照片详情和设置压入主路由，覆盖详情显示时主页底栏隐藏；活动详情由日程 Tab 的独立栈承载，今天入口占用底部布局高度。详情之间的关联跳转继续入主栈，返回逐层恢复。
 
@@ -55,9 +55,9 @@ entry/src/main/ets/
 - data/repository/：结构化持久化、关系查询与 MetadataBackupRepository 的版本化元数据/恢复事务
 - data/media/：选中媒体导入、缩略图、原文件清理
 
-首页与设置共享 `component/DashboardSplitLayout`：在实际内容宽度达到 Theme.wideBreakpoint（840vp）且高度至少 600vp 时复用 Dashboard 的固定概览 / 独立滚动分栏，4:6 权重和 1440vp 最大宽度。页面仅提供业务 builder 与各自 Scroller，不维护另一套导航、颜色或反馈。首页在较窄窗口恢复单列，主路由仍为 Stack；内容分栏不代表覆盖式详情已经实现大屏双栏。
+设置使用 `component/DashboardSplitLayout`：在实际内容宽度达到 Theme.wideBreakpoint（840vp）且高度至少 600vp 时复用 Dashboard 的固定概览 / 独立滚动分栏，4:6 权重和 1440vp 最大宽度。页面仅提供业务 builder 与 Scroller，不维护另一套导航、颜色或反馈。首页在 D 阶段采用单列三区块；主路由仍为 Stack，未承诺覆盖式详情的大屏双栏。
 
-`common/scroll` 原样复用 Dashboard 的轴事件转发，五个主页与设置复用各自 Scroller；页面不访问输入设备服务或申请全局监听权限。首页任务用 TaskLinkCard、最近照片用 InteractiveCard 统一反馈；组件只发出原有路由动作，不持有实体仓库或业务写入方法。
+`common/scroll` 原样复用 Dashboard 的轴事件转发，五个主页与设置复用各自 Scroller；页面不访问输入设备服务或申请全局监听权限。首页与完整待办共用模型层 TaskQueue，列表动作通过带上下文的路由回到对象的家；页面不直接持有实体仓库。
 
 @ObservedV2 / @Trace 应用状态承担异步状态与 UI 刷新；实体使用明确 ArkTS 类型。不使用 any、动态属性或解构逃避 ArkTS 检查。
 

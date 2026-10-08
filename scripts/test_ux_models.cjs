@@ -33,6 +33,7 @@ const day = require(root + '/model/DayMode.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
 const { EventSaveCoordinator } = require(root + '/common/EventSaveCoordinator.ets');
 const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/model/TaskQueue.ets');
+const { PlanListRoute, filterPlanList } = require(root + '/model/PlanListRoute.ets');
 const { PreparationTask } = require(root + '/model/Preparation.ets');
 const { Expense } = require(root + '/model/Planning.ets');
 const { buildPlanReadiness, budgetLabel } = require(root + '/model/PlanReadiness.ets');
@@ -188,6 +189,30 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   await test('empty preparation and packing stay empty', () => {
     const r = buildPlanReadiness(project, [], [], [], [], [], [], [], '2026-12-31'); assert.equal(r.prep.total, 0); assert.equal(r.prep.percent, 0); assert.equal(r.pack.total, 0); assert.equal(r.photos.byStage.reduce((a, b) => a + b, 0), 0);
+  });
+  await test('plan date and detailed status filters compose with all three list sections', () => {
+    const make = (id, status, targetDate, eventId = '') => Object.assign(new CosProject(), { id, name: id, characterId: 'role', status, targetDate, eventId });
+    const list = [make('ready-undated', ProjectStatus.READY, ''), make('event-inherited', ProjectStatus.PREPARING, '', 'event'), make('complete-undated', ProjectStatus.COMPLETED, ''), make('archived', ProjectStatus.ARCHIVED, '2027-01-03'), make('next-week', ProjectStatus.READY, '2027-01-07')];
+    const role = Object.assign(new entities.Character(), { id: 'role', name: '角色名' });
+    const plans = list.map(p => buildPlanReadiness(p, [], [], [], [], [], [], [event], '2026-12-31'));
+    const route = new PlanListRoute();
+    const find = () => filterPlanList(list, plans, [role], route, '2026-12-31').map(p => p.id);
+    assert.deepEqual(find(), ['ready-undated', 'event-inherited', 'next-week']);
+    route.dateRange = 'undated'; route.status = ProjectStatus.READY;
+    assert.deepEqual(find(), ['ready-undated']);
+    route.section = 1; route.status = '';
+    assert.deepEqual(find(), ['complete-undated']);
+    route.section = 2; route.dateRange = 'week'; route.status = ProjectStatus.ARCHIVED;
+    assert.deepEqual(find(), ['archived']);
+    route.status = ProjectStatus.READY;
+    assert.deepEqual(find(), ['next-week']);
+    route.status = ''; route.dateRange = 'today'; route.query = '  角色名  ';
+    assert.deepEqual(find(), ['event-inherited']);
+    route.query = 'no match';
+    assert.deepEqual(find(), []);
+    assert.equal(list[1].targetDate, ''); assert.equal(list[3].status, ProjectStatus.ARCHIVED);
+    route.offsets = [18, 240, 60]; route.section = 1;
+    assert.equal(route.offsets[route.section], 240);
   });
   await test('task queue uses one row per photo stage and never counts waiting as overdue', () => {
     const queue = buildTaskQueue([read()], [project], '2026-12-31');

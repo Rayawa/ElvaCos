@@ -50,7 +50,7 @@ export struct ProjectCard {
           .total === 0 ? '尚未添加准备任务' : this.state.readiness(this.project.id).prep
           .done + ' / ' + this.state.readiness(this.project.id).prep
           .total + ' 项准备完成')
-          .fontSize(12)
+          .fontSize(14)
           .fontColor(Theme.muted)
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%')
