@@ -28,7 +28,7 @@ class RelationalModelTest(unittest.TestCase):
         old = sqlite3.connect(':memory:')
         try:
             before_v4 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_4')[0])
-            v4 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_4')[1])
+            v4 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_4')[1].split('const MIGRATION_5')[0])
             for sql in before_v4: old.execute(sql)
             old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Old',1,1)")
             for id, cents in [('unknown', 0), ('configured', 12999)]:
@@ -41,6 +41,21 @@ class RelationalModelTest(unittest.TestCase):
             self.assertEqual(old.execute("SELECT budget_configured FROM projects WHERE id='unknown'").fetchone()[0],0)
             with self.assertRaises(sqlite3.IntegrityError): old.execute('UPDATE projects SET budget_configured=2')
         finally: old.close()
+
+    def test_entries_are_rehomed_when_the_owner_is_deleted(self):
+        for scope, table, id in [('event','events','e'), ('project','projects','p'), ('asset','assets','a')]:
+            entry = 'entry-' + scope
+            self.db.execute("INSERT INTO entries(id,kind,scope_kind,scope_id,text,created_at) VALUES(?,'note',?,?,'keep me',1)", (entry,scope,id))
+            self.db.execute('DELETE FROM ' + table + ' WHERE id=?', (id,))
+            self.assertEqual(self.db.execute('SELECT scope_kind,scope_id,text FROM entries WHERE id=?', (entry,)).fetchone(), ('global','','keep me'))
+        self.db.execute("INSERT INTO entries(id,kind,scope_kind,scope_id,text,created_at) VALUES('role','note','character','c','keep role',1)")
+        self.db.execute("DELETE FROM characters WHERE id='c'")
+        self.assertEqual(self.db.execute("SELECT scope_kind,scope_id FROM entries WHERE id='role'").fetchone(), ('global',''))
+
+    def test_entries_reject_invalid_scope_pairs_and_pins(self):
+        for scope, id, pin in [('global','p',0), ('project','',0), ('global','',2)]:
+            with self.assertRaises(sqlite3.IntegrityError):
+                self.db.execute("INSERT INTO entries(id,kind,scope_kind,scope_id,text,pinned,created_at) VALUES('bad','note',?,?,'bad',?,1)",(scope,id,pin))
 
     def test_variant_must_belong_to_character(self):
         with self.assertRaises(sqlite3.IntegrityError):

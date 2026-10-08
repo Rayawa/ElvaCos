@@ -1,3 +1,5 @@
+import { CollectedEntry, validateEntry } from '../../model/CollectedEntry';
+import { entryScopeTable } from './EntryRepository';
 import { CosEvent } from '../../model/Entities';
 import { checkSchedule } from '../../model/Schedule';
 import { relationalStore } from '@kit.ArkData';
@@ -25,7 +27,8 @@ const TABLES: TableSpec[] = [
   new TableSpec('preparation_tasks', ['id', 'project_id', 'category_id', 'label', 'done', 'due_date', 'notes', 'sort_order']),
   new TableSpec('team_members', ['id', 'project_id', 'role', 'name', 'notes']),
   new TableSpec('expenses', ['id', 'project_id', 'name', 'category', 'amount_cents', 'date', 'notes', 'created_at']),
-  new TableSpec('reference_images', ['id', 'project_id', 'character_id', 'source_uri', 'local_path', 'thumbnail_path', 'caption', 'created_at'])
+  new TableSpec('reference_images', ['id', 'project_id', 'character_id', 'source_uri', 'local_path', 'thumbnail_path', 'caption', 'created_at']),
+  new TableSpec('entries', ['id','kind','scope_kind','scope_id','title','url','text','local_path','thumbnail_path','pinned','created_at'])
 ];
 interface BackupTable { name: string; rows: relationalStore.ValuesBucket[]; }
 interface BackupDocument { format: string; version: number; exportedAt: number; tables: BackupTable[]; }
@@ -48,7 +51,7 @@ export class MetadataBackupRepository {
       } finally { result.close(); }
       tables.push({ name: spec.name, rows: rows });
     }
-    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 4, exportedAt: Date.now(), tables: tables };
+    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 5, exportedAt: Date.now(), tables: tables };
     const output = JSON.stringify(doc);
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
@@ -56,9 +59,12 @@ export class MetadataBackupRepository {
   async restoreMetadata(input: string): Promise<void> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : TABLES.length)) {
+    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
+    const existingEntries = new Map<string, relationalStore.ValuesBucket>();
+    const entryRows = await this.db.getStore().querySql('SELECT id,local_path,thumbnail_path FROM entries');
+    try { while (entryRows.goToNextRow()) { existingEntries.set(entryRows.getString(0), { local_path: entryRows.getString(1), thumbnail_path: entryRows.getString(2) }); } } finally { entryRows.close(); }
     const allowedCovers: string[] = [];
     const existingMedia = new Map<string, relationalStore.ValuesBucket>();
     const existingRows = await this.db.getStore().querySql('SELECT project_id,source_uri,local_path,thumbnail_path FROM photos');
@@ -97,7 +103,7 @@ export class MetadataBackupRepository {
         for (const col of spec.columns) {
           const value = row[col];
           if (value !== null && typeof value !== 'string' && typeof value !== 'number') { throw new Error('备份包含无效字段'); }
-          const numbers = ['favorite', 'created_at', 'updated_at', 'ticket_purchased', 'budget_cents', 'price_cents', 'done', 'sort_order', 'amount_cents', 'reminder_id', 'reminder_minutes'];
+          const numbers = ['pinned', 'favorite', 'created_at', 'updated_at', 'ticket_purchased', 'budget_cents', 'price_cents', 'done', 'sort_order', 'amount_cents', 'reminder_id', 'reminder_minutes'];
           if (col === 'budget_configured') {
             if (value !== null && value !== 0 && value !== 1) { throw new Error('备份包含无效预算标记'); }
             continue;
@@ -115,6 +121,19 @@ export class MetadataBackupRepository {
             throw new Error('备份包含无效日期');
           }
           if (typeof value === 'string' && value.length > 20000) { throw new Error('备份字段过长'); }
+        }
+        if (spec.name === 'entries') {
+          const entry = new CollectedEntry();
+          entry.kind = String(row['kind']); entry.scopeKind = String(row['scope_kind']); entry.scopeId = String(row['scope_id']);
+          entry.title = String(row['title']); entry.url = String(row['url']); entry.text = String(row['text']);
+          validateEntry(entry, true);
+          if (row['pinned'] !== 0 && row['pinned'] !== 1) { throw new Error('备份包含无效置顶标记'); }
+          if (entry.scopeKind !== 'global') {
+            const owner = doc.tables.find((table: BackupTable) => table.name === entryScopeTable(entry.scopeKind));
+            if (!owner || !owner.rows.some((record: relationalStore.ValuesBucket) => record['id'] === entry.scopeId)) { throw new Error('备份收录指向不存在的对象'); }
+          }
+          const existing = existingEntries.get(String(row['id']));
+          row['local_path'] = existing ? existing['local_path'] : ''; row['thumbnail_path'] = existing ? existing['thumbnail_path'] : '';
         }
         if (spec.name === 'projects' && doc.version < 4) { row['budget_configured'] = Number(row['budget_cents']) > 0 ? 1 : null; }
         if (spec.name === 'events') {

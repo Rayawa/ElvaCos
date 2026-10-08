@@ -105,6 +105,7 @@ export struct CharacterDetail {
           if (this.projects().length === 0) { EmptyState({ title: '从喜欢到登场', message: '为这个角色创建一份计划，把准备过程留存下来。' }) }
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
+        Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'character' && entry.scopeId === this.character.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'character|' + this.character.id); })
         Blank().height(Theme.contentBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding })

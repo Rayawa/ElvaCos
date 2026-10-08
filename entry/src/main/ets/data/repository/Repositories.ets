@@ -415,7 +415,7 @@ export class RelationRepository {
   }
   async clear(): Promise<void> {
     await this.db.transaction(async (tx: WriteTransaction) => {
-      for (const table of ['projects', 'variants', 'characters', 'assets', 'events', 'diary_entries']) {
+      for (const table of ['entries', 'projects', 'variants', 'characters', 'assets', 'events', 'diary_entries']) {
         await tx.execute('DELETE FROM ' + table);
       }
     });

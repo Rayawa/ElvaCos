@@ -50,3 +50,13 @@ const MIGRATION_4: string[] = [
   `UPDATE projects SET budget_configured=1 WHERE budget_cents>0`
 ];
 export function migration4(): string[] { return MIGRATION_4; }
+
+const MIGRATION_5: string[] = [
+  `CREATE TABLE entries (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('link','ticket','map','note','idea','image')), scope_kind TEXT NOT NULL CHECK(scope_kind IN ('global','event','project','character','asset')), scope_id TEXT NOT NULL DEFAULT '', title TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', text TEXT NOT NULL DEFAULT '', local_path TEXT NOT NULL DEFAULT '', thumbnail_path TEXT NOT NULL DEFAULT '', pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0,1)), created_at INTEGER NOT NULL, CHECK((scope_kind='global' AND scope_id='') OR (scope_kind!='global' AND scope_id!='')))`,
+  `CREATE INDEX entries_scope_idx ON entries(scope_kind,scope_id)`,
+  `CREATE TRIGGER entries_event_removed BEFORE DELETE ON events BEGIN UPDATE entries SET scope_kind='global',scope_id='' WHERE scope_kind='event' AND scope_id=OLD.id; END`,
+  `CREATE TRIGGER entries_project_removed BEFORE DELETE ON projects BEGIN UPDATE entries SET scope_kind='global',scope_id='' WHERE scope_kind='project' AND scope_id=OLD.id; END`,
+  `CREATE TRIGGER entries_character_removed BEFORE DELETE ON characters BEGIN UPDATE entries SET scope_kind='global',scope_id='' WHERE scope_kind='character' AND scope_id=OLD.id; END`,
+  `CREATE TRIGGER entries_asset_removed BEFORE DELETE ON assets BEGIN UPDATE entries SET scope_kind='global',scope_id='' WHERE scope_kind='asset' AND scope_id=OLD.id; END`
+];
+export function migration5(): string[] { return MIGRATION_5; }

@@ -55,7 +55,7 @@ connection.close()
       if (response.error) waiter.reject(new Error(response.error)); else waiter.resolve(response.result);
     });
   }
-  sql(sql, args = []) { return new Promise((resolve, reject) => { this.pending.push({ resolve, reject }); this.worker.stdin.write(JSON.stringify({ sql, args }) + '\n'); }); }
+  sql(sql, args = []) { if (this.failSql && sql.startsWith(this.failSql)) return Promise.reject(new Error('injected write failure')); return new Promise((resolve, reject) => { this.pending.push({ resolve, reject }); this.worker.stdin.write(JSON.stringify({ sql, args }) + '\n'); }); }
   getStore() { return this; }
   async executeSql(sql, args) { await this.sql(sql, args); }
   async querySql(sql, args) {
@@ -140,8 +140,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');
     const backup = new MetadataBackupRepository(db);
     const exported = await backup.exportMetadata();
-    await test('v4 backup round trip preserves explicit zero, unset and unknown budgets', async () => {
-      assert.equal(JSON.parse(exported).version, 4); await backup.restoreMetadata(exported);
+    await test('current backup round trip preserves explicit zero, unset and unknown budgets', async () => {
+      assert.equal(JSON.parse(exported).version, 5); await backup.restoreMetadata(exported);
       assert.deepEqual((await db.sql('SELECT id,budget_cents,budget_configured FROM projects ORDER BY id')).rows, [['positive',1234,1], ['unknown',0,null], ['unset',0,0], ['zero',0,1]]);
     });
     await test('v1, v2 and v3 backups infer positive budgets but preserve historical zero as unknown', async () => {
@@ -151,6 +151,11 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
         await backup.restoreMetadata(JSON.stringify(doc));
         assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',null], ['zero',null]]);
       }
+    });
+    await test('v4 backup retains budget flags and defaults the new entries table to empty', async () => {
+      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0,15); await backup.restoreMetadata(JSON.stringify(doc));
+      assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',0], ['zero',1]]);
+      assert.equal((await db.sql('SELECT count(*) FROM entries')).rows[0][0], 0);
     });
     await test('invalid budget flags are rejected before replacement', async () => {
       const doc = JSON.parse(exported); doc.tables.find(t => t.name === 'projects').rows[0].budget_configured = 2;
@@ -162,6 +167,45 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       await assert.rejects(backup.restoreMetadata(JSON.stringify(doc)), /FOREIGN KEY/);
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
       assert.equal((await db.sql('SELECT name FROM characters')).rows[0][0], 'Legacy');
+    });
+    const { EntryRepository } = require(root + '/data/repository/EntryRepository.ets');
+    const { entryFromText, validateEntry, CollectedEntry } = require(root + '/model/CollectedEntry.ets');
+    const entries = new EntryRepository(db);
+    await test('capture needs no title, type selection or owner', async () => {
+      const link = entryFromText('https://example.com/ticket'); assert.equal(link.title,''); assert.equal(link.kind,'link'); assert.equal(link.scopeKind,'global'); validateEntry(link);
+      const note = entryFromText('下一次试试这个造型'); assert.equal(note.kind,'note'); assert.equal(note.scopeId,''); await entries.save(note);
+      assert.equal((await entries.list())[0].text, note.text);
+    });
+    await test('entry assignment rejects missing owners and preserves source', async () => {
+      const note = (await entries.list())[0]; note.scopeKind = 'project'; note.scopeId = 'missing'; await assert.rejects(entries.save(note), /已不存在/);
+      assert.equal((await entries.list())[0].scopeKind, 'global');
+    });
+    await test('task conversion commits the category, task and removal together once', async () => {
+      const note = (await entries.list())[0]; await entries.convert(note,'task','project','zero','','2026-10-08');
+      assert.equal((await db.sql('SELECT count(*) FROM preparation_tasks')).rows[0][0],1); assert.equal((await entries.list()).length,0);
+      await assert.rejects(entries.convert(note,'task','project','zero','','2026-10-08'), /已变化/);
+      assert.equal((await db.sql('SELECT count(*) FROM preparation_tasks')).rows[0][0],1);
+    });
+    await test('conversion failure leaves the original entry intact', async () => {
+      const note = entryFromText('门票'); await entries.save(note); db.failSql = 'INSERT INTO expenses';
+      await assert.rejects(entries.convert(note,'expense','project','zero','123.45','2026-10-08'), /injected/); db.failSql = '';
+      assert.equal((await entries.list())[0].id,note.id); assert.equal((await db.sql('SELECT count(*) FROM expenses')).rows[0][0],0);
+      await entries.convert(note,'expense','project','zero','123.45','2026-10-08'); assert.equal((await db.sql('SELECT amount_cents FROM expenses')).rows[0][0],12345);
+    });
+    await test('reference conversion preserves media paths and excludes it from photos', async () => {
+      const entry = Object.assign(new CollectedEntry(), { kind:'image', localPath:'/sandbox/original', thumbnailPath:'/sandbox/thumb' }); await entries.save(entry);
+      await entries.convert(entry,'reference','character','c','','2026-10-08');
+      assert.deepEqual((await db.sql('SELECT character_id,local_path,thumbnail_path FROM reference_images')).rows[0],['c','/sandbox/original','/sandbox/thumb']);
+      assert.equal((await db.sql('SELECT count(*) FROM photos')).rows[0][0],0);
+    });
+    await test('entry metadata restore strips foreign paths and rejects dangling scope', async () => {
+      const entry = Object.assign(new CollectedEntry(), { kind:'image', scopeKind:'project', scopeId:'zero', localPath:'/sandbox/existing', thumbnailPath:'/sandbox/existing-thumb' }); await entries.save(entry);
+      const saved = await backup.exportMetadata(); const doc = JSON.parse(saved);
+      doc.tables.find(t => t.name === 'entries').rows.push({id:'foreign',kind:'image',scope_kind:'global',scope_id:'',title:'',url:'',text:'',local_path:'/etc/passwd',thumbnail_path:'/etc/passwd',pinned:0,created_at:1});
+      await backup.restoreMetadata(JSON.stringify(doc)); const current = await entries.list(); assert.equal(current.find(e=>e.id==='foreign').localPath,''); assert.equal(current.find(e=>e.id===entry.id).localPath,entry.localPath);
+      doc.tables.find(t => t.name === 'entries').rows[0].scope_id='missing'; await assert.rejects(backup.restoreMetadata(JSON.stringify(doc)), /不存在的对象/);
+      assert.equal((await entries.list()).length,2);
+      await db.sql("DELETE FROM projects WHERE id='zero'"); assert.equal((await entries.list()).find(e=>e.id===entry.id).scopeKind,'global');
     });
   } finally { db.close(); }
   console.log(`${count} model and backup checks passed`);

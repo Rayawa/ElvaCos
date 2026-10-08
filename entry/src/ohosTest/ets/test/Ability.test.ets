@@ -34,7 +34,7 @@ export default function abilityTest(): void {
     beforeAll(async () => { if (!TestContext.value) { throw new Error('TestAbility context unavailable'); } context = TestContext.value; await db.open(context); });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('migrationAndCrudWorkOnNativeRdb', 0, async () => {
-      expect(db.getStore().version).assertEqual(4);
+      expect(db.getStore().version).assertEqual(5);
       await characters.save(character); await variants.save(variant); await projects.save(project); await assets.save(asset);
       expect((await characters.list())[0].name).assertEqual(character.name);
       expect((await projects.list())[0].variantId).assertEqual(variant.id);
@@ -55,7 +55,7 @@ export default function abilityTest(): void {
       character.name = 'Changed'; await characters.save(character);
       await backup.restoreMetadata(exported);
       expect((await characters.list())[0].name).assertEqual('Verification Character');
-      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":4', '"version":99')); } catch (error) { rejected = true; }
+      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":5', '"version":99')); } catch (error) { rejected = true; }
       expect(rejected).assertTrue(); expect((await projects.list()).length).assertEqual(1);
     });
     it('invalidBackupForeignKeyRollsBackReplacement', 0, async () => {

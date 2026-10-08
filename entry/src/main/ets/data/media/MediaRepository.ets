@@ -50,9 +50,9 @@ export class MediaRepository {
       if ((await fs.stat(path)).isDirectory()) { await fs.rmdir(path); } else { await fs.unlink(path); }
     }
   }
-  async select(): Promise<string[]> {
+  async select(maxSelectNumber: number = 20): Promise<string[]> {
     const picker = new photoAccessHelper.PhotoViewPicker();
-    const result = await picker.select({ MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE, maxSelectNumber: 20 });
+    const result = await picker.select({ MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE, maxSelectNumber: maxSelectNumber });
     return result.photoUris;
   }
   async import(uri: string, projectId: string): Promise<PhotoAsset> {
@@ -119,10 +119,11 @@ export class MediaRepository {
       if (path.startsWith(this.mediaRoot + '/')) { try { await fs.unlink(path); } catch (error) { } }
     }
   }
-  async collect(photos: PhotoAsset[], references: ReferenceImage[] = []): Promise<void> {
+  async collect(photos: PhotoAsset[], references: ReferenceImage[] = [], entries: ManagedMedia[] = []): Promise<void> {
     const dir = this.mediaRoot;
     const keep: string[] = [];
     photos.forEach((p: PhotoAsset) => { keep.push(p.localPath); keep.push(p.thumbnailPath); });
+    entries.forEach((entry: ManagedMedia) => { keep.push(entry.localPath); keep.push(entry.thumbnailPath); });
     references.forEach((r: ReferenceImage) => { keep.push(r.localPath); keep.push(r.thumbnailPath); });
     try {
       const names = await fs.listFile(dir);

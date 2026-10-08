@@ -103,6 +103,10 @@ export struct HomePage {
   @Builder overview() {
     Column({ space: 16 }) {
       this.greetingHeader()
+      Button('收录一条').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })
+      if (this.state.untriagedEntries.length > 0) {
+        Button('收录箱 · 未归位 ' + this.state.untriagedEntries.length + ' 条').id('home-inbox').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })
+      }
       Button('花费统计 · ¥' + (expenseTotal(this.state.expenses) / 100)
         .toFixed(2))
         .accessibilityText('查看花费统计，实际花费 ' + (expenseTotal(this.state.expenses) / 100)

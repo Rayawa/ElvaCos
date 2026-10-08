@@ -1,3 +1,5 @@
+import { InboxPage } from './more/InboxPage';
+import { InboxRoute } from '../model/CollectedEntry';
 import { AppLogPage } from './more/AppLogPage';
 import { DevPage } from './more/DevPage';
 import { LocalHtmlPage } from './more/LocalHtmlPage';
@@ -115,7 +117,9 @@ import { EmptyState } from '../component/Surfaces';
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
-    if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos') {
+    if (kind === 'inbox') {
+      const parts = id.split('|'); this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
+    } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos') {
       const section = kind === 'packing' ? 1 : kind === 'projectPhotos' ? 2 : 0;
       this.detailStack.pushPathByName('project', new ProjectRoute(id, section));
     } else {
@@ -283,6 +287,8 @@ import { EmptyState } from '../component/Surfaces';
         destructive: (k: string): void => { this.destructive(k); },
         openDeveloper: (): void => { this.openDeveloper(); }
       })
+    } else if (kind === 'inbox') {
+      InboxPage({ state: this.state, route: param as InboxRoute, backToOwner: (): void => { this.closeDetail(); }, open: (kind: string, id: string): void => { this.open(kind, id); } })
     } else if (kind === 'developer') {
       DevPage({ entrance: entrance, state: this.state })
     } else {
@@ -307,7 +313,7 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' ? '' : this.destinationTitle(kind, param as string),
+          kind === 'project' ? '' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
           kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
@@ -324,12 +330,18 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
 
+  private inboxTitle(route: InboxRoute): string {
+    if (route.scopeKind === 'global') { return '收录箱'; }
+    return this.destinationTitle(route.scopeKind, route.scopeId) + ' · 收录';
+  }
+
   private destinationTitle(kind: string, id: string): string {
     if (kind === 'privacy') { return '隐私政策'; }
     if (kind === 'settings') { return '设置'; }
     if (kind === 'developer') { return DEVELOPER_PAGE_TITLE; }
     if (kind === 'reference') { return '准备参考图'; }
     if (kind === 'expenseStats') { return '花费统计'; }
+    if (kind === 'inbox') { return '收录箱'; }
     if (kind === 'character') { return this.state.characterName(id); }
     if (kind === 'project') { return this.state.projectName(id); }
     if (kind === 'event') { return this.state.events.find((e: CosEvent) => e.id === id)?.name || '活动'; }

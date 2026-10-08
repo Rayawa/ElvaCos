@@ -1,3 +1,5 @@
+import { CollectedEntry, entryFromText } from './CollectedEntry';
+import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
 import { PlanReadiness, buildPlanReadiness } from './PlanReadiness';
 import { OperationResult, executeOperation, operationCommitted } from './OperationResult';
@@ -58,6 +60,7 @@ export interface SettingsSelection {
 }
 
 class DataSnapshot {
+  entries: CollectedEntry[] = [];
   team: TeamMember[] = [];
   expenses: Expense[] = [];
   references: ReferenceImage[] = [];
@@ -73,7 +76,7 @@ class DataSnapshot {
   links: ProjectAsset[] = [];
   diary: DiaryEntry[] = [];
 }
-const DATA_SCOPES: string[] = ['team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary'];
+const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary'];
 
 @ObservedV2
 export class AppState {
@@ -88,6 +91,7 @@ export class AppState {
   @Trace error: string = '';
   @Trace notice: string = '';
   @Trace feedbackVersion: number = 0;
+  @Trace entries: CollectedEntry[] = [];
   @Trace characters: Character[] = [];
   @Trace variants: CharacterVariant[] = [];
   @Trace projects: CosProject[] = [];
@@ -107,6 +111,7 @@ export class AppState {
   @Trace accountBusy: boolean = false;
   @Trace sensedHand: string = 'auto';
   private db: Database = new Database();
+  private entryRepo = new EntryRepository(this.db);
   private characterRepo = new CharacterRepository(this.db);
   private variantRepo = new CharacterVariantRepository(this.db);
   private projectRepo = new CosProjectRepository(this.db);
@@ -174,7 +179,7 @@ export class AppState {
   async maintain(): Promise<void> {
     if (!this.ready || this.busy) { return; }
     await this.perform(async () => {
-      await this.media?.collect(this.photos, this.references);
+      await this.media?.collect(this.photos, this.references, this.entries);
       try { await this.reminder.reconcile(this.events); }
       catch (error) { this.reportNotice('系统提醒暂未核对，可重新打开应用后重试'); }
     }, false);
@@ -258,6 +263,7 @@ export class AppState {
   }
   async refresh(scopes: string[] = DATA_SCOPES): Promise<void> {
     const snapshot = new DataSnapshot();
+    if (scopes.includes('entries')) { snapshot.entries = await this.entryRepo.list(); }
     if (scopes.includes('team')) { snapshot.team = await this.planningRepo.team(); }
     if (scopes.includes('expenses')) { snapshot.expenses = await this.planningRepo.expenses(); }
     if (scopes.includes('references')) { snapshot.references = await this.planningRepo.references(); }
@@ -287,6 +293,7 @@ export class AppState {
     if (scopes.includes('photos')) { this.photos = snapshot.photos; }
     if (scopes.includes('links')) { this.links = snapshot.links; }
     if (scopes.includes('diary')) { this.diary = snapshot.diary; }
+    if (scopes.includes('entries')) { this.entries = snapshot.entries; }
     this.localDate = today();
   }
   @Computed
@@ -342,6 +349,47 @@ export class AppState {
       else if (result.status === 'failed') { this.reportError(result.detail || '操作失败，请重试'); }
       return result;
     } finally { this.busy = false; this.operationScope = ''; }
+  }
+  @Computed
+  get untriagedEntries(): CollectedEntry[] { return this.entries.filter((entry: CollectedEntry) => entry.scopeKind === 'global'); }
+  saveEntry(entry: CollectedEntry): Promise<OperationResult> {
+    return this.performResult(async () => { await this.entryRepo.save(entry); }, true, ['entries']);
+  }
+  captureEntry(text: string, scopeKind: string = 'global', scopeId: string = ''): Promise<OperationResult> {
+    return this.performResult(async () => { await this.entryRepo.save(entryFromText(text, scopeKind, scopeId)); }, true, ['entries']);
+  }
+  captureEntryImage(scopeKind: string = 'global', scopeId: string = ''): Promise<OperationResult> {
+    return this.performResult(async () => {
+      if (!this.media) { throw new Error('图片选择暂不可用，请重试'); }
+      const uris = await this.media.select(1); if (!uris.length) { return; }
+      const media = await this.media.import(uris[0], '');
+      const entry = new CollectedEntry(); entry.id = media.id; entry.kind = 'image';
+      entry.scopeKind = scopeKind; entry.scopeId = scopeId; entry.localPath = media.localPath; entry.thumbnailPath = media.thumbnailPath;
+      try { await this.entryRepo.save(entry); }
+      catch (error) { await this.media.remove(media); throw error as Error; }
+    }, true, ['entries']);
+  }
+  repairEntryImage(entry: CollectedEntry): Promise<OperationResult> {
+    return this.performResult(async () => {
+      if (!this.media || !this.entries.some((item: CollectedEntry) => item.id === entry.id)) { throw new Error('收录已不存在，请重新加载'); }
+      const uris = await this.media.select(1); if (!uris.length) { return; }
+      const media = await this.media.import(uris[0], '');
+      const copy = JSON.parse(JSON.stringify(entry)) as CollectedEntry; copy.localPath = media.localPath; copy.thumbnailPath = media.thumbnailPath;
+      try { await this.entryRepo.save(copy); }
+      catch (error) { await this.media.remove(media); throw error as Error; }
+      await this.media.remove(entry);
+    }, true, ['entries']);
+  }
+  convertEntry(entry: CollectedEntry, kind: string, scopeKind: string, scopeId: string, amount: string, date: string): Promise<OperationResult> {
+    return this.performResult(async () => {
+      if (kind === 'reference' && (!this.media || !await this.media.exists(entry))) { throw new Error('图片缺失，请先重新选图'); }
+      await this.entryRepo.convert(entry, kind, scopeKind, scopeId, amount, date);
+      // Task/expense conversions no longer retain the attachment's media.
+      if (kind !== 'reference') { await this.media?.remove(entry); }
+    }, true, ['entries', 'preparationCategories', 'preparationTasks', 'expenses', 'references']);
+  }
+  removeEntry(entry: CollectedEntry): Promise<OperationResult> {
+    return this.performResult(async () => { await this.entryRepo.remove(entry.id); await this.media?.remove(entry); }, true, ['entries']);
   }
   async saveCharacter(item: Character): Promise<boolean> {
     return this.perform(async () => {

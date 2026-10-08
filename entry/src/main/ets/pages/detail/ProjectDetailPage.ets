@@ -491,6 +491,10 @@ export struct ProjectDetail {
       .attributeModifier(this.feedback.control('button-30'))
   }
 
+  @Builder entryLink() {
+    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'project|' + this.project.id); })
+  }
+
   @Builder packing() {
     SectionHeading({
       title: '打包清单',
@@ -545,7 +549,7 @@ export struct ProjectDetail {
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 1 ? 1 : 0).translate({ y: this.entrance.step >= 1 ? 0 : 20 })
         Column({ space: Theme.sectionSpacing }) {
-          if (this.route.section === 1) { this.packing() } else { this.preparationList(); this.equipmentList(); this.planning() }
+          if (this.route.section === 1) { this.packing() } else { this.preparationList(); this.equipmentList(); this.planning(); this.entryLink() }
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
         Blank().height(Theme.contentBottom).width('100%')

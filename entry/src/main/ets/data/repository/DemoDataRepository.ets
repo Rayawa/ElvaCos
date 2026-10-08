@@ -61,6 +61,7 @@ export class DemoDataRepository {
               const value = row[column];
               if (typeof value === 'string') { row[column] = this.resolve(value, paths, now); }
             }
+            if (table.name === 'projects' && row['budget_configured'] === undefined) { row['budget_configured'] = Number(row['budget_cents']) > 0 ? 1 : null; }
             await tx.insert(table.name, row);
           }
         }

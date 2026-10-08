@@ -69,6 +69,7 @@ export struct AssetDetail {
           }, (p: CosProject) => p.id)
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
+        Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'asset' && entry.scopeId === this.asset.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'asset|' + this.asset.id); })
         Blank().height(Theme.contentBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
