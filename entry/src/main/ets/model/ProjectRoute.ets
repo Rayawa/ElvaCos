@@ -1,3 +1,4 @@
+import { InboxRoute } from './CollectedEntry';
 import { PhotoCollectionRoute } from './PhotoCollection';
 // Each detail destination keeps its own task view when another detail is opened.
 @ObservedV2
@@ -22,6 +23,7 @@ export class ProjectRoute {
   focusTaskId: string = '';
   focusPackingId: string = '';
   focusHandled: boolean = false;
+  entries: InboxRoute;
   offsets: number[] = [0, 0, 0, 0];
-  constructor(id: string, section: number = 0) { this.id = id; this.section = section; this.photos = new PhotoCollectionRoute(id); }
+  constructor(id: string, section: number = 0) { this.id = id; this.entries = new InboxRoute('project', id); this.section = section; this.photos = new PhotoCollectionRoute(id); }
 }

@@ -298,7 +298,7 @@ export struct EventDetail {
             Blank().height(Theme.detailTopWithSegment).width('100%')
             if (this.route.section === 0) { this.overview() }
             else if (this.route.section === 1) { this.plans() }
-            else if (this.route.section === 2) { EntryCollection({ state: this.state, scopeKind: 'event', scopeId: this.event.id, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
+            else if (this.route.section === 2) { EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
             else { this.reminders() }
           } else {
             ForEach(this.modules(), (module: DayModule) => { this.dayModule(module) }, (module: DayModule) => module.id)

@@ -166,7 +166,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 | 全局搜索 | `SearchRoute { query, section, resourceKind, offsets, anchorKey }`；标题分段为计划 / 角色 / 日程 / 资源，资源类型用筛选 | 空关键词说明搜索范围，并提供角色库入口；非空关键词匹配本机名称 / 说明 / 地点 / 归属上下文 | 查看对象后保留关键词、分段、资源类型与原行附近偏移；活动跨 Tab 返回恢复同一搜索路由；删除后保留范围并说明结果更新 |
 | 完整待办 | `TaskRoute { category, projectId?, range?, focusId? }` | 需要行动 | 保留筛选 |
 | 花费/统计 | `LedgerRoute { projectId?, range?, category? }` | 本月 | 保留筛选 |
-| 收录箱 | `InboxRoute { kind?, scope?, untriagedOnly? }` | 未归位 | 保留筛选 |
+| 收录箱 | `InboxRoute { kind?, scope?, untriagedOnly?, content, offset, anchorId }` | 未归位 | 保留筛选、未提交捕获文字与附近偏移；已归位条目进入归属对象的收录视图 |
 
 运行时路由保存分段、筛选、焦点、各视图偏移与来源引用；计划 section 索引重排不涉及数据迁移。相册根页与从计划进入的范围相册复用同一组件，后者返回所属计划，照片查看返回原集合与缩略图位置。各根页设置返回保留来源 Tab、筛选与偏移；清空或完整替换数据后统一重置这些上下文。
 

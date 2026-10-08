@@ -190,7 +190,14 @@ import { EmptyState } from '../component/Surfaces';
     }
     if (kind === 'inbox' && id.startsWith('event|')) { this.openEvent(id.slice(6), false, 2); return; }
     if (kind === 'inbox') {
-      const parts = id.split('|'); this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
+      const parts = id.split('|');
+      if (parts[0] === 'asset') {
+        const top = this.detailStack.size() - 1;
+        if (top < 0 || this.detailStack.getAllPathName()[top] !== 'asset' || (this.detailStack.getParamByIndex(top) as AssetRoute).id !== parts[1]) {
+          this.detailStack.pushPathByName('asset', new AssetRoute(parts[1], 'collection', '', this.tab), false);
+        }
+      }
+      this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
     } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos' || kind === 'outing' || kind === 'projectPreparation') {
       const section = kind === 'packing' || kind === 'outing' ? 2 : kind === 'projectPhotos' ? 3 : kind === 'projectPreparation' ? 1 : 0;
       const route = new ProjectRoute(id, section); route.outing = kind === 'outing';
@@ -350,6 +357,11 @@ import { EmptyState } from '../component/Surfaces';
     if (name === 'project') { return this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id); }
     if (name === 'asset') { return this.state.assets.some((asset: Asset) => asset.id === (param as AssetRoute).id); }
     if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as CharacterRoute).id); }
+    if (name === 'inbox') {
+      const route = param as InboxRoute;
+      if (route.scopeKind === deletedKind && route.scopeId === deletedId) { return false; }
+      return this.inboxOwnerExists(route);
+    }
     if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id && !(deletedKind === 'project' && photo.projectId === deletedId)); }
     if (name === 'album') {
       (param as AlbumRoute).reconcile(this.state.projects, this.state.photos, deletedKind === 'project' ? deletedId : '');
@@ -358,6 +370,13 @@ import { EmptyState } from '../component/Surfaces';
     if (name === 'tasks' && (param as TaskRoute).projectId && (deletedKind === 'project' && (param as TaskRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as TaskRoute).projectId))) { (param as TaskRoute).projectId = ''; }
     if (name === 'expenseStats' && (param as LedgerRoute).projectId && (deletedKind === 'project' && (param as LedgerRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as LedgerRoute).projectId))) { (param as LedgerRoute).projectId = ''; }
     return true;
+  }
+  private inboxOwnerExists(route: InboxRoute): boolean {
+    if (route.scopeKind === 'global') { return true; }
+    if (route.scopeKind === 'project') { return this.state.projects.some((project: CosProject) => project.id === route.scopeId); }
+    if (route.scopeKind === 'character') { return this.state.characters.some((character: Character) => character.id === route.scopeId); }
+    if (route.scopeKind === 'event') { return this.state.events.some((event: CosEvent) => event.id === route.scopeId); }
+    return route.scopeKind === 'asset' && this.state.assets.some((asset: Asset) => asset.id === route.scopeId);
   }
   private pruneInvalidDetails(deletedKind: string, deletedId: string): void {
     const indexes: number[] = [];
@@ -544,7 +563,11 @@ import { EmptyState } from '../component/Surfaces';
         openDeveloper: (): void => { this.openDeveloper(); }
       })
     } else if (kind === 'inbox') {
-      InboxPage({ state: this.state, route: param as InboxRoute, backToOwner: (): void => { this.closeDetail(); }, open: (kind: string, id: string): void => { this.open(kind, id); } })
+      if (this.inboxOwnerExists(param as InboxRoute)) {
+        InboxPage({ state: this.state, route: param as InboxRoute, backToOwner: (): void => { this.closeDetail(); }, open: (kind: string, id: string): void => { this.open(kind, id); } })
+      } else {
+        EmptyState({ title: '收录归属对象已不存在', message: '保留的条目可在未归位收录中继续整理。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop })
+      }
     } else if (kind === 'developer') {
       DevPage({ entrance: entrance, state: this.state })
     } else {
@@ -578,6 +601,7 @@ import { EmptyState } from '../component/Surfaces';
         ),
         back: (): void => { this.closeDetail(); },
         shown: (): void => {
+          if (kind === 'inbox') { (param as InboxRoute).restoreVersion++; }
           if (kind === 'search') { (param as SearchRoute).restoreVersion++; }
           if (kind === 'characters') { (param as PlanListRoute).restoreVersion++; }
           if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }

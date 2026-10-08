@@ -202,6 +202,30 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   const dayEvent = Object.assign(new CosEvent(), { id: 'day', date: '2026-10-08', dateMode: 'multiple', endDate: '2026-10-10' });
   const time = value => new Date(value).getTime();
+  await test('collection scope and kind queries preserve source records and distinguish unfiled from owner views', () => {
+    const { CollectedEntry, InboxRoute, filterCollectedEntries } = require(root + '/model/CollectedEntry.ets');
+    const records = [['loose','note','global',''],['map','map','event','expo'],['foreign','map','event','other'],['asset','map','asset','wig']]
+      .map(([id,kind,scopeKind,scopeId]) => Object.assign(new CollectedEntry(),{id,kind,scopeKind,scopeId}));
+    const before = JSON.stringify(records); const route = new InboxRoute();
+    assert.deepEqual(filterCollectedEntries(records,route).map(entry=>entry.id),['loose']);
+    route.setUntriagedOnly(false); route.setKind('map'); assert.deepEqual(filterCollectedEntries(records,route).map(entry=>entry.id),['map','foreign','asset']);
+    const owner = new InboxRoute('event','expo'); assert.deepEqual(filterCollectedEntries(records,owner).map(entry=>entry.id),['map']);
+    owner.setKind('note'); assert.deepEqual(filterCollectedEntries(records,owner),[]); owner.setKind(''); assert.equal(filterCollectedEntries(records,owner).length,1);
+    assert.equal(JSON.stringify(records),before);
+  });
+  await test('collection return paths preserve filters, unsaved capture and nearby offset; leaving results gives honest feedback', () => {
+    const { CollectedEntry, InboxRoute } = require(root + '/model/CollectedEntry.ets');
+    const { EventRoute, EventReturnPath } = require(root + '/model/EventRoute.ets');
+    const route = new InboxRoute(); route.setUntriagedOnly(false); route.setKind('map'); route.content='尚未收录的想法'; route.offset=640; route.anchorId='ticket';
+    const event = new EventRoute('expo'); event.returnPaths.push(new EventReturnPath('inbox',route));
+    const restored=event.returnPaths[0].param; restored.restoreVersion++; restored.reconcile([Object.assign(new CollectedEntry(),{id:'ticket',kind:'map',scopeKind:'event',scopeId:'expo'})]);
+    assert.equal(restored,route); assert.equal(route.kind,'map'); assert.equal(route.untriagedOnly,false); assert.equal(route.content,'尚未收录的想法'); assert.equal(route.offset,640); assert.equal(route.anchorId,'ticket');
+    restored.reconcile([]); assert.equal(route.anchorId,''); assert.match(route.feedback,/当前范围/); assert.equal(route.offset,640); assert.equal(route.kind,'map');
+    const generation=route.restoreVersion; route.setKind('invalid'); assert.equal(route.restoreVersion,generation); route.setKind('map'); assert.equal(route.offset,640);
+    route.setKind('ticket'); assert.equal(route.offset,0); assert.equal(route.feedback,''); assert.equal(route.restoreVersion,generation+1); assert.equal(route.content,'尚未收录的想法');
+    const { ProjectRoute }=require(root+'/model/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/model/CharacterRoute.ets');
+    for(const owner of [new ProjectRoute('plan'),new CharacterRoute('role'),event]) { owner.entries.setKind('link'); assert.equal(owner.entries.kind,'link'); assert.equal(owner.entries.scopeId,owner.id); assert.equal(owner.entries.content,''); }
+  });
   await test('day entry opens at local eve 20:00 and ends after the entire last day', () => {
     assert.equal(day.dayWindow(dayEvent, time('2026-10-07T19:59:59')), false);
     assert.equal(day.dayWindow(dayEvent, time('2026-10-07T20:00:00')), true);

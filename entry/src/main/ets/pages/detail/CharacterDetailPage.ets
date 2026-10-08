@@ -92,7 +92,7 @@ export struct CharacterDetail {
     Column({ space: 14 }) {
       SheetHeader({ title: '角色收录', hint: this.character.name, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => { this.route.entriesOpen = false; } })
       Scroll() {
-        EntryCollection({ state: this.state, scopeKind: 'character', scopeId: this.character.id, open: (kind: string, id: string): void => { this.open(kind, id); } })
+        EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } })
       }.layoutWeight(1).width('100%')
     }.width('100%').height('100%').padding(Theme.pagePadding).backgroundColor(Theme.surface)
   }

@@ -443,7 +443,7 @@ export struct ProjectDetail {
           }
           else if (this.route.contextSheet === 'references') {
             ReferenceGallery({ state: this.state, images: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id), add: (): void => { this.state.importReferences(this.project.id); }, open: (id: string): void => { this.open('reference', id); } })
-          } else { EntryCollection({ state: this.state, scopeKind: 'project', scopeId: this.project.id, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
+          } else { EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
         }.width('100%').alignItems(HorizontalAlign.Start)
       }.layoutWeight(1).width('100%')
     }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)

@@ -29,4 +29,4 @@ trap 'rm -f "$TASK_REPORT"' EXIT
 # Only controls this app; never writes business data.
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyUITestRunner -s timeout 120000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
-rg 'Tests run: 12, Failure: 0, Error: 0, Pass: 12, Ignore: 0' "$TASK_REPORT"
+rg 'Tests run: 13, Failure: 0, Error: 0, Pass: 13, Ignore: 0' "$TASK_REPORT"

@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { AppState } from '../model/ApplicationState';
-import { CollectedEntry, ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_SCOPES, ENTRY_SCOPE_LABELS, entryTitle } from '../model/CollectedEntry';
+import { CollectedEntry, InboxRoute, filterCollectedEntries, ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_SCOPES, ENTRY_SCOPE_LABELS, entryTitle } from '../model/CollectedEntry';
 import { operationCommitted } from '../model/OperationResult';
 import { Theme } from '../common/Theme';
 import { today } from '../common/format';
@@ -16,14 +16,8 @@ interface EntryOwner { id: string; name: string; }
 @ComponentV2
 export struct EntryCollection {
   @Require @Param state: AppState;
-  @Param scopeKind: string = 'global';
-  @Param initialKind: string = '';
-  @Param untriagedOnly: boolean = true;
-  @Param scopeId: string = '';
+  @Param route: InboxRoute = new InboxRoute();
   @Event open: (kind: string, id: string) => void = () => {};
-  @Local content: string = '';
-  @Local kindFilter: string = '';
-  @Local includeFiled: boolean = false;
   @Local editing: boolean = false;
   @Local entry: CollectedEntry = new CollectedEntry();
   @Local title: string = '';
@@ -40,11 +34,9 @@ export struct EntryCollection {
   @Local ownerQuery: string = '';
   @Local sheetEntrance: StaggerEntrance = new StaggerEntrance();
 
-  aboutToAppear(): void { this.kindFilter = this.initialKind; this.includeFiled = !this.untriagedOnly; }
   @Computed
   private get visible(): CollectedEntry[] {
-    return this.state.entries.filter((entry: CollectedEntry) =>
-      (this.scopeKind === 'global' ? this.includeFiled || entry.scopeKind === 'global' : entry.scopeKind === this.scopeKind && entry.scopeId === this.scopeId) && (!this.kindFilter || entry.kind === this.kindFilter));
+    return filterCollectedEntries(this.state.entries, this.route);
   }
   private ownerName(entry: CollectedEntry): string {
     if (entry.scopeKind === 'project') { return this.state.projectName(entry.scopeId); }
@@ -63,7 +55,7 @@ export struct EntryCollection {
     return owners.filter((owner: EntryOwner) => owner.name.toLocaleLowerCase().includes(this.ownerQuery.toLocaleLowerCase()));
   }
   private async capture(value: string): Promise<void> {
-    if (operationCommitted(await this.state.captureEntry(value, this.scopeKind, this.scopeId))) { if (value === this.content) { this.content = ''; } }
+    if (operationCommitted(await this.state.captureEntry(value, this.route.scopeKind, this.route.scopeId))) { if (value === this.route.content) { this.route.content = ''; } }
   }
   private async paste(): Promise<void> {
     if (this.state.busy) { return; }
@@ -71,7 +63,8 @@ export struct EntryCollection {
     catch (error) { this.state.reportError('未能读取剪贴板，可以在输入框中手动粘贴后收录'); }
   }
   private begin(entry: CollectedEntry): void {
-    if (this.scopeKind === 'global' && entry.scopeKind !== 'global') { this.open(entry.scopeKind, entry.scopeId); return; }
+    this.route.anchorId = entry.id;
+    if (this.route.scopeKind === 'global' && entry.scopeKind !== 'global') { this.open('inbox', entry.scopeKind + '|' + entry.scopeId); return; }
     this.entry = entry; this.title = entry.title; this.text = entry.text; this.url = entry.url; this.entryKind = entry.kind;
     this.pinned = entry.pinned; this.assigning = false; this.conversion = ''; this.targetId = ''; this.ownerQuery = ''; this.editing = true;
   }
@@ -174,25 +167,26 @@ export struct EntryCollection {
   }
   build() {
     Column({ space: 16 }) {
-      TextArea({ text: this.content, placeholder: '粘贴链接或写一句话，直接收录' }).height(100).onChange((value: string): void => { this.content = value; }).accessibilityText('收录内容')
+      TextArea({ text: this.route.content, placeholder: '粘贴链接或写一句话，直接收录' }).height(100).onChange((value: string): void => { this.route.content = value; }).accessibilityText('收录内容')
       Flex({ wrap: FlexWrap.Wrap }) {
-        Button(this.state.busy ? '收录中…' : '收录').enabled(!this.state.busy && this.content.trim().length > 0).backgroundColor(Theme.brand).fontColor(Theme.onAccent)
-          .onClick((): void => { this.capture(this.content); }).margin({ right: 8, bottom: 8 })
+        Button(this.state.busy ? '收录中…' : '收录').enabled(!this.state.busy && this.route.content.trim().length > 0).backgroundColor(Theme.brand).fontColor(Theme.onAccent)
+          .onClick((): void => { this.capture(this.route.content); }).margin({ right: 8, bottom: 8 })
         PasteButton().onClick((_event: ClickEvent, result: PasteButtonOnClickResult): void => {
           if (result === PasteButtonOnClickResult.SUCCESS) { this.paste(); }
           else { this.state.reportError('未获粘贴授权，可以手动粘贴到输入框'); }
         })
         Button('存一张图').enabled(!this.state.busy).backgroundColor(Theme.tint).fontColor(Theme.accent)
-          .onClick((): void => { this.state.captureEntryImage(this.scopeKind, this.scopeId); }).margin({ bottom: 8 })
+          .onClick((): void => { this.state.captureEntryImage(this.route.scopeKind, this.route.scopeId); }).margin({ bottom: 8 })
       }.width('100%')
-      if (this.scopeKind === 'global') {
-        Select([{ value: '未归位' }, { value: '全部收录' }]).value(this.includeFiled ? '全部收录' : '未归位')
-          .onSelect((index: number): void => { this.includeFiled = index === 1; })
+      if (this.route.scopeKind === 'global') {
+        Select([{ value: '未归位' }, { value: '全部收录' }]).value(this.route.untriagedOnly ? '未归位' : '全部收录').id('entry-scope-filter')
+          .onSelect((index: number): void => { this.route.setUntriagedOnly(index === 0); })
         Text('未归位 ' + this.state.untriagedEntries.length + ' 条 · 归位可稍后处理').fontSize(13).fontColor(Theme.muted)
       }
       Select(new Array<SelectOption>({ value: '所有类型' }).concat(ENTRY_KIND_LABELS.map((label: string): SelectOption => ({ value: label }))))
-        .value(this.kindFilter ? ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.kindFilter)] : '所有类型')
-        .onSelect((index: number): void => { this.kindFilter = index === 0 ? '' : ENTRY_KINDS[index - 1]; })
+        .value(this.route.kind ? ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.route.kind)] : '所有类型').id('entry-kind-filter')
+        .onSelect((index: number): void => { this.route.setKind(index === 0 ? '' : ENTRY_KINDS[index - 1]); })
+      if (this.route.feedback) { Text(this.route.feedback).fontSize(14).fontColor(Theme.muted) }
       ForEach(this.visible, (entry: CollectedEntry) => {
         Button() {
           Row({ space: 12 }) {
@@ -203,10 +197,10 @@ export struct EntryCollection {
             }.layoutWeight(1).alignItems(HorizontalAlign.Start)
             Text('›').fontColor(Theme.muted)
           }.width('100%').padding(14)
-        }.width('100%').backgroundColor(Theme.surface).constraintSize({ minHeight: 64 })
+        }.id('entry-row:' + entry.id).width('100%').backgroundColor(Theme.surface).constraintSize({ minHeight: 64 })
           .onClick((): void => { this.begin(entry); }).accessibilityText(entryTitle(entry) + '，' + this.ownerName(entry))
       }, (entry: CollectedEntry) => entry.id)
-      if (this.visible.length === 0) { EmptyState({ title: this.kindFilter ? '没有匹配的收录' : '先存下，再慢慢整理', message: '上方可直接粘贴、写一句话或选择图片。', button: this.kindFilter ? '清除类型筛选' : '存一张图', action: (): void => { if (this.kindFilter) { this.kindFilter = ''; } else { this.state.captureEntryImage(this.scopeKind, this.scopeId); } } }) }
+      if (this.visible.length === 0) { EmptyState({ title: this.route.kind ? '没有匹配的收录' : '先存下，再慢慢整理', message: '上方可直接粘贴、写一句话或选择图片。', button: this.route.kind ? '清除类型筛选' : '存一张图', action: (): void => { if (this.route.kind) { this.route.setKind(''); } else { this.state.captureEntryImage(this.route.scopeKind, this.route.scopeId); } } }) }
     }.width('100%').alignItems(HorizontalAlign.Start)
       .bindSheet(this.editing, this.editor(), this.sheetOptions())
   }

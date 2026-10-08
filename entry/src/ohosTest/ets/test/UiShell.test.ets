@@ -1,5 +1,6 @@
 import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
+import { CollectedEntry } from '../../../main/ets/model/CollectedEntry';
 import { CosEvent } from '../../../main/ets/model/Entities';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
@@ -154,6 +155,31 @@ export default function uiShellTest(): void {
       await driver.pressBack(); await driver.delayMs(350); await present('当前范围没有匹配结果'); await tap('清除搜索'); await present('打开角色库');
       expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
       await back(); await present('home-search');
+    });
+    it('inboxReturnsFromEventWithTheSameKindScopeAndScrolledRow', 0, async () => {
+      const state = getApplicationState(); const oldEntries = state.entries; const oldEvents = state.events;
+      const event = new CosEvent(); event.id = 'ui-inbox-context-event'; event.name = '收录返回验证'; event.dateMode = 'pending';
+      const fixtures: CollectedEntry[] = [];
+      for (let index = 0; index < 32; index++) {
+        const entry = new CollectedEntry(); entry.id = 'ui-inbox-context-' + index; entry.kind = 'map'; entry.scopeKind = 'event'; entry.scopeId = event.id; entry.title = '返回位置地图 ' + index; entry.text = '只读内存验证'; fixtures.push(entry);
+      }
+      const loose = new CollectedEntry(); loose.id = 'ui-inbox-context-loose'; loose.text = '未归位只读验证'; fixtures.push(loose);
+      try {
+        state.events = oldEvents.concat(event); state.entries = fixtures;
+        await tap('首页'); await (await driver.findComponent(ON.id('home-scroll').inWindow(bundle))).scrollSearch(ON.id('home-inbox').inWindow(bundle)); await tap('home-inbox');
+        await present('未归位'); await tap('entry-scope-filter'); await tap('全部收录'); await tap('entry-kind-filter'); await tap('地图');
+        const id = 'entry-row:ui-inbox-context-30'; const scroll = await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle));
+        await scroll.scrollSearch(ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+        const before = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds(); await tap(id);
+        await present('event-detail-segment'); await present('收录'); await back(); await present(id);
+        const after = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+        expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
+        await (await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350);
+        await present('全部收录'); await present('地图'); await back();
+      } finally {
+        for (let attempt = 0; attempt < 4 && !(await driver.findComponent(ON.id('main-tabs').inWindow(bundle))); attempt++) { await back(); }
+        state.entries = oldEntries; state.events = oldEvents;
+      }
     });
     it('fixedChromeAndIndependentSettingsRespectSafeAreas', 0, async () => {
       await tap('衣柜');
