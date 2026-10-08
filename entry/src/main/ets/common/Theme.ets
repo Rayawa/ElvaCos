@@ -2,6 +2,7 @@ import { CustomTheme } from '@kit.ArkUI';
 import { DEFAULT_THEME_COLOR } from './constants';
 import { resolveThemePalette } from './ThemePalettes';
 import {
+  LAYOUT_MAIN_TABS_HEIGHT, LAYOUT_MAIN_TABS_BOTTOM_MARGIN, LAYOUT_DAY_SNACK_GAP, LAYOUT_DAY_SNACK_RESERVATION,
   LAYOUT_CONTENT_TOP,
   LAYOUT_DETAIL_TOP,
   LAYOUT_DETAIL_TOP_WITH_SEGMENT,
@@ -83,6 +84,10 @@ class ThemeTokens {
     // 根 WithTheme 观察新对象即时更新；不改变系统默认主题，切回蓝色即可恢复原风格。
   }
 
+  readonly mainTabsHeight: number = LAYOUT_MAIN_TABS_HEIGHT;
+  readonly mainTabsBottomMargin: number = LAYOUT_MAIN_TABS_BOTTOM_MARGIN;
+  readonly daySnackGap: number = LAYOUT_DAY_SNACK_GAP;
+  readonly daySnackReservation: number = LAYOUT_DAY_SNACK_RESERVATION;
   readonly contentTop: number = LAYOUT_CONTENT_TOP;
   /** 二级页面与一级页面共用同一套标题栏几何，顶部留白一致（与 Dashboard AppDetailPage 对照确认）。 */
   readonly detailTop: number = LAYOUT_DETAIL_TOP;

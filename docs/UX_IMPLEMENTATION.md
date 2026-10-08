@@ -233,3 +233,14 @@ E 继续：衣柜搜索 / 类型 / 状态 / 位置筛选、装备资料 / 使用
 ## 全方案核对：失效参考图（2026-10-08）
 
 参考图路由不再用新建空对象替代已删除记录；与计划 / 装备 / 照片详情一样显示失效说明及返回动作。`./scripts/build.sh` 33 tasks 编译通过；该只读空状态未另加重复实现的测试。继续核对第 3.2 节的全局搜索入口与各对象的反向链接 / 返回契约；最终五入口设备交互仍未宣称通过。
+
+
+## 今日入口：官方 HdsSnackBar（2026-10-08）
+
+按用户要求替换 C 阶段的自绘底条：使用 `@kit.UIDesignKit` 的 HdsSnackBar，沿用华为[常驻通知弹窗示例](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/ui-design-snackbar-resident-notification)的 `duration: -1`、`TEXT_WITH_CLOSE`、按钮 ID 与焦点设置；[官方 API](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/ui-design-hdssnackbar)和本机 SDK 确认底部避让与 API 23 高度自适应参数。网页工具未取得正文，已通过浏览器读取官方示例及 API 表格。
+
+- 通知悬浮在 HdsTabs 上方，通过官方 `keyboardDownAvoidHeight` 避让页签栏高度 / 下边距 / 间距；页签栏保持原位，不再由自绘底条上推。根页共用通知占位，随字体比例增加，收起时撤回。
+- 前夜 / 当天 / 跨日退场、多活动优先级和当天关闭记录继续复用原模型；进入按钮切日程并进入今天模式。关闭等待 Preferences 结果，失败由既有错误反馈表达并恢复入口。
+- 根导航隐藏、打开 Sheet 或应用后台时 dismiss，返回根页后按时间窗恢复；消息 / 宽度 / 配色未变时不重复 show。使用原生文本与关闭操作区，不自定义 SnackBar 内部 Builder。
+
+验证：`./scripts/build.sh` 主包 33 tasks 编译通过；未运行设备套件。编译验证 API 与 ArkTS 写法，不作为实际真机间距、字体或触控范围的证据。全局搜索契约已补入方案，后续继续实现及全方案核对。

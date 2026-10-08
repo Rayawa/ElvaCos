@@ -28,6 +28,7 @@ import { ReferenceDetail } from './detail/ReferenceDetailPage';
 import { ExpenseSummary } from './more/ExpenseSummaryPage';
 import { ReferenceImage } from '../model/Planning';
 import {
+  HdsSnackBar, SnackBarOperationType,
   HdsNavigation,
   HdsNavigationTitleMode,
   HdsTabs,
@@ -43,7 +44,7 @@ import { appSheetOptions } from '../common/sheet';
 import { Theme } from '../common/Theme';
 import { Icons } from '../common/Icons';
 import { SheetHeader } from '../component/SheetHeader';
-import { SegmentButtonV2Items, SegmentButtonV2ItemOptions } from '@kit.ArkUI';
+import { LengthMetrics, SegmentButtonV2Items, SegmentButtonV2ItemOptions } from '@kit.ArkUI';
 import { HdsTitleBarSegment } from '../component/HdsTitleBarSegment';
 import { HdsActionTabs } from '../component/HdsActionTabs';
 import { HapticService } from '../common/HapticService';
@@ -93,6 +94,11 @@ import { EmptyState } from '../component/Surfaces';
   private editingShotRoute?: ProjectRoute;
   private checkingFormClose: boolean = false;
   @Local viewportWidth: number = 360;
+  private daySnackBar?: HdsSnackBar;
+  private daySnackKey: string = '';
+  private rootVisible: boolean = true;
+  private closingDaySnack: boolean = false;
+  @Local daySnackReservation: number = 0;
   private clockTimer: number = -1;
   private startupTimer: number = -1;
   private maintenanceTimer: number = -1;
@@ -101,8 +107,8 @@ import { EmptyState } from '../component/Surfaces';
 
   onPageShow(): void {
     this.visible = true;
-    this.state.tickClock();
-    if (this.clockTimer < 0) { this.clockTimer = setInterval((): void => { this.state.tickClock(); }, 1000); }
+    this.state.tickClock(); this.syncDaySnack();
+    if (this.clockTimer < 0) { this.clockTimer = setInterval((): void => { this.state.tickClock(); this.syncDaySnack(); }, 1000); }
     if (this.startupTimer >= 0) { return; }
     this.startupTimer = setTimeout(async (): Promise<void> => {
       this.startupTimer = -1;
@@ -117,7 +123,7 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private cancelTasks(): void {
-    this.visible = false;
+    this.visible = false; this.hideDaySnack();
     if (this.clockTimer >= 0) { clearInterval(this.clockTimer); this.clockTimer = -1; }
     if (this.startupTimer >= 0) { clearTimeout(this.startupTimer); this.startupTimer = -1; }
     if (this.maintenanceTimer >= 0) { clearTimeout(this.maintenanceTimer); this.maintenanceTimer = -1; }
@@ -864,7 +870,7 @@ import { EmptyState } from '../component/Surfaces';
             scroller: this.pageScrollers[index],
             state: this.state,
             topInset: Theme.contentTop,
-            bottomInset: Theme.homeContentBottom,
+            bottomInset: Theme.homeContentBottom + this.daySnackReservation,
             active: this.tab === index,
             open: (k: string, id: string) => this.open(k, id),
             openTask: (item: TaskQueueItem): void => { this.openTaskItem(item); },
@@ -877,7 +883,7 @@ import { EmptyState } from '../component/Surfaces';
             scroller: this.pageScrollers[index],
             state: this.state,
             topInset: Theme.contentTop,
-            bottomInset: Theme.contentBottom,
+            bottomInset: Theme.contentBottom + this.daySnackReservation,
             active: this.tab === index,
             route: this.planListRoute,
             open: (k: string, id: string) => this.open(k, id),
@@ -890,7 +896,7 @@ import { EmptyState } from '../component/Surfaces';
             scroller: this.pageScrollers[index],
             state: this.state,
             topInset: Theme.contentTop,
-            bottomInset: Theme.contentBottom,
+            bottomInset: Theme.contentBottom + this.daySnackReservation,
             active: this.tab === index,
             route: this.scheduleRoute,
             openTask: (item: TaskQueueItem): void => { this.openTaskItem(item); },
@@ -904,7 +910,7 @@ import { EmptyState } from '../component/Surfaces';
             scroller: this.pageScrollers[index],
             state: this.state,
             topInset: Theme.contentTop,
-            bottomInset: Theme.contentBottom,
+            bottomInset: Theme.contentBottom + this.daySnackReservation,
             active: this.tab === index,
             route: this.wardrobeRoute,
             open: (k: string, id: string) => this.open(k, id),
@@ -915,7 +921,7 @@ import { EmptyState } from '../component/Surfaces';
           AlbumPage({
             state: this.state, route: this.albumRoute,
             scroller: this.pageScrollers[index], entranceSession: this.mainEntranceSession,
-            topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index,
+            topInset: Theme.contentTop, bottomInset: Theme.contentBottom + this.daySnackReservation, active: this.tab === index,
             view: (route: PhotoViewerRoute): void => { this.openPhoto(route); },
             importPhotos: (id: string): void => { this.chooseImport(id); }
           })
@@ -937,6 +943,7 @@ import { EmptyState } from '../component/Surfaces';
       .hideToolBar(true)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%').height('100%').backgroundColor(Theme.bg)
+      .onNavBarStateChange((_visible: boolean): void => { this.syncDaySnack(); })
   }
 
   @Builder mainTabs() {
@@ -952,7 +959,7 @@ import { EmptyState } from '../component/Surfaces';
       TabContent() { this.mainNavigation(4) }
         .tabBar(new BottomTabBarStyle(Icons.importPhoto, '相册')).accessibilityText('相册标签页')
     }.id('main-tabs')
-      .barPosition(BarPosition.End)
+      .barPosition(BarPosition.End).barHeight(Theme.mainTabsHeight)
       .barWidth(Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)))
       .cachedMaxCount(5, TabsCacheMode.CACHE_LATEST_SWITCHED)
       .scrollable(false).vertical(false).barOverlap(true)
@@ -973,33 +980,65 @@ import { EmptyState } from '../component/Surfaces';
         this.state.suspend();
         HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
       })
-      .layoutWeight(1).width('100%')
+      .width('100%').height('100%')
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg)
       .accessibilityText('首页、计划、日程、衣柜、相册五个标签页')
-      .onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
+      .onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); this.syncDaySnack(); })
   }
 
-  @Builder dayEntryBar() {
-    if (this.state.ready && this.state.todayEvents.length > 0) {
-      Row({ space: 8 }) {
-        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
-          .layoutWeight(1).constraintSize({ minHeight: 64 }).fontSize(17).fontColor(Theme.accent).backgroundColor(Theme.tint)
-          .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); }).id('day-entry-bar')
-        Button('关闭').constraintSize({ minHeight: 64, minWidth: 64 }).fontColor(Theme.muted).backgroundColor(Theme.surface).enabled(!this.state.settingsBusy)
-          .onClick((): void => { const id = this.state.todayEvents[0]?.id; if (id) { this.state.dismissDayEntry(id); } }).accessibilityText('今天不再显示这场活动的入口')
-      }.padding({ left: 16, right: 16, bottom: 28 }).width('100%').backgroundColor(Theme.bg)
+  private hideDaySnack(): void {
+    try { if (this.daySnackKey) { this.daySnackBar?.dismiss(); } }
+    catch (error) { console.warn('Today SnackBar could not be dismissed: ' + String(error)); }
+    finally { this.daySnackKey = ''; this.daySnackReservation = 0; }
+  }
+  @Monitor('state.todayEvents', 'state.ready', 'formOpen', 'importOpen', 'restoreOpen', 'state.settings')
+  daySnackChanged(): void { this.syncDaySnack(); }
+  private async dismissDaySnack(id: string): Promise<void> {
+    if (this.closingDaySnack) { return; }
+    this.closingDaySnack = true; this.hideDaySnack();
+    try { await this.state.dismissDayEntry(id); }
+    finally { this.closingDaySnack = false; this.syncDaySnack(); }
+  }
+  private syncDaySnack(): void {
+    const event = this.state.todayEvents[0];
+    if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.stacks[this.tab].size() > 0 || this.formOpen || this.importOpen || this.restoreOpen || this.closingDaySnack) {
+      this.hideDaySnack(); return;
     }
+    const title = dayTitle(event, this.state.clockTime);
+    const remaining = this.state.todayEvents.length - 1;
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    const scale = Math.max(1, context?.config.fontSizeScale || 1);
+    const width = Math.min(Theme.contentMaxWidth, Math.max(0, this.viewportWidth - 32));
+    if (width <= 0) { return; }
+    const key = JSON.stringify([event.id, title, remaining, width, scale, Theme.paletteId, this.state.settings.effects, this.state.settings.appearance]);
+    if (key === this.daySnackKey) { return; }
+    this.hideDaySnack();
+    try {
+      if (!this.daySnackBar) { this.daySnackBar = new HdsSnackBar(this.getUIContext()); }
+      this.daySnackBar.show(
+        { icon: Icons.event },
+        { title: title, content: remaining ? '还有 ' + remaining + ' 场活动 · 查看今天模式' : '出发前与现场事项' },
+        { operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: '进入', textButtonId: 'day-entry-bar', cancelButtonId: 'day-entry-close',
+          contentAccessibilityText: '进入' + title + '的今天模式', closeButtonAccessibilityText: '今天不再显示这场活动的入口',
+          onContentClick: (): void => { this.hideDaySnack(); this.open('dayEvent', event.id); },
+          onCloseButtonClick: (): void => { void this.dismissDaySnack(event.id); } },
+        { duration: -1, isHeightAdaptive: true, width: LengthMetrics.vp(width),
+          keyboardDownAvoidHeight: LengthMetrics.vp(Theme.mainTabsHeight + Theme.mainTabsBottomMargin + Theme.daySnackGap),
+          keyboardUpAvoidHeight: LengthMetrics.vp(Theme.daySnackGap), nextFocusId: 'main-tabs', theme: Theme.nativeTheme,
+          blurStrategy: this.state.settings.effects ? BlurStrategy.ENABLE : BlurStrategy.DISABLE,
+          pressBackCallback: (): void => { void this.dismissDaySnack(event.id); } }
+      );
+      this.daySnackKey = key; this.daySnackReservation = Theme.daySnackReservation * scale;
+    } catch (error) { console.warn('Today SnackBar could not be shown: ' + String(error)); }
   }
 
   build() {
     WithTheme({ theme: Theme.nativeTheme }) {
     HdsNavigation(this.detailStack) {
-      Column() {
-        this.mainTabs()
-        this.dayEntryBar()
-      }.width('100%').height('100%')
+      this.mainTabs()
     }.mode(NavigationMode.Stack).hideTitleBar(true).hideToolBar(true)
+      .onNavBarStateChange((visible: boolean): void => { this.rootVisible = visible; this.syncDaySnack(); })
       .navDestination(this.destination)
       .customNavContentTransition((_from: NavContentInfo, _to: NavContentInfo, operation: NavigationOperation) => {
         if (operation === NavigationOperation.POP) { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); }

@@ -14,7 +14,7 @@ Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。�
 
 当前五个一级入口为首页、计划、日程、衣柜、相册；各根页右上角齿轮进入同一设置目的地。首页采用接下来 / 在途与待办 / 最近三区块。计划标题栏为进行中 / 已完成 / 全部；角色库从计划页首部与首页进入覆盖目的地，角色详情承担角色编辑与履历。日程为列表 / 日历；衣柜只承载装备；相册为按场次 / 待处理，作品集复用同一照片查询。旧独立我的页移除，计划日志移入所属计划概览的记录 Sheet。
 
-主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、计划、装备、照片详情和设置压入主路由，覆盖详情显示时主页底栏隐藏；活动详情由日程 Tab 的独立栈承载，今天入口占用底部布局高度。详情之间的关联跳转继续入主栈，返回逐层恢复。
+主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、计划、装备、照片详情和设置压入主路由，覆盖详情显示时主页底栏隐藏；活动详情由日程 Tab 的独立栈承载，今天入口改用官方常驻 HdsSnackBar，悬浮在固定的 HdsTabs 页签栏上方；根页共用通知占位，详情 / Sheet / 后台时收起。详情之间的关联跳转继续入主栈，返回逐层恢复。
 
 二级切换使用 titleBar.stackBuilder 内的 HdsTitleBarSegment / TabSegmentButtonV2。根页只保留主要业务动作与设置齿轮；计划和活动详情动作使用标题菜单，底栏不混入业务动作。新增、编辑、关联与导入选择使用 Sheet；删除使用确认 Dialog。相册根页与带计划范围的相册覆盖页共用 AlbumPage，PhotoViewerRoute 返回原照片集合与位置；从计划进入的相册返回仍恢复来源计划。
 
