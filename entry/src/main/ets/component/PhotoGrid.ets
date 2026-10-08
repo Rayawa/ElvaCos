@@ -7,6 +7,7 @@ import { ManagedImage } from './ManagedImage';
 import { AppState } from '../model/ApplicationState';
 import { Theme } from '../common/Theme';
 import { ArrayDataSource } from '../common/ArrayDataSource';
+import { groupPhotoRows } from '../common/PhotoRows';
 import { PhotoAsset, PhotoStatus } from '../model/Entities';
 import { EmptyState, InteractiveCard } from './Surfaces';
 import { vibration } from '../common/vibration';
@@ -38,8 +39,8 @@ export struct PhotoGrid {
   private viewportHeight: number = 0;
   aboutToAppear(): void { this.route.reconcile(this.photos); this.refreshRows(); this.restoreOffset(); }
   aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; } }
-  @Monitor('photos', 'route.filter', 'route.portfolio', 'route.queue', 'route.planId', 'viewportWidth', 'route.selecting', 'route.selectedIds')
-  private refreshRows(): void { this.rowsSource.replace(this.rows()); }
+  @Monitor('photos', 'route', 'route.filter', 'route.portfolio', 'route.queue', 'route.planId', 'viewportWidth', 'route.selecting', 'route.selectedIds')
+  private refreshRows(): void { this.rowsSource.replace(this.photoRows); }
   @Monitor('photos')
   private photosChanged(): void { this.route.reconcile(this.photos); }
   @Monitor('route', 'route.filter', 'route.portfolio', 'route.planId', 'route.restoreVersion')
@@ -50,12 +51,17 @@ export struct PhotoGrid {
     if (this.viewportHeight <= 0) { return; }
     this.restoreTimer = setTimeout((): void => {
       this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false }); this.restoring = false; this.restored = true;
-      if (this.route.anchorId && this.visible().some((photo: PhotoAsset) => photo.id === this.route.anchorId)) {
+      if (this.route.anchorId && this.visiblePhotos.some((photo: PhotoAsset) => photo.id === this.route.anchorId)) {
         try { this.getUIContext().getFocusController().requestFocus('photo-thumbnail:' + this.route.anchorId); } catch (error) {}
       }
     }, 0);
   }
-  private visible(): PhotoAsset[] { return selectPhotoCollection(this.photos, this.route); }
+  @Computed
+  private get visiblePhotos(): PhotoAsset[] { return selectPhotoCollection(this.photos, this.route); }
+  @Computed
+  private get photoRows(): PhotoAsset[][] { return groupPhotoRows(this.visiblePhotos, this.columns()); }
+  @Computed
+  private get selectedPhotoIds(): Set<string> { return new Set<string>(this.route.selectedIds); }
   private filters(): number[] { return this.route.portfolio ? [0, 7] : this.route.queue ? [0, 1, 3] : [0, 1, 2, 3, 4, 5, 6, 7]; }
   private filterLabels(): string[] { return this.route.portfolio ? ['全部作品', '已发布'] : this.filters().map((filter: number) => PHOTO_FILTER_LABELS[filter]); }
   private choose(photo: PhotoAsset): void {
@@ -76,7 +82,7 @@ export struct PhotoGrid {
   }
   @Builder controls() {
     Column({ space: 12 }) {
-      Text('当前范围 ' + this.visible().length + ' 张').fontSize(14).fontColor(Theme.muted)
+      Text('当前范围 ' + this.visiblePhotos.length + ' 张').fontSize(14).fontColor(Theme.muted)
       Row({ space: 12 }) {
         Select(this.filterLabels().map((label: string): SelectOption => { return { value: label }; }))
           .selected(this.filters().indexOf(this.route.filter)).value(this.filterLabels()[this.filters().indexOf(this.route.filter)] || this.filterLabels()[0]).layoutWeight(1)
@@ -85,13 +91,13 @@ export struct PhotoGrid {
           .onSelect((index: number): void => { vibration.dotVibration(); this.route.setFilter(this.filters()[index]); })
           .accessibilityText('照片状态筛选')
         Button(this.route.selecting ? '取消选择' : '批量选片').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
-          .enabled(!this.state.busy && !this.route.submitting && this.visible().length > 0)
+          .enabled(!this.state.busy && !this.route.submitting && this.visiblePhotos.length > 0)
           .onClick((): void => { this.route.selecting = !this.route.selecting; this.route.clearSelection(); })
       }.width('100%')
       if (this.route.selecting) {
         Row() {
           Text('已选 ' + this.route.selectedIds.length + ' 张').fontSize(14).fontColor(Theme.ink).layoutWeight(1)
-          Button(this.visible().length > 0 && this.route.selectedIds.length === this.visible().length ? '取消全选' : '全选当前筛选')
+          Button(this.visiblePhotos.length > 0 && this.route.selectedIds.length === this.visiblePhotos.length ? '取消全选' : '全选当前筛选')
             .constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy && !this.route.submitting)
             .onClick((): void => { this.route.selectAll(this.photos); })
         }.width('100%')
@@ -116,17 +122,13 @@ export struct PhotoGrid {
         Text(photo.localPath ? '缩略图未建立，可打开原图' : '媒体待恢复').width('100%').aspectRatio(0.8).backgroundColor(Theme.surface).borderRadius(14).fontColor(Theme.muted).textAlign(TextAlign.Center)
       }
       Column({ space: 6 }) {
-        if (this.route.selecting) { Text(this.route.selectedIds.includes(photo.id) ? '✓ 已选' : '○ 点选').fontSize(14).fontColor(Theme.accent) }
+        if (this.route.selecting) { Text(this.selectedPhotoIds.has(photo.id) ? '✓ 已选' : '○ 点选').fontSize(14).fontColor(Theme.accent) }
         Text(photoStatusLabel(photo.status)).fontSize(14).fontColor(Theme.accent)
         Text(this.state.projectName(photo.projectId)).fontSize(14).fontColor(Theme.muted).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
       }.id('photo-caption:' + photo.id).width('100%').alignItems(HorizontalAlign.Start).padding({ left: 12, right: 12, top: 4, bottom: 14 })
     }.width('100%')
   }
   private columns(): number { return this.viewportWidth >= 720 ? 4 : this.viewportWidth >= 520 ? 3 : 2; }
-  private rows(): PhotoAsset[][] {
-    const rows: PhotoAsset[][] = []; const photos = this.visible(); const count = this.columns();
-    for (let i = 0; i < photos.length; i += count) { rows.push(photos.slice(i, i + count)); } return rows;
-  }
   build() {
     List({ space: Theme.sectionSpacing, scroller: this.scroller }) {
       ListItem() {
@@ -135,7 +137,7 @@ export struct PhotoGrid {
           Column({ space: 12 }) { this.header(); PhotoImportStatus({ state: this.state, projectId: this.route.planId }); this.controls() }.width('100%').opacity(this.step() >= 1 ? 1 : 0)
         }.width('100%')
       }
-      if (!this.visible().length) {
+      if (!this.visiblePhotos.length) {
         ListItem() {
           Column({ space: 12 }) {
           EmptyState({ title: this.route.portfolio ? '作品从第一张成片开始' : this.route.queue ? '这个范围没有待处理照片' : '这个范围还没有照片',
@@ -152,11 +154,11 @@ export struct PhotoGrid {
                 InteractiveCard({
                   label: this.state.projectName(photo.projectId) + '，' + photoStatusLabel(photo.status), hint: this.route.selecting ? '双击切换照片选择' : '双击打开照片详情',
                   effects: this.state.settings.effects, contentPadding: 0, action: (): void => { this.choose(photo); }, content: (): void => { this.photoContent(photo); } }).id('photo-thumbnail:' + photo.id).layoutWeight(1)
-              }, (photo: PhotoAsset) => photo.id + ':' + photo.thumbnailPath + ':' + photo.status + ':' + this.route.selecting + ':' + this.route.selectedIds.includes(photo.id))
+              }, (photo: PhotoAsset) => photo.id + ':' + photo.thumbnailPath + ':' + photo.status + ':' + this.route.selecting + ':' + this.selectedPhotoIds.has(photo.id))
               ForEach(new Array<number>(Math.max(0, this.columns() - row.length)).fill(0), (_value: number) => { Blank().layoutWeight(1) }, (_value: number, index: number) => String(index))
             }.width('100%').alignItems(VerticalAlign.Top).opacity(this.step() >= 2 ? 1 : 0)
           }
-        }, (row: PhotoAsset[]) => row.map((photo: PhotoAsset) => photo.id + ':' + photo.thumbnailPath + ':' + photo.status + ':' + this.route.selecting + ':' + this.route.selectedIds.includes(photo.id)).join('|'))
+        }, (row: PhotoAsset[]) => row.map((photo: PhotoAsset) => photo.id + ':' + photo.thumbnailPath + ':' + photo.status + ':' + this.route.selecting + ':' + this.selectedPhotoIds.has(photo.id)).join('|'))
       }
       ListItem() { Column() { Blank().height(this.bottomInset).width('100%') }.width('100%') }
     }.id(this.route.portfolio ? 'portfolio-photo-list' : 'photo-list').width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).height('100%')

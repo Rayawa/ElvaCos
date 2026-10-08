@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
 const crypto = require('node:crypto');
+const { performance } = require('node:perf_hooks');
 const studio = (process.env.DEVECO_HOME || path.join(process.env.HOME, 'Applications/DevEco-Studio.app')).replace(/\/Contents$/, '') + '/Contents';
 const ts = require(path.join(studio, 'tools/ohpm/node_modules/typescript'));
 const originalLoad = Module._load;
@@ -682,6 +683,65 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.deepEqual(PHOTO_FILTER_LABELS, ['全部', '待选', '已选', '待修', '已修', '成片', '归档', '已发布']);
     assert.equal(new Set(PHOTO_EDIT_STATUSES.map(photoStatusLabel)).size, 7);
     assert.equal(photoStatusLabel(PhotoStatus.IMPORTED), photoStatusLabel(PhotoStatus.RAW));
+  });
+  await test('100 plans, 1000 assets and 5000 photo metadata retain shared counts, scoped filters, row order and batch recovery', () => {
+    const { buildAlbumSummary } = require(root + '/model/AlbumSummary.ets');
+    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/model/PhotoCollection.ets');
+    const { groupPhotoRows } = require(root + '/common/PhotoRows.ets');
+    const statuses = [PhotoStatus.IMPORTED, PhotoStatus.RAW, PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED];
+    const stageIndexes = [0, 0, 1, 2, 3, 4, 4, 5];
+    const plans = Array.from({ length: 100 }, (_, index) => Object.assign(new CosProject(), { id: 'scale-plan-' + index, targetDate: index % 3 ? '2026-10-08' : '', status: index % 5 ? ProjectStatus.PLANNING : ProjectStatus.COMPLETED }));
+    const equipment = Array.from({ length: 1000 }, (_, index) => Object.assign(new Asset(), { id: 'scale-asset-' + index, status: Object.values(AssetStatus)[index % 6] }));
+    const links = equipment.map((asset, index) => Object.assign(new ProjectAsset(), { projectId: plans[Math.floor(index / 10)].id, assetId: asset.id }));
+    for (const plan of plans.slice(1)) links.push(Object.assign(new ProjectAsset(), { projectId: plan.id, assetId: equipment[0].id }));
+    const expectedCounts = plans.map(() => [0, 0, 0, 0, 0, 0]);
+    const input = Array.from({ length: 5000 }, (_, index) => {
+      const planIndex = index % 100, statusIndex = Math.floor(index / 100) % 8;
+      expectedCounts[planIndex][stageIndexes[statusIndex]]++;
+      return Object.assign(new PhotoAsset(), { id: 'scale-photo-' + index, projectId: plans[planIndex].id, status: statuses[statusIndex] });
+    });
+    const readAll = () => plans.map(plan => buildPlanReadiness(plan, [], [], equipment, links, input, [], [], '2026-10-08'));
+    const readiness = readAll(), summary = buildAlbumSummary(readiness, plans, [], input);
+    assert.equal(summary.total, 5000); assert.equal(summary.plans.length, 100);
+    assert.deepEqual(summary.counts, expectedCounts.reduce((sum, counts) => sum.map((value, index) => value + counts[index]), [0, 0, 0, 0, 0, 0]));
+    readiness.forEach((value, index) => {
+      assert.deepEqual(value.photos.byStage, expectedCounts[index]); assert.equal(value.photos.total, 50);
+      assert.equal(value.equipment.total, index ? 11 : 10);
+      assert.equal(summary.plans.find(plan => plan.id === value.id).date, plans[index].targetDate);
+    });
+    const filterStatuses = [statuses, statuses.slice(0, 2), [statuses[2]], [statuses[3]], [statuses[4]], statuses.slice(5, 7), [statuses[7]], [statuses[6]]];
+    for (const planId of ['', plans[37].id]) {
+      for (const mode of ['all', 'queue', 'portfolio']) {
+        for (let filter = 0; filter < 8; filter++) {
+          const route = new PhotoCollectionRoute(planId, mode === 'portfolio', mode === 'queue'); route.filter = filter;
+          const expected = input.filter(photo => (!planId || photo.projectId === planId) && filterStatuses[filter].includes(photo.status) && (mode !== 'queue' || [statuses[0], statuses[1], statuses[3]].includes(photo.status)) && (mode !== 'portfolio' || [statuses[5], statuses[6]].includes(photo.status)));
+          const visible = selectPhotoCollection(input, route); assert.deepEqual(visible, expected);
+          for (const columns of [2, 3, 4]) {
+            const rows = groupPhotoRows(visible, columns), flattened = rows.flat();
+            assert.equal(rows.length, Math.ceil(expected.length / columns)); assert.deepEqual(flattened, expected);
+            assert.ok(flattened.every((photo, index) => photo === expected[index]));
+          }
+        }
+      }
+    }
+    const route = new PhotoCollectionRoute(); route.selecting = true; route.offset = 1200; route.selectAll(input);
+    assert.equal(route.selectedIds.length, 5000); route.toggle(input[0].id, input); assert.equal(route.selectedIds.length, 4999);
+    route.toggle(input[0].id, input); const submitted = route.begin(input); assert.equal(new Set(submitted).size, 5000);
+    route.finish(false); assert.deepEqual(route.selectedIds, submitted); assert.equal(route.offset, 1200);
+    route.reconcile(input.slice(20)); assert.equal(route.selectedIds.length, 4980); assert.equal(route.offset, 1200);
+    route.selectAll(input); assert.equal(route.selectedIds.length, 5000); route.selectAll(input); assert.equal(route.selectedIds.length, 0);
+    function measure(action, samples = 30) {
+      for (let index = 0; index < 3; index++) action();
+      const times = Array.from({ length: samples }, () => { const start = performance.now(); action(); return performance.now() - start; }).sort((a, b) => a - b);
+      return { medianMs: +times[Math.floor(times.length / 2)].toFixed(3), p95Ms: +times[Math.ceil(times.length * .95) - 1].toFixed(3), samples };
+    }
+    const timings = {
+      planReadiness100: measure(readAll),
+      albumSummary: measure(() => buildAlbumSummary(readiness, plans, [], input)),
+      photoFilterAndRows5000: measure(() => groupPhotoRows(selectPhotoCollection(input, route), 2)),
+      selectAllAndReconcile5000: measure(() => { route.selectedIds = []; route.selectAll(input); route.reconcile(input); route.selectAll(input); }, 12)
+    };
+    console.log('HOST_METADATA_TIMING ' + JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch, plans: 100, assets: 1000, photos: 5000, timings, scope: 'pure functions; no native observation, rendering, media decoding or database IO' }));
   });
   await test('photo batch freezes its actual selection, preserves it on failure, clears on committed success and explains filter changes', () => {
     const { PhotoCollectionRoute } = require(root + '/model/PhotoCollection.ets');

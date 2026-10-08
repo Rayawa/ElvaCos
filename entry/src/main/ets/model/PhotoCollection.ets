@@ -41,12 +41,13 @@ export class PhotoCollectionRoute {
   selectAll(photos: PhotoAsset[]): void {
     if (this.submitting || !this.selecting) { return; }
     const ids = selectPhotoCollection(photos, this).map((photo: PhotoAsset) => photo.id);
-    this.selectedIds = ids.length && ids.every((id: string) => this.selectedIds.includes(id)) ? [] : ids;
+    const selected = new Set<string>(this.selectedIds);
+    this.selectedIds = ids.length && ids.every((id: string) => selected.has(id)) ? [] : ids;
   }
   reconcile(photos: PhotoAsset[]): void {
     if (this.submitting) { return; }
-    const visible = selectPhotoCollection(photos, this).map((photo: PhotoAsset) => photo.id);
-    const retained = this.selectedIds.filter((id: string) => visible.includes(id));
+    const visible = new Set<string>(selectPhotoCollection(photos, this).map((photo: PhotoAsset) => photo.id));
+    const retained = this.selectedIds.filter((id: string) => visible.has(id));
     if (retained.length !== this.selectedIds.length) { this.selectedIds = retained; this.feedback = '照片范围已更新，已移除失效选择'; }
   }
   begin(photos: PhotoAsset[]): string[] {
