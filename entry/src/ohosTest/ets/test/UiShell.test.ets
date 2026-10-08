@@ -1,7 +1,7 @@
 import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
 import { CollectedEntry } from '../../../main/ets/model/CollectedEntry';
-import { CosEvent, CosProject, Character } from '../../../main/ets/model/Entities';
+import { CosEvent, CosProject, Character, ChecklistItem, PhotoAsset, PhotoStatus, ProjectStatus } from '../../../main/ets/model/Entities';
 import { localDay } from '../../../main/ets/model/DayMode';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
@@ -162,6 +162,64 @@ export default function uiShellTest(): void {
       await driver.pressBack(); await driver.delayMs(350); await present('当前范围没有匹配结果'); await tap('清除搜索'); await present('打开角色库');
       expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
       await back(); await present('home-search');
+    });
+    it('secondaryNativeTabsKeepSelectionAndPackingPositionWithIsolatedMetadata', 0, async () => {
+      const state = getApplicationState();
+      const oldCharacters = state.characters, oldProjects = state.projects, oldChecklist = state.checklist, oldPhotos = state.photos;
+      const stamp = String(Date.now());
+      const role = new Character(); role.id = 'ui-native-tabs-role-' + stamp; role.name = '页签验证角色' + stamp;
+      const plan = new CosProject(); plan.id = 'ui-native-tabs-plan-' + stamp; plan.name = '页签验证计划' + stamp;
+      plan.characterId = role.id; plan.status = ProjectStatus.PREPARING; plan.targetDate = localDay(Date.now());
+      const packing: ChecklistItem[] = [], photos: PhotoAsset[] = [];
+      for (let index = 0; index < 40; index++) {
+        const item = new ChecklistItem(); item.id = 'ui-native-tabs-pack-' + stamp + '-' + index; item.projectId = plan.id;
+        item.label = '临时打包项 ' + index; item.sortOrder = index; packing.push(item);
+      }
+      for (let index = 0; index < 12; index++) {
+        const photo = new PhotoAsset(); photo.id = 'ui-native-tabs-photo-' + stamp + '-' + index;
+        photo.projectId = plan.id; photo.status = PhotoStatus.RAW; photos.push(photo);
+      }
+      try {
+        // Only runtime arrays and selection change; no files, Picker, Apply or repository write.
+        state.characters = oldCharacters.concat(role); state.projects = oldProjects.concat(plan);
+        state.checklist = oldChecklist.concat(packing); state.photos = oldPhotos.concat(photos);
+        await tap('首页');
+        await (await driver.findComponent(ON.id('home-scroll').inWindow(bundle))).scrollSearch(ON.id('home-search').inWindow(bundle));
+        await tap('home-search'); await tap('search-view-tabs-0');
+        await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).inputText(plan.name);
+        await driver.delayMs(400); await driver.pressBack(); await driver.delayMs(350);
+        const resultId = 'search-result:project:' + plan.id;
+        await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id(resultId).inWindow(bundle)); await tap(resultId);
+        await present('project-view-tabs'); await present('project-overview'); await detailActions();
+        await tap('project-view-tabs-2'); await present('project-packing');
+        const anchor = 'packing-row:' + packing[20].id;
+        await (await driver.findComponent(ON.id('project-packing').inWindow(bundle))).scrollSearch(ON.id(anchor).inWindow(bundle)); await driver.delayMs(350);
+        const before = await (await driver.findComponent(ON.id(anchor).inWindow(bundle))).getBounds();
+        await tap('project-view-tabs-3'); await present('photo-list'); await tap('批量选片'); await tap('全选当前筛选'); await present('已选 12 张');
+        await tap('project-view-tabs-1'); await present('project-preparation');
+        await tap('project-view-tabs-3'); await present('已选 12 张'); await tap('取消选择');
+        await tap('project-view-tabs-2'); await present('project-packing'); await driver.delayMs(350);
+        const after = await (await driver.findComponent(ON.id(anchor).inWindow(bundle))).getBounds();
+        expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
+        await back(); await present('search-view-tabs');
+        await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id('global-search-input').inWindow(bundle));
+        expect(await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).getText()).assertEqual(plan.name);
+        await tap('search-view-tabs-1');
+        await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).inputText(role.name);
+        await driver.delayMs(400); await driver.pressBack(); await driver.delayMs(350);
+        const roleResult = 'search-result:character:' + role.id;
+        await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id(roleResult).inWindow(bundle)); await tap(roleResult);
+        await present('character-view-tabs'); await tap('character-view-tabs-1'); await present('角色履历');
+        await tap('character-view-tabs-2'); await present('参考图片'); await tap('character-view-tabs-0');
+        await (await driver.findComponent(ON.id('character-detail-scroll').inWindow(bundle))).scrollSearch(ON.id('character-entry-link').inWindow(bundle)); await present('character-entry-link');
+        await back(); await present('search-view-tabs'); await back(); await present('home-search');
+        expect(state.checklist.filter((item: ChecklistItem): boolean => item.projectId === plan.id && item.done).length).assertEqual(0);
+        expect(state.photos.filter((photo: PhotoAsset): boolean => photo.projectId === plan.id && photo.status !== PhotoStatus.RAW).length).assertEqual(0);
+      } finally {
+        for (let attempt = 0; attempt < 5 && !(await driver.findComponent(ON.id('main-tabs').inWindow(bundle))); attempt++) { await back(); }
+        state.characters = oldCharacters; state.projects = oldProjects; state.checklist = oldChecklist; state.photos = oldPhotos;
+        await tap('首页');
+      }
     });
     it('inboxAndOwnerCollectionsKeepKindAndScrolledRowsThroughReturnAndSheetReopening', 0, async () => {
       const state = getApplicationState(); const oldEntries = state.entries; const oldEvents = state.events;

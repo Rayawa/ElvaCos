@@ -29,4 +29,4 @@ trap 'rm -f "$TASK_REPORT"' EXIT
 # Does not write business data; the system-calendar case opens its editor and cancels.
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyUITestRunner -s timeout 120000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
-rg 'Tests run: 14, Failure: 0, Error: 0, Pass: 14, Ignore: 0' "$TASK_REPORT"
+rg 'Tests run: 15, Failure: 0, Error: 0, Pass: 15, Ignore: 0' "$TASK_REPORT"
