@@ -79,4 +79,11 @@ export function validateBackupRelations(tables: BackupTable[]): void {
     link(row, 'project_id', 'projects', true); link(row, 'character_id', 'characters', true);
   });
   unique('reference_images', ['project_id', 'source_uri'], true); unique('reference_images', ['character_id', 'source_uri'], true);
+  each('project_shots', (row): void => {
+    const project = link(row, 'project_id', 'projects');
+    if (row['reference_id'] !== '') {
+      const reference = link(row, 'reference_id', 'reference_images');
+      if (reference?.['project_id'] !== row['project_id'] && reference?.['character_id'] !== project?.['character_id']) { throw new Error('备份拍摄参考图不属于此计划或角色'); }
+    }
+  });
 }

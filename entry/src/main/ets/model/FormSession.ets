@@ -41,7 +41,7 @@ export class FormSession {
   }
   restore(): void {
     const record = this.pendingRestore; if (!record || this.closed) { return; }
-    this.sourceChanged = record.baseline !== this.baseline;
+    this.sourceChanged = EditDraft.fromJSON(record.baseline).fingerprint() !== this.baseline;
     this.draft = EditDraft.fromJSON(record.payload); this.recoveredAt = record.savedAt; this.savedAt = record.savedAt;
     this.lastSaved = this.draft.fingerprint(); this.pendingRestore = undefined;
   }

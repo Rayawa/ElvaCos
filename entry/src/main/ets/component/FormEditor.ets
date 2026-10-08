@@ -1,3 +1,5 @@
+import { ReferenceImage } from '../model/Planning';
+import { shotReferences } from '../model/Shot';
 import { today } from '../common/format';
 import {
   ASSET_STATUSES,
@@ -121,6 +123,7 @@ export struct FormEditor {
     finally { this.session.submitting = false; }
   }
   private nameHint(): string {
+    if (this.draft.kind === 'shot') { return '例如：桥边回头、合影、道具特写'; }
     if (this.draft.kind === 'event') { return '例如：秋日漫展、外景拍摄'; }
     if (this.draft.kind === 'team') { return '例如：摄影小林'; }
     if (this.draft.kind === 'expense') { return '例如：摄影定金'; }
@@ -131,6 +134,7 @@ export struct FormEditor {
     if (this.draft.kind === 'preparation') { return '例如：试穿并确认尺寸'; }
     return '例如：初音未来';
   }
+  private references(): ReferenceImage[] { const project = this.state.projects.find((item: CosProject) => item.id === this.draft.parentId); return project ? shotReferences(this.state.references, project) : []; }
   build() {
     Column({ space: 12 }) {
       SheetHeader({
@@ -143,7 +147,7 @@ export struct FormEditor {
           this.draftStatus()
           Column({ space: 18 }) {
           if (this.draft.kind !== 'project' && this.draft.kind !== 'reference' && this.draft.kind !== 'photo') { Field({ componentId: 'form-input:name', error: this.issue('name'), area: (area: Area): void => { this.fieldArea('name', area); }, focused: (): void => { this.focus('name'); },
-              label: this.draft.kind === 'team' ? '姓名 / 称呼 *' : this.draft.kind === 'expense' ? '花费用途 *' : '名称 *',
+              label: this.draft.kind === 'team' ? '姓名 / 称呼 *' : this.draft.kind === 'expense' ? '花费用途 *' : this.draft.kind === 'shot' ? '拍摄事项 *' : '名称 *',
               value: this.draft.name,
               placeholder: this.nameHint(),
               change: (v: string) => { this.draft.name = v; }
@@ -422,7 +426,17 @@ export struct FormEditor {
             DateField({ componentId: 'form-input:waitingUntil', error: this.issue('waitingUntil'), area: (area: Area): void => { this.fieldArea('waitingUntil', area); }, label: '等待至（可选）', value: this.draft.waitingUntil, optional: true, change: (value: string): void => { this.draft.waitingUntil = value; } })
             Text('填写任一等待字段后，未完成任务会归入「在途」，不计入逾期。清空两项可回到待办。').fontSize(13).fontColor(Theme.muted)
           }
-          if (this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { Field({ componentId: 'form-input:notes', error: this.issue('notes'), area: (area: Area): void => { this.fieldArea('notes', area); }, focused: (): void => { this.focus('notes'); },
+          if (this.draft.kind === 'shot') {
+            Text('参考图（可选）').fontSize(14).fontColor(Theme.muted)
+            Select(new Array<SelectOption>({ value: '不关联参考图' }).concat(this.references().map((reference: ReferenceImage): SelectOption => { return { value: (reference.caption || '参考图') + (reference.projectId ? ' · 此计划' : ' · 此角色') }; })))
+              .value(this.draft.referenceId ? (this.references().find((reference: ReferenceImage) => reference.id === this.draft.referenceId)?.caption || (this.references().some((reference: ReferenceImage) => reference.id === this.draft.referenceId) ? '参考图' : '参考图已不存在，请重新选择')) : '不关联参考图')
+              .constraintSize({ minHeight: 48 }).id('form-input:referenceId').accessibilityText('拍摄参考图')
+              .onSelect((index: number): void => { this.draft.referenceId = index === 0 ? '' : this.references()[index - 1].id; })
+              .onAreaChange((_, area: Area): void => { this.fieldArea('referenceId', area); })
+            this.fieldIssue('referenceId')
+            Text('拍摄勾选独立于准备任务、装包与照片处理状态。').fontSize(14).fontColor(Theme.muted)
+          }
+          if (this.draft.kind !== 'shot' && this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { Field({ componentId: 'form-input:notes', error: this.issue('notes'), area: (area: Area): void => { this.fieldArea('notes', area); }, focused: (): void => { this.focus('notes'); },
               multilineLimit: this.draft.kind === 'photo' ? 20000 : 2000, label: this.draft.kind === 'photo' ? '照片说明' : this.draft.kind === 'reference' ? '图片说明' : '备注',
               value: this.draft.notes,
               multiline: true,

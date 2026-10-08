@@ -87,6 +87,11 @@ export default function uiShellTest(): void {
         await back(); await driver.delayMs(350);
       }
       await tap('计划'); await present('新建计划');
+      const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
+      if (plans.length > 0) {
+        await plans[0].click(); await driver.delayMs(500); await tap('照片'); await present('project-shots-open'); await tap('project-shots-open'); await present('拍摄清单');
+        await tap('添加拍摄事项'); await present('拍摄事项 *'); await present('参考图（可选）'); await tap('sheet-close'); await present('拍摄清单'); await tap('sheet-close'); await back();
+      }
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
       await tap('活动'); await present('添加活动');
       await tap('日历'); await present('今天'); await tap('今天'); await tap('列表'); await present('查看某一天（可选）');

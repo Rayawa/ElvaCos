@@ -10,6 +10,11 @@ export class ProjectRoute {
   @Trace linking: boolean = false;
   @Trace expandedCategories: string[] = [];
   @Trace photos: PhotoCollectionRoute;
+  @Trace shotsOpen: boolean = false;
+  resumeShots: boolean = false;
+  shotOffset: number = 0;
+  focusShotId: string = '';
+  focusShotHandled: boolean = false;
   @Trace contextSheet: string = '';
   @Trace restoreVersion: number = 0;
   @Trace showCompleted: boolean = false;

@@ -1,3 +1,4 @@
+import { ProjectShot, shotReferences } from './Shot';
 import { today } from '../common/format';
 import { TeamMember, Expense, ReferenceImage } from './Planning';
 import { PreparationCategory, PreparationTask, makePreparation, preparationKeys } from './Preparation';
@@ -46,6 +47,7 @@ export class EditDraft {
   @Trace startTime: string = '';
   @Trace endTime: string = '';
   @Trace reminderMinutes: number = -1;
+  @Trace referenceId: string = '';
   @Trace categoryId: string = '';
   @Trace waitingOn: string = '';
   @Trace waitingUntil: string = '';
@@ -54,6 +56,7 @@ export class EditDraft {
   @Trace preparationKeys: string[] = preparationKeys(1);
   static make(state: AppState, kind: string, id: string = '', parent: string = '', variant: string = ''): EditDraft {
     const d = new EditDraft(); d.kind = kind; d.id = id; d.parentId = parent;
+    if (kind === 'shot') { const shot = state.shots.find((item: ProjectShot) => item.id === id); if (shot) { d.name = shot.title; d.referenceId = shot.referenceId; d.parentId = shot.projectId; } }
     if (kind === 'photo') { const photo = state.photos.find((item: PhotoAsset) => item.id === id); if (photo) { d.notes = photo.caption; d.parentId = photo.projectId; } }
     if (kind === 'character') {
       const c = state.characters.find((item: Character) => item.id === id);
@@ -192,6 +195,7 @@ export class EditDraft {
     value.timeMode = this.timeMode;
     value.startTime = this.startTime;
     value.endTime = this.endTime;
+    value.referenceId = this.referenceId;
     value.categoryId = this.categoryId;
     value.waitingOn = this.waitingOn;
     value.waitingUntil = this.waitingUntil;
@@ -241,6 +245,7 @@ export class EditDraft {
     if (typeof source.timeMode !== 'string') { throw new Error('草稿字段无法读取'); } value.timeMode = source.timeMode;
     if (typeof source.startTime !== 'string') { throw new Error('草稿字段无法读取'); } value.startTime = source.startTime;
     if (typeof source.endTime !== 'string') { throw new Error('草稿字段无法读取'); } value.endTime = source.endTime;
+    if (source.referenceId !== undefined && typeof source.referenceId !== 'string') { throw new Error('草稿字段无法读取'); } value.referenceId = source.referenceId || '';
     if (typeof source.categoryId !== 'string') { throw new Error('草稿字段无法读取'); } value.categoryId = source.categoryId;
     if (typeof source.waitingOn !== 'string') { throw new Error('草稿字段无法读取'); } value.waitingOn = source.waitingOn;
     if (typeof source.waitingUntil !== 'string') { throw new Error('草稿字段无法读取'); } value.waitingUntil = source.waitingUntil;
@@ -256,6 +261,7 @@ export class EditDraft {
     value.preparationKeys = source.preparationKeys.slice(); return value;
   }
   exists(state: AppState, id: string = this.id): boolean {
+    if (this.kind === 'shot' && id) { return state.shots.some((item: ProjectShot) => item.id === id); }
     if (this.kind === 'photo') { return !!id && state.photos.some((item: PhotoAsset) => item.id === id); }
     if (!id) { return true; }
     if (this.kind === 'character') { return state.characters.some((item: Character) => item.id === id); }
@@ -289,7 +295,8 @@ export class EditDraft {
       if (!state.preparationCategories.some((item: PreparationCategory) => item.id === this.categoryId && item.projectId === this.parentId)) { errors.push(new FormIssue('categoryId', '请选择此计划的准备分类')); }
       if (this.waitingUntil && !validDate(this.waitingUntil)) { errors.push(new FormIssue('waitingUntil', '请选择有效等待日期')); }
     }
-    if (['team', 'expense', 'category', 'preparation', 'checklist'].includes(this.kind) && !state.projects.some((item: CosProject) => item.id === this.parentId)) { errors.push(new FormIssue('parentId', '请选择现有计划')); }
+    if (['team', 'expense', 'category', 'preparation', 'checklist', 'shot'].includes(this.kind) && !state.projects.some((item: CosProject) => item.id === this.parentId)) { errors.push(new FormIssue('parentId', '请选择现有计划')); }
+    if (this.kind === 'shot' && this.referenceId) { const project = state.projects.find((item: CosProject) => item.id === this.parentId); if (!project || !shotReferences(state.references, project).some((reference: ReferenceImage) => reference.id === this.referenceId)) { errors.push(new FormIssue('referenceId', '请选择此计划或角色的现有参考图')); } }
     if (this.kind === 'asset' && this.parentId && !this.id && !state.projects.some((item: CosProject) => item.id === this.parentId)) { errors.push(new FormIssue('parentId', '关联计划已不存在')); }
     if (this.kind === 'variant' && !state.characters.some((item: Character) => item.id === this.characterId)) { errors.push(new FormIssue('characterId', '所属角色已不存在')); }
     if (this.kind === 'project') {
@@ -310,6 +317,7 @@ export class EditDraft {
   async save(state: AppState): Promise<boolean> {
     const issues = this.issues(state);
     if (issues.length) { state.reportError(issues[0].message); return false; }
+    if (this.kind === 'shot') { const shot = new ProjectShot(); shot.id = this.id || this.creationId; shot.projectId = this.parentId; shot.title = this.name; shot.referenceId = this.referenceId; return state.saveShot(shot, !this.id); }
     if (this.kind === 'photo') { return state.setPhotoCaption(this.id, this.notes); }
 
     if (this.kind === 'character') {
@@ -437,7 +445,7 @@ export class EditDraft {
     return false;
   }
   title(): string {
-    const labels = new Map<string, string>([['character', '角色'], ['variant', '角色版本'], ['project', '计划'], ['asset', '装备'], ['event', '活动'], ['checklist', '清单项'], ['preparation', '准备任务'], ['category', '准备分类'], ['team', '团队成员'], ['expense', '花费'], ['reference', '参考图说明'], ['photo', '照片说明']]);
+    const labels = new Map<string, string>([['character', '角色'], ['variant', '角色版本'], ['project', '计划'], ['asset', '装备'], ['event', '活动'], ['checklist', '清单项'], ['preparation', '准备任务'], ['category', '准备分类'], ['team', '团队成员'], ['expense', '花费'], ['reference', '参考图说明'], ['photo', '照片说明'], ['shot', '拍摄事项']]);
     return (this.id ? '编辑' : this.kind === 'project' ? '新建' : '添加') + labels.get(this.kind);
   }
 }

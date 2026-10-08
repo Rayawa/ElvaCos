@@ -1,3 +1,5 @@
+import { ShotRepository } from '../../../main/ets/data/repository/ShotRepository';
+import { ProjectShot } from '../../../main/ets/model/Shot';
 import { makePreparation, preparationKeys } from '../../../main/ets/model/Preparation';
 import { PreparationRepository } from '../../../main/ets/data/repository/PreparationRepository';
 import { common } from '@kit.AbilityKit';
@@ -40,7 +42,7 @@ export default function planningTest(): void {
         await legacy.executeSql('PRAGMA user_version=2');
       } finally { await legacy.close(); }
       try {
-        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(6);
+        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(7);
         const tasks = await upgraded.getStore().querySql("SELECT done FROM preparation_tasks WHERE id='t'"); try { tasks.goToFirstRow(); expect(tasks.getLong(0)).assertEqual(1); } finally { tasks.close(); }
         const restored = (await new CosEventRepository(upgraded).list())[0]; expect(restored.dateMode).assertEqual('single'); expect(restored.reminderId).assertEqual(-1); expect(restored.date).assertEqual('2026-10-07');
       } finally { await upgraded.close(); await relationalStore.deleteRdbStore(context, oldName); }
@@ -67,8 +69,11 @@ export default function planningTest(): void {
       r.projectId = ''; r.characterId = ''; try { await repo.saveReference(r); } catch (error) { rejected++; }
       r.projectId = 'missing'; try { await repo.saveReference(r); } catch (error) { rejected++; }
       expect(rejected).assertEqual(3); expect((await repo.references()).length).assertEqual(0);
+      r.projectId = project.id; await repo.saveReference(r); const shots = new ShotRepository(db), shot = new ProjectShot(); shot.projectId = project.id; shot.title = '道具特写'; shot.referenceId = r.id;
+      await shots.save(shot, true); await shots.setDone(shot.id, project.id, true, false); await repo.removeReference(r);
+      expect((await shots.list())[0].referenceId).assertEqual(''); expect((await shots.list())[0].done).assertTrue(); await shots.remove(shot.id, project.id);
     });
-    it('backupV3RestoresWorkflowAndRejectsInvalidScheduleWithoutReplacement', 0, async () => {
+    it('backupRestoresWorkflowAndRejectsInvalidScheduleWithoutReplacement', 0, async () => {
       const exported = await backup.exportMetadata(); await backup.restoreMetadata(exported);
       expect((await repo.team()).length).assertEqual(1); expect(expenseTotal(await repo.expenses())).assertEqual(12990); expect((await events.list()).length).assertEqual(2);
       const doc = JSON.parse(exported) as BackupDocument; const table = doc.tables.find((t: BackupTable) => t.name === 'events');

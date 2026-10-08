@@ -66,3 +66,14 @@ const MIGRATION_6: string[] = [
   `ALTER TABLE preparation_tasks ADD COLUMN waiting_until TEXT NOT NULL DEFAULT ''`
 ];
 export function migration6(): string[] { return MIGRATION_6; }
+
+const MIGRATION_7: string[] = [
+  `CREATE TABLE project_shots (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, title TEXT NOT NULL CHECK(length(trim(title))>0), done INTEGER NOT NULL DEFAULT 0 CHECK(done IN (0,1)), reference_id TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0 CHECK(sort_order>=0), created_at INTEGER NOT NULL)`,
+  `CREATE INDEX shots_project_idx ON project_shots(project_id,sort_order,id)`,
+  `CREATE TRIGGER shot_reference_insert BEFORE INSERT ON project_shots WHEN NEW.reference_id<>'' AND NOT EXISTS(SELECT 1 FROM reference_images r JOIN projects p ON p.id=NEW.project_id WHERE r.id=NEW.reference_id AND (r.project_id=p.id OR r.character_id=p.character_id)) BEGIN SELECT RAISE(ABORT,'拍摄参考图不属于此计划或角色'); END`,
+  `CREATE TRIGGER shot_reference_update BEFORE UPDATE OF reference_id,project_id ON project_shots WHEN NEW.reference_id<>'' AND NOT EXISTS(SELECT 1 FROM reference_images r JOIN projects p ON p.id=NEW.project_id WHERE r.id=NEW.reference_id AND (r.project_id=p.id OR r.character_id=p.character_id)) BEGIN SELECT RAISE(ABORT,'拍摄参考图不属于此计划或角色'); END`,
+  `CREATE TRIGGER shot_reference_removed BEFORE DELETE ON reference_images BEGIN UPDATE project_shots SET reference_id='' WHERE reference_id=OLD.id; END`,
+  `CREATE TRIGGER shot_project_role_changed AFTER UPDATE OF character_id ON projects BEGIN UPDATE project_shots SET reference_id='' WHERE project_id=NEW.id AND reference_id<>'' AND NOT EXISTS(SELECT 1 FROM reference_images r WHERE r.id=project_shots.reference_id AND (r.project_id=NEW.id OR r.character_id=NEW.character_id)); END`,
+  `CREATE TRIGGER shot_reference_owner_changed AFTER UPDATE OF project_id,character_id ON reference_images BEGIN UPDATE project_shots SET reference_id='' WHERE reference_id=NEW.id AND NOT EXISTS(SELECT 1 FROM projects p WHERE p.id=project_shots.project_id AND (NEW.project_id=p.id OR NEW.character_id=p.character_id)); END`
+];
+export function migration7(): string[] { return MIGRATION_7; }

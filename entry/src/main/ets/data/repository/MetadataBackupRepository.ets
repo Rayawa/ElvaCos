@@ -30,7 +30,8 @@ const TABLES: TableSpec[] = [
   new TableSpec('team_members', ['id', 'project_id', 'role', 'name', 'notes']),
   new TableSpec('expenses', ['id', 'project_id', 'name', 'category', 'amount_cents', 'date', 'notes', 'created_at']),
   new TableSpec('reference_images', ['id', 'project_id', 'character_id', 'source_uri', 'local_path', 'thumbnail_path', 'caption', 'created_at']),
-  new TableSpec('entries', ['id','kind','scope_kind','scope_id','title','url','text','local_path','thumbnail_path','pinned','created_at'])
+  new TableSpec('entries', ['id','kind','scope_kind','scope_id','title','url','text','local_path','thumbnail_path','pinned','created_at']),
+  new TableSpec('project_shots', ['id','project_id','title','done','reference_id','sort_order','created_at'])
 ];
 interface BackupDocument { format: string; version: number; exportedAt: number; tables: BackupTable[]; }
 
@@ -52,7 +53,7 @@ export class MetadataBackupRepository {
       } finally { result.close(); }
       tables.push({ name: spec.name, rows: rows });
     }
-    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 6, exportedAt: Date.now(), tables: tables };
+    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 7, exportedAt: Date.now(), tables: tables };
     const output = JSON.stringify(doc);
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
@@ -60,7 +61,7 @@ export class MetadataBackupRepository {
   private async prepareDocument(input: string): Promise<BackupDocument> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (!doc || doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
+    if (!doc || doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6, 7].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : doc.version < 7 ? 16 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
     if (!Number.isSafeInteger(doc.exportedAt) || doc.exportedAt < 0 || !Number.isFinite(new Date(doc.exportedAt).getTime())) { throw new Error('备份导出时间无效'); }
@@ -119,7 +120,7 @@ export class MetadataBackupRepository {
           if (value === null && !['variant_id', 'event_id', 'asset_id', 'project_id', 'character_id'].includes(col)) {
             throw new Error('备份包含缺失字段');
           }
-          if (typeof value === 'string' && ['name', 'label', 'role', 'category', 'event_type'].includes(col)) { requiredName(value); }
+          if (typeof value === 'string' && (col !== 'title' || spec.name === 'project_shots') && ['name', 'label', 'role', 'category', 'event_type', 'title'].includes(col)) { requiredName(value); }
           if (typeof value === 'string' && (col === 'url' || col === 'purchase_url')) { safeUrl(value); }
           if (typeof value === 'string' && (col === 'date' || col === 'target_date' || col === 'due_date' || col === 'end_date' || col === 'waiting_until') && (value !== '' || (col === 'date' && !(spec.name === 'events' && row['date_mode'] === 'pending'))) && !validDate(value)) {
             throw new Error('备份包含无效日期');
@@ -174,7 +175,7 @@ export class MetadataBackupRepository {
   async previewMetadata(input: string): Promise<MetadataBackupPreview> {
     const doc = await this.prepareDocument(input);
     const preview = new MetadataBackupPreview(); preview.version = doc.version; preview.exportedAt = doc.exportedAt;
-    const labels: string[] = ['角色', '角色版本', '活动', '计划', '装备', '计划装备关联', '打包项', '照片', '照片版本', '计划日志', '准备分类', '准备任务', '团队成员', '花费', '参考图', '收录'];
+    const labels: string[] = ['角色', '角色版本', '活动', '计划', '装备', '计划装备关联', '打包项', '照片', '照片版本', '计划日志', '准备分类', '准备任务', '团队成员', '花费', '参考图', '收录', '拍摄事项'];
     for (let i = 0; i < TABLES.length; i++) {
       const count = new BackupObjectCount(); count.table = TABLES[i].name; count.label = labels[i];
       count.incoming = doc.tables.find((table: BackupTable) => table.name === count.table)?.rows.length || 0;

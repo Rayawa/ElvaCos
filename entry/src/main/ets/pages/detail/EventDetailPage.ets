@@ -1,3 +1,4 @@
+import { ProjectShot } from '../../model/Shot';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { SegmentButtonV2Items } from '@kit.ArkUI';
@@ -9,7 +10,7 @@ import { CosEvent, CosProject, ChecklistItem } from '../../model/Entities';
 import { TeamMember } from '../../model/Planning';
 import { CollectedEntry, entryTitle } from '../../model/CollectedEntry';
 import { eventDateLabel, eventTimeLabel } from '../../model/Schedule';
-import { DayModule, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState } from '../../model/DayMode';
+import { DayModule, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState } from '../../model/DayMode';
 import { StaggerEntrance } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
 import { confirm } from '../../common/Confirm';
@@ -28,6 +29,8 @@ export struct EventDetail {
   @Param event: CosEvent = new CosEvent();
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   @Event open: (kind: string, id: string) => void = () => {};
+  @Local shotError: string = '';
+  @Event openShot: (projectId: string, shotId: string) => void = () => {};
   @Event openAsset: (id: string, projectId: string) => void = () => {};
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
   @Event back: () => void = () => {};
@@ -41,7 +44,8 @@ export struct EventDetail {
   @Local sheetEntrance: StaggerEntrance = new StaggerEntrance();
   private scroller: Scroller = new Scroller();
   private displayedIndex: number = 0;
-  private restoring: boolean = false;
+  private restoring: boolean = true;
+  private measured: boolean = false;
   private restoreTimer: number = -1;
   private offsetIndex(): number { return this.route.dayMode ? 4 + this.route.section : this.route.section; }
   aboutToAppear(): void { this.displayedIndex = this.offsetIndex(); this.restoreScroll(); }
@@ -51,6 +55,7 @@ export struct EventDetail {
     this.displayedIndex = this.offsetIndex(); this.restoreScroll();
   }
   private restoreScroll(): void {
+    if (!this.measured) { return; }
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
     this.restoring = true;
     this.restoreTimer = setTimeout((): void => {
@@ -62,7 +67,7 @@ export struct EventDetail {
     return this.state.entries.filter((entry: CollectedEntry) => entry.scopeKind === 'event' && entry.scopeId === this.event.id && ['ticket', 'map', 'link'].includes(entry.kind));
   }
   private modules(): DayModule[] {
-    return assembledDayModules(availableDayModules(this.event, this.state.projects, this.state.entries, this.state.team, this.state.clockTime), this.state.dayModules, this.route.section);
+    return assembledDayModules(availableDayModules(this.event, this.state.projects, this.state.entries, this.state.team, this.state.clockTime, hasEventShots(this.event.id, this.state.projects, this.state.readinessPlans)), this.state.dayModules, this.route.section);
   }
   private async associate(project: CosProject): Promise<void> {
     const copy = JSON.parse(JSON.stringify(project)) as CosProject; copy.eventId = this.event.id;
@@ -235,6 +240,22 @@ export struct EventDetail {
       Button('打开出门清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('outing', project.id); })
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
+  private async toggleShot(shot: ProjectShot): Promise<void> {
+    this.shotError = ''; const result = await this.state.toggleShot(shot.id, shot.projectId, shot.done);
+    if (!operationCommitted(result)) { this.shotError = this.state.error || '拍摄勾选未保存，请重试'; }
+  }
+  @Builder shots(project: CosProject) {
+    Button(project.name + ' · 已拍 ' + this.state.readiness(project.id).shots.done + ' / ' + this.state.readiness(project.id).shots.total + ' 项').constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
+      .onClick((): void => { this.openShot(project.id, ''); })
+    ForEach(this.state.readiness(project.id).shots.items, (shot: ProjectShot) => {
+      Column({ space: 8 }) {
+        Button((shot.done ? '✓ 已拍 · ' : '拍摄后勾选 · ') + shot.title).constraintSize({ minHeight: 64 }).width('100%').fontSize(18).enabled(!this.state.busy && !this.state.staleScopes.length)
+          .onClick((): void => { void this.toggleShot(shot); }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
+        if (shot.referenceId) { Button('查看这条拍摄参考').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.open('reference', shot.referenceId); }) }
+        Button('查看所属计划拍摄事项').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openShot(project.id, shot.id); }).accessibilityText('在计划照片中查看 ' + shot.title)
+      }.width('100%').alignItems(HorizontalAlign.Start)
+    }, (shot: ProjectShot) => shot.id)
+  }
   @Builder dayModule(module: DayModule) {
     Column({ space: 14 }) {
       SectionHeading({ title: module.label })
@@ -260,6 +281,9 @@ export struct EventDetail {
         ForEach(this.projects(), (project: CosProject) => {
           Button(project.name + ' · ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)]).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
         }, (project: CosProject) => project.id)
+      } else if (module.id === 'shots') {
+        if (this.shotError) { Text(this.shotError).fontSize(17).fontColor(Theme.danger) }
+        ForEach(this.projects().filter((project: CosProject) => this.state.readiness(project.id).shots.total > 0), (project: CosProject) => { this.shots(project) }, (project: CosProject) => project.id)
       } else if (module.id === 'timeline') { FactRow({ label: '活动时段', value: eventDateLabel(this.event) + ' · ' + eventTimeLabel(this.event) }) }
       else if (module.id === 'wrapup') { Text('今天结束了？选好所属计划后导入照片。').fontSize(18).fontColor(Theme.ink)
         Button('导入照片').constraintSize({ minHeight: 64 }).onClick((): void => { this.recordKind = 2; this.recording = true; }) }
@@ -285,7 +309,8 @@ export struct EventDetail {
           Blank().height(Theme.contentBottom).width('100%')
         }.width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top)
-        .onDidScroll((): void => { if (!this.restoring) { this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset; } })
+        .onAreaChange((_, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreScroll(); } })
+        .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset; } })
     }.width('100%').height('100%')
       .bindSheet(this.linking || this.configuring || this.recording || this.viewing, this.activeSheet(), this.sheetOptions())
   }

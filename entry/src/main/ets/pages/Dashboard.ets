@@ -1,3 +1,4 @@
+import { ProjectPhotoHeader } from '../component/ProjectPhotoHeader';
 import { CharacterRoute } from '../model/CharacterRoute';
 import { AssetRoute } from '../model/AssetRoute';
 import { WardrobeRoute, assetUsesSegments } from '../model/Wardrobe';
@@ -91,6 +92,7 @@ import { EmptyState } from '../component/Surfaces';
   @Local formOpen: boolean = false;
   @Local restoreOpen: boolean = false;
   @Local formSession: FormSession = new FormSession(new EditDraft(), formDraftStore);
+  private editingShotRoute?: ProjectRoute;
   private checkingFormClose: boolean = false;
   @Local viewportWidth: number = 360;
   private clockTimer: number = -1;
@@ -220,6 +222,10 @@ import { EmptyState } from '../component/Surfaces';
     this.tab = 2; this.tabsController.changeIndex(2);
     this.stacks[2].pushPathByName('event', route);
   }
+  private openShot(projectId: string, shotId: string): void {
+    const route = new ProjectRoute(projectId, 3); route.focusShotId = shotId; route.shotsOpen = true;
+    this.detailStack.pushPathByName('project', route);
+  }
   private openTaskItem(item: TaskQueueItem): void {
     if (item.source === 'asset') { this.openAsset(item.focusId, '', item.projectId); return; }
     const route = new ProjectRoute(item.projectId, item.section); route.photos.filter = item.photoFilter;
@@ -249,6 +255,7 @@ import { EmptyState } from '../component/Surfaces';
     if (this.state.events.some((event: CosEvent) => event.id === route.id)) {
       EventDetail({ state: this.state, event: this.state.events.find((event: CosEvent) => event.id === route.id) as CosEvent, route: route, entrance: entrance,
         open: (kind: string, id: string): void => { this.open(kind, id); }, openAsset: (id: string, projectId: string): void => { this.openAsset(id, 'day', projectId); },
+        openShot: (projectId: string, shotId: string): void => { this.openShot(projectId, shotId); },
         edit: (kind: string, id: string, parent: string): void => { this.edit(kind, id, parent); }, back: (): void => { this.closeEvent(route); } })
     } else {
       EmptyState({ title: '活动已不存在', message: '关联计划仍保留，可以返回继续查看。', button: '返回', action: (): void => { this.closeEvent(route); } }).margin({ top: Theme.detailTop, left: Theme.pagePadding, right: Theme.pagePadding })
@@ -363,7 +370,7 @@ import { EmptyState } from '../component/Surfaces';
     } finally { this.checkingFormClose = false; }
   }
   private rootSheetOptions(): SheetOptions {
-    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; this.restoreOpen = false; this.creatingForImport = false; if (this.pendingImportPlanId && !this.state.staleScopes.length) { void this.continueImport(); } if (this.rootSheetKind === 'restore') { this.state.cancelRestoreData(); } }, this.sheetEntrance, this.getUIContext());
+    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; this.restoreOpen = false; this.creatingForImport = false; if (this.pendingImportPlanId && !this.state.staleScopes.length) { void this.continueImport(); } if (this.rootSheetKind === 'restore') { this.state.cancelRestoreData(); } if (this.editingShotRoute) { const route = this.editingShotRoute; this.editingShotRoute = undefined; if (this.state.projects.some((project: CosProject) => project.id === route.id)) { route.shotsOpen = true; } } }, this.sheetEntrance, this.getUIContext());
     if (this.rootSheetKind === 'form') {
       options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
       options.onWillDismiss = (action: DismissSheetAction): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { action.dismiss(); } }); };
@@ -386,6 +393,7 @@ import { EmptyState } from '../component/Surfaces';
       close: (): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { this.formOpen = false; } }); },
       done: (): void => { this.formOpen = false; },
       saved: (kind: string, id: string, created: boolean): void => {
+        if (kind === 'shot' && this.editingShotRoute) { this.editingShotRoute.focusShotId = id; this.editingShotRoute.focusShotHandled = false; }
         if (kind === 'project' && created) {
           if (this.creatingForImport) { this.pendingImportPlanId = id; this.open('projectPhotos', id); }
           else { this.open('projectPreparation', id); }
@@ -531,7 +539,7 @@ import { EmptyState } from '../component/Surfaces';
           if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }
           if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
           if (kind === 'tasks') { (param as TaskRoute).restoreVersion++; }
-          if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).outing) { this.state.resume(); } }
+          if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).resumeShots) { (param as ProjectRoute).resumeShots = false; (param as ProjectRoute).shotsOpen = true; } if ((param as ProjectRoute).outing) { this.state.resume(); } }
           if (kind === 'album') { (param as AlbumRoute).restoreVersion++; (param as AlbumRoute).collection.restoreVersion++; }
         },
         hidden: (): void => {
@@ -687,12 +695,11 @@ import { EmptyState } from '../component/Surfaces';
       onSelectedIndexChanged: (section: number): void => { route.showMode(section ? 'queue' : 'byPlan'); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
   }
   @Builder projectPhotoHeader(route: ProjectRoute) {
-    Column({ space: 8 }) {
-      Text(this.state.projectName(route.id)).fontSize(18).fontColor(Theme.ink)
-      Text('本计划照片 ' + this.state.readiness(route.id).photos.total + ' 张').fontSize(14).fontColor(Theme.muted)
-      Button('在相册查看本计划').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
-        .onClick((): void => { this.open('album', route.id); })
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    ProjectPhotoHeader({ state: this.state, route: route,
+      edit: (id: string, projectId: string): void => { this.edit('shot', id, projectId); this.editingShotRoute = route; },
+      openReference: (id: string): void => { this.open('reference', id); },
+      openAlbum: (): void => { this.open('album', route.id); }
+    })
   }
   private photoMenus(route: PhotoViewerRoute): HdsNavigationMenuItemOptions[] {
     const photo = this.state.photos.find((photo: PhotoAsset) => photo.id === route.id); if (!photo) { return []; }

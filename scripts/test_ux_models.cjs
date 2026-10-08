@@ -692,6 +692,103 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.projects = ['p1', 'p2', 'p3'].map(id => Object.assign(new CosProject(), { id, characterId: 'role', status: id === 'p2' ? ProjectStatus.COMPLETED : ProjectStatus.PREPARING }));
     state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
   }
+  async function shotsFixture() {
+    const fixture = await wardrobeFixture(), { db, state } = fixture;
+    const { ShotRepository } = require(root + '/data/repository/ShotRepository.ets'), { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');
+    await db.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('other-role','其他角色',1,1)");
+    for (const [id, project, character] of [['plan-ref','p1',null], ['role-ref',null,'role'], ['foreign-ref',null,'other-role']]) await db.sql('INSERT INTO reference_images(id,project_id,character_id,source_uri,local_path,thumbnail_path,created_at) VALUES(?,?,?,?,?, ?,1)', [id,project,character,'test://' + id,'','']);
+    const repo = new ShotRepository(db); state.shotRepo = repo; state.refresh = async () => { state.shots = await repo.list(); }; await state.refresh();
+    return { ...fixture, repo, backup: new MetadataBackupRepository(db) };
+  }
+  await test('shot counts and completion stay independent of preparation, packing, equipment, money and photo workflow', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { db, state, repo } = await shotsFixture();
+    try {
+      state.preparationTasks = [Object.assign(new PreparationTask(), { id:'prepare', projectId:'p1', label:'准备', done:false })];
+      state.checklist = [Object.assign(new ChecklistItem(), { projectId:'p1', done:true })]; state.photos = [Object.assign(new PhotoAsset(), { projectId:'p1', status:PhotoStatus.FINAL })]; state.expenses = [Object.assign(new Expense(), { projectId:'p1', amountCents:123 })];
+      const before = state.readiness('p1'), beforeQueue = JSON.stringify(state.taskQueue); const shot = Object.assign(new ProjectShot(), { id:'shot', projectId:'p1', title:'道具特写' });
+      await repo.save(shot,true); await state.refresh(); assert.equal(state.readiness('p1').shots.total,1); assert.equal(state.readiness('p1').shots.done,0);
+      assert.equal((await state.toggleShot('shot','p1',false)).status,'ok'); const after = state.readiness('p1'); assert.equal(after.shots.done,1);
+      for (const key of ['prep','pack','equipment','photos','money']) assert.deepEqual(after[key],before[key]); assert.equal(JSON.stringify(state.taskQueue),beforeQueue);
+      assert.equal((await state.toggleShot('shot','p1',true)).status,'ok'); assert.equal(state.readiness('p1').shots.done,0);
+    } finally { db.close(); }
+  });
+  await test('day shots appear only for this event and obey module enablement and data-driven removal', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { hasEventShots, availableDayModules, assembledDayModules } = require(root + '/model/DayMode.ets'), { db, state, repo } = await shotsFixture();
+    try {
+      const event = Object.assign(new CosEvent(), { id:'scene', date:'2026-10-08', startTime:'09:00' }); state.projects[0].eventId = event.id;
+      const now = new Date('2026-10-08T12:00:00').getTime(); const available = () => availableDayModules(event,state.projects,[],[],now,hasEventShots(event.id,state.projects,state.readinessPlans));
+      assert.equal(available().includes('shots'),false);
+      const unrelated = Object.assign(new ProjectShot(), { id:'other-shot', projectId:'p3', title:'另一场' }); await repo.save(unrelated,true); await state.refresh(); assert.equal(available().includes('shots'),false);
+      const shot = Object.assign(new ProjectShot(), { id:'today-shot', projectId:'p1', title:'今天要拍' }); await repo.save(shot,true); await state.refresh();
+      assert.equal(available().includes('shots'),true); assert.equal(assembledDayModules(available(),{},0).some(module=>module.id==='shots'),false); assert.equal(assembledDayModules(available(),{},1).some(module=>module.id==='shots'),true);
+      assert.equal(assembledDayModules(available(),{ shots:{ enabled:false,order:0 } },1).some(module=>module.id==='shots'),false);
+      await repo.setDone(shot.id,'p1',true,false); await state.refresh(); assert.equal(available().includes('shots'),true);
+      await repo.remove(shot.id,'p1'); await state.refresh(); assert.equal(available().includes('shots'),false);
+    } finally { db.close(); }
+  });
+  await test('actual shot CRUD preserves completion on edit, stable order and owner, rejects duplicate creation and rolls back failures', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { db, repo } = await shotsFixture();
+    try {
+      const shot = Object.assign(new ProjectShot(), { id:'first', projectId:'p1', title:'特写', referenceId:'plan-ref' });
+      db.failSql = 'INSERT INTO project_shots'; await assert.rejects(repo.save(shot,true),/injected/); db.failSql = ''; assert.equal((await repo.list()).length,0);
+      await repo.save(shot,true); await assert.rejects(repo.save(shot,true),/已创建/); await repo.setDone(shot.id,'p1',true,false);
+      await assert.rejects(repo.setDone(shot.id,'p1',true,false),/已变更/); await assert.rejects(repo.setDone(shot.id,'p3',false,true),/已变更/);
+      shot.title = '新的画面'; shot.referenceId = 'role-ref'; await repo.save(shot,false); const edited = (await repo.list())[0]; assert.equal(edited.done,true); assert.equal(edited.title,'新的画面'); assert.equal(edited.referenceId,'role-ref'); assert.equal(edited.createdAt,shot.createdAt);
+      const next = Object.assign(new ProjectShot(), { id:'second', projectId:'p1', title:'合影' }); await repo.save(next,true); assert.deepEqual((await repo.list()).map(item=>[item.id,item.sortOrder]),[['first',0],['second',1]]);
+      await assert.rejects(repo.save(Object.assign(new ProjectShot(), { projectId:'p1', title:'', referenceId:'' }),true),/名称/);
+      await assert.rejects(repo.save(Object.assign(new ProjectShot(), { projectId:'gone', title:'未知计划' }),true),/所属计划/);
+      shot.referenceId = 'foreign-ref'; await assert.rejects(repo.save(shot,false),/不属于/); assert.equal((await repo.list())[0].referenceId,'role-ref');
+      db.failSql = 'DELETE FROM project_shots'; await assert.rejects(repo.remove(shot.id,'p1'),/injected/); db.failSql = ''; assert.equal((await repo.list()).length,2);
+      await repo.remove(shot.id,'p1'); await assert.rejects(repo.save(shot,false),/已不存在/); await assert.rejects(repo.remove(shot.id,'p1'),/已不存在/); assert.equal((await repo.list()).length,1);
+    } finally { db.close(); }
+  });
+  await test('shot references clear when media or role ownership changes; project deletion cascades only its own shots', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { db, repo } = await shotsFixture();
+    try {
+      for (const [id,project,reference] of [['plan-shot','p1','plan-ref'],['role-shot','p1','role-ref'],['other-shot','p3','role-ref']]) await repo.save(Object.assign(new ProjectShot(),{id,projectId:project,title:id,referenceId:reference}),true);
+      await repo.setDone('plan-shot','p1',true,false); await db.sql("DELETE FROM reference_images WHERE id='plan-ref'"); assert.equal((await repo.list()).find(item=>item.id==='plan-shot').referenceId,''); assert.equal((await repo.list()).find(item=>item.id==='plan-shot').done,true);
+      await db.sql("UPDATE projects SET character_id='other-role' WHERE id='p1'"); assert.equal((await repo.list()).find(item=>item.id==='role-shot').referenceId,''); assert.equal((await repo.list()).find(item=>item.id==='other-shot').referenceId,'role-ref');
+      await db.sql("UPDATE reference_images SET character_id='other-role' WHERE id='role-ref'"); assert.equal((await repo.list()).find(item=>item.id==='other-shot').referenceId,'');
+      await db.sql("DELETE FROM projects WHERE id='p1'"); assert.deepEqual((await repo.list()).map(item=>item.id),['other-shot']);
+    } finally { db.close(); }
+  });
+  await test('shot writes distinguish failed persistence from committed refresh failure and reload never repeats creation or completion', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { db, state, repo } = await shotsFixture();
+    try {
+      const shot = Object.assign(new ProjectShot(),{id:'saved',projectId:'p1',title:'合影'}); const reload = state.refresh;
+      db.failSql = 'INSERT INTO project_shots'; assert.equal(await state.saveShot(shot,true),false); assert.equal(state.shots.length,0); db.failSql = '';
+      state.refresh = async () => { throw new Error('read failure'); }; assert.equal(await state.saveShot(shot,true),true); assert.equal(state.lastOperation.status,'savedNotRefreshed'); assert.deepEqual(state.staleScopes,['shots']); assert.equal((await repo.list()).length,1);
+      assert.equal((await state.toggleShot(shot.id,'p1',false)).status,'failed'); state.refresh = reload; assert.equal(await state.reloadRecords(),true); assert.equal(state.shots.length,1);
+      state.refresh = async () => { throw new Error('read failure'); }; assert.equal((await state.toggleShot(shot.id,'p1',false)).status,'savedNotRefreshed'); assert.equal((await repo.list())[0].done,true);
+      state.refresh = reload; assert.equal(await state.reloadRecords(),true); assert.equal(state.shots[0].done,true); assert.equal((await repo.list()).length,1);
+    } finally { db.close(); }
+  });
+  await test('shot drafts preserve reference context, support old draft records and recognize interrupted committed creation', async () => {
+    const { PlanningRepository } = require(root + '/data/repository/PlanningRepository.ets'), { db,state } = await shotsFixture();
+    try {
+      state.references = await new PlanningRepository(db).references(); let text=''; const store = new FormDraftStore({read:async()=>text,write:async value=>{text=value;}});
+      const draft = EditDraft.make(state,'shot','','p1'); const session = new FormSession(draft,store); await session.initialize(state); draft.name='合影'; draft.referenceId='role-ref'; await session.flush();
+      const snapshot = (await store.load(formDraftKey(draft))).payload; const restored = EditDraft.fromJSON(snapshot); assert.equal(restored.referenceId,'role-ref'); assert.deepEqual(restored.issues(state),[]);
+      restored.referenceId='foreign-ref'; assert.ok(restored.issues(state).some(issue=>issue.field==='referenceId'));
+      assert.equal(await draft.save(state),true); assert.equal(draft.committedCreation(state),true);
+      const reopening = new FormSession(EditDraft.make(state,'shot','','p1'),store); await reopening.initialize(state); assert.equal(reopening.pendingRestore,undefined); assert.match(reopening.error,/上次创建已保存/);
+      const old = JSON.parse(EditDraft.make(state,'character','').serialize()); delete old.referenceId; assert.equal(EditDraft.fromJSON(JSON.stringify(old)).referenceId,'');
+      const baseline = JSON.parse(EditDraft.make(state,'character').fingerprint()); delete baseline.referenceId; text = JSON.stringify({ version:1,records:[{key:formDraftKey(EditDraft.make(state,'character')),payload:JSON.stringify(old),baseline:JSON.stringify(baseline),savedAt:Date.now()}] });
+      const oldSession = new FormSession(EditDraft.make(state,'character'),store); await oldSession.initialize(state); oldSession.restore(); assert.equal(oldSession.sourceChanged,false);
+    } finally { db.close(); }
+  });
+  await test('v7 shot backup preview and restore preserve links and completion; v6 clears only the absent shot type; invalid ownership and failed replacement retain records', async () => {
+    const { ProjectShot } = require(root + '/model/Shot.ets'), { db,repo,backup } = await shotsFixture();
+    try {
+      await repo.save(Object.assign(new ProjectShot(),{id:'backed',projectId:'p1',title:'合影',referenceId:'role-ref'}),true); await repo.setDone('backed','p1',true,false);
+      const exported = await backup.exportMetadata(); assert.equal(JSON.parse(exported).version,7); const preview = await backup.previewMetadata(exported); assert.equal(preview.counts.find(row=>row.table==='project_shots').incoming,1); assert.equal((await repo.list())[0].done,true);
+      const bad = JSON.parse(exported); bad.tables.find(table=>table.name==='project_shots').rows[0].reference_id='foreign-ref'; await assert.rejects(backup.previewMetadata(JSON.stringify(bad)),/不属于/); assert.equal((await repo.list()).length,1);
+      db.failSql='INSERT INTO project_shots'; await assert.rejects(backup.restoreMetadata(exported),/injected/); db.failSql=''; assert.equal((await repo.list())[0].done,true);
+      const legacy = JSON.parse(exported); legacy.version=6; legacy.tables=legacy.tables.slice(0,16); const oldPreview = await backup.previewMetadata(JSON.stringify(legacy)); assert.equal(oldPreview.counts.find(row=>row.table==='project_shots').incoming,0);
+      await backup.restoreMetadata(JSON.stringify(legacy)); assert.equal((await repo.list()).length,0); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0],3);
+      await backup.restoreMetadata(exported); assert.equal((await repo.list())[0].referenceId,'role-ref'); assert.equal((await repo.list())[0].done,true);
+    } finally { db.close(); }
+  });
   await test('role-scoped plan creation persists the selected version atomically and retains the draft after a failed write', async () => {
     const { CosProjectRepository, CharacterRepository, CharacterVariantRepository, DiaryEntryRepository } = require(root + '/data/repository/Repositories.ets');
     const { PreparationRepository } = require(root + '/data/repository/PreparationRepository.ets');
@@ -1023,7 +1120,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     });
     await test('actual home completion and undo preserve failed writes and distinguish saved-but-not-refreshed snapshots', async () => {
       const state = new AppState(); state.settings.haptic = false;
-      state.projects = [Object.assign(new CosProject(), { id: 'positive' })]; state.preparationRepo = preparations;
+      state.projects = [Object.assign(new CosProject(), { id: 'positive' })]; state.preparationRepo = preparations; state.shotRepo = new (require(root + '/data/repository/ShotRepository.ets').ShotRepository)(db);
       const item = Object.assign(new PreparationTask(), { id: 'home-write', projectId: 'positive', categoryId: 'waiting-category', label: '带道具' });
       await preparations.saveTask(item); await state.refresh(['preparationTasks']);
       db.failSql = 'UPDATE preparation_tasks';
@@ -1054,7 +1151,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     await test('a project draft uses its persisted IDs in the real transaction and is recognized after an interrupted cleanup', async () => {
       const { CosProjectRepository, CharacterRepository, DiaryEntryRepository } = require(root + '/data/repository/Repositories.ets');
       const state = new AppState();
-      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.diaryRepo = new DiaryEntryRepository(db); state.preparationRepo = preparations;
+      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.diaryRepo = new DiaryEntryRepository(db); state.preparationRepo = preparations; state.shotRepo = new (require(root + '/data/repository/ShotRepository.ets').ShotRepository)(db);
       let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
       const draft = EditDraft.make(state, 'project'); const session = new FormSession(draft, store); await session.initialize(state);
       draft.name = '恢复验证计划'; draft.characterName = '恢复验证角色'; await session.flush();
@@ -1074,7 +1171,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const backup = new MetadataBackupRepository(db);
     const exported = await backup.exportMetadata();
     await test('current backup round trip preserves explicit zero, unset and unknown budgets', async () => {
-      assert.equal(JSON.parse(exported).version, 6); await backup.restoreMetadata(exported);
+      assert.equal(JSON.parse(exported).version, 7); await backup.restoreMetadata(exported);
       assert.deepEqual((await db.sql('SELECT id,budget_cents,budget_configured FROM projects ORDER BY id')).rows, [['positive',1234,1], ['unknown',0,null], ['unset',0,0], ['zero',0,1]]);
     });
     await test('v1, v2 and v3 backups infer positive budgets but preserve historical zero as unknown', async () => {
@@ -1091,10 +1188,10 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',0], ['zero',1]]);
       assert.equal((await db.sql('SELECT count(*) FROM entries')).rows[0][0], 0);
     });
-    await test('v6 waiting fields round trip; v5 defaults them without changing task history', async () => {
+    await test('current waiting fields round trip; v5 defaults them without changing task history', async () => {
       await backup.restoreMetadata(exported); const current = (await preparations.tasks()).find(task => task.id === 'persist-wait');
       assert.equal(current.waitingOn, '毛娘'); assert.equal(current.waitingUntil, '2026-10-11');
-      const old = JSON.parse(exported); old.version = 5;
+      const old = JSON.parse(exported); old.version = 5; old.tables = old.tables.slice(0, 16);
       for (const row of old.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
       await backup.restoreMetadata(JSON.stringify(old)); const restored = (await preparations.tasks()).find(task => task.id === 'persist-wait');
       assert.equal(restored.waitingOn, ''); assert.equal(restored.waitingUntil, ''); assert.equal(restored.done, true); assert.equal(restored.dueDate, '2026-10-01');
@@ -1121,7 +1218,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       for (const row of doc.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
       const preview = await backup.previewMetadata(JSON.stringify(doc));
       assert.equal(preview.version, 4); assert.equal(preview.exportedAt, doc.exportedAt);
-      assert.equal(preview.counts.length, 16); assert.equal(preview.counts.find(row => row.table === 'projects').incoming, 4);
+      assert.equal(preview.counts.length, 17); assert.equal(preview.counts.find(row => row.table === 'projects').incoming, 4);
       assert.equal(preview.counts.find(row => row.table === 'entries').incoming, 0);
       assert.equal(preview.incomingCount, preview.counts.reduce((sum, row) => sum + row.incoming, 0));
       assert.deepEqual(JSON.parse(await backup.exportMetadata()).tables, JSON.parse(before).tables);
@@ -1168,7 +1265,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0, output;
       backupFileControl = { save: () => ['test://export'], close: () => { closes++; }, write: (fd, bytes) => { output = Buffer.from(bytes); return bytes.byteLength; } };
-      assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 6);
+      assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 7);
       assert.equal(output.includes(Buffer.from('毛娘', 'utf8')), true);
       backupFileControl.write = (fd, bytes) => bytes.byteLength - 1;
       await assert.rejects(service.export(), /未完整写入/); assert.equal(closes, 2);
@@ -1178,7 +1275,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0;
       backupFileControl = { bytes: Buffer.from(exported), select: () => ['test://import'], close: () => { closes++; }, read: (fd, buffer, options) => { const part = backupFileControl.bytes.subarray(options.offset, options.offset + Math.min(buffer.byteLength, 127)); new Uint8Array(buffer).set(part); return part.length; } };
-      const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 6); assert.equal(closes, 1);
+      const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 7); assert.equal(closes, 1);
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
       backupFileControl.read = () => 0; await assert.rejects(service.prepareRestore(), /读取不完整/); assert.equal(closes, 2);
       backupFileControl.bytes = Buffer.from('bad json'); backupFileControl.read = (fd, buffer) => { new Uint8Array(buffer).set(backupFileControl.bytes); return backupFileControl.bytes.length; };

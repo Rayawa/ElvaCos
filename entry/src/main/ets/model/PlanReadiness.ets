@@ -1,3 +1,4 @@
+import { ProjectShot, ShotReadiness, buildShotReadiness } from './Shot';
 import { Asset, AssetStatus, ChecklistItem, CosEvent, CosProject, PhotoAsset, ProjectAsset, ProjectStatus } from './Entities';
 import { PreparationTask } from './Preparation';
 import { Expense } from './Planning';
@@ -54,6 +55,7 @@ export class PlanReadiness {
   prep: PreparationReadiness = new PreparationReadiness();
   pack: PackingReadiness = new PackingReadiness();
   equipment: EquipmentReadiness = new EquipmentReadiness();
+  shots: ShotReadiness = new ShotReadiness();
   photos: PhotoReadiness = new PhotoReadiness();
   money: MoneyReadiness = new MoneyReadiness();
   blockers: string[] = [];
@@ -62,7 +64,7 @@ export function isWaiting(task: PreparationTask): boolean { return !task.done &&
 export function budgetLabel(configured: boolean | undefined, cents: number): string {
   return configured === true ? '预算 ¥' + (cents / 100).toFixed(2) : configured === false ? '未设置预算' : '历史预算未明确';
 }
-export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[], checklist: ChecklistItem[], assets: Asset[], links: ProjectAsset[], photos: PhotoAsset[], expenses: Expense[], events: CosEvent[], date: string): PlanReadiness {
+export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[], checklist: ChecklistItem[], assets: Asset[], links: ProjectAsset[], photos: PhotoAsset[], expenses: Expense[], events: CosEvent[], date: string, shots: ProjectShot[] = []): PlanReadiness {
   const result = new PlanReadiness(); result.id = project.id;
   result.date = planDate(project, events); result.dateFromEvent = !project.targetDate && Boolean(result.date);
   result.active = project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.ARCHIVED;
@@ -100,6 +102,7 @@ export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[]
   result.equipment.waiting = equipment.filter((asset: Asset) => [AssetStatus.ORDERED, AssetStatus.REPAIR, AssetStatus.LENT].includes(asset.status));
   result.equipment.available = equipment.length - result.equipment.unavailable.length;
   result.equipment.percent = equipment.length ? Math.round(result.equipment.available * 100 / equipment.length) : 0;
+  result.shots = buildShotReadiness(shots, project.id);
   result.photos.byStage = photoStageCounts(photos.filter((photo: PhotoAsset) => photo.projectId === project.id));
   result.money.spentCents = expenses.filter((expense: Expense) => expense.projectId === project.id).reduce((sum: number, expense: Expense) => sum + expense.amountCents, 0);
   result.money.budgetCents = project.budgetCents; result.money.budgetConfigured = project.budgetConfigured;

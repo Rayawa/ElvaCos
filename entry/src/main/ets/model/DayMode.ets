@@ -1,3 +1,4 @@
+import { PlanReadiness } from './PlanReadiness';
 import { CosEvent, CosProject } from './Entities';
 import { CollectedEntry } from './CollectedEntry';
 import { TeamMember } from './Planning';
@@ -64,6 +65,7 @@ export function orderedDayModules(preferences: DayModulePreferences, section: nu
   return DAY_MODULES.filter((module: DayModule) => module.section === section)
     .sort((a: DayModule, b: DayModule) => (preferences[a.id]?.order ?? a.order) - (preferences[b.id]?.order ?? b.order) || a.order - b.order);
 }
+export function hasEventShots(eventId: string, projects: CosProject[], plans: PlanReadiness[]): boolean { return projects.some((project: CosProject) => project.eventId === eventId && (plans.find((plan: PlanReadiness) => plan.id === project.id)?.shots.total || 0) > 0); }
 export function availableDayModules(event: CosEvent, projects: CosProject[], entries: CollectedEntry[], team: TeamMember[], now: number, hasShots: boolean = false): string[] {
   const ids = projects.filter((project: CosProject) => project.eventId === event.id).map((project: CosProject) => project.id);
   const modules: string[] = [];

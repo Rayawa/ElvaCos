@@ -160,4 +160,43 @@ class RelationalModelTest(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT count(*) FROM preparation_tasks').fetchone()[0], 0)
         self.assertEqual(self.db.execute('SELECT count(*) FROM checklist_items').fetchone()[0], 1)
 
+    def test_v6_to_v7_adds_shots_without_changing_existing_history(self):
+        old = sqlite3.connect(':memory:')
+        try:
+            old.execute('PRAGMA foreign_keys=ON')
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_7')[0]): old.execute(sql)
+            old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','旧角色',1,1)")
+            old.execute("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('p','c','旧计划','Preparing',1,1)")
+            old.execute("INSERT INTO preparation_categories VALUES('category','p','分类',0)")
+            old.execute("INSERT INTO preparation_tasks(id,project_id,category_id,label,done,waiting_on,waiting_until) VALUES('task','p','category','在途',1,'快递','2026-10-10')")
+            old.execute("INSERT INTO checklist_items VALUES('pack','p',NULL,'打包',1,0)")
+            old.execute("INSERT INTO photos VALUES('photo','p','test://photo','/original','/thumbnail','Final','说明',1)")
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_7')[1]): old.execute(sql)
+            self.assertEqual(old.execute('SELECT done,waiting_on,waiting_until FROM preparation_tasks').fetchone(), (1,'快递','2026-10-10'))
+            self.assertEqual(old.execute('SELECT done FROM checklist_items').fetchone()[0], 1)
+            self.assertEqual(old.execute('SELECT local_path,status,caption FROM photos').fetchone(), ('/original','Final','说明'))
+            self.assertEqual(old.execute('SELECT count(*) FROM project_shots').fetchone()[0], 0)
+        finally: old.close()
+
+    def test_shot_reference_ownership_removal_and_completion_constraints(self):
+        self.db.execute("INSERT INTO reference_images(id,character_id,source_uri,local_path,thumbnail_path,created_at) VALUES('ref','c','test://ref','','',1)")
+        self.db.execute("INSERT INTO reference_images(id,character_id,source_uri,local_path,thumbnail_path,created_at) VALUES('wrong','other','test://wrong','','',1)")
+        self.db.execute("INSERT INTO project_shots(id,project_id,title,done,reference_id,created_at) VALUES('s','p','合影',1,'ref',1)")
+        for sql in ["UPDATE project_shots SET reference_id='wrong'", "UPDATE project_shots SET done=2", "UPDATE project_shots SET title=' '", "UPDATE project_shots SET sort_order=-1"]:
+            with self.assertRaises(sqlite3.IntegrityError): self.db.execute(sql)
+        self.db.execute("DELETE FROM reference_images WHERE id='ref'")
+        self.assertEqual(self.db.execute('SELECT title,done,reference_id FROM project_shots').fetchone(), ('合影',1,''))
+        self.db.execute("DELETE FROM projects WHERE id='p'")
+        self.assertEqual(self.db.execute('SELECT count(*) FROM project_shots').fetchone()[0], 0)
+
+    def test_shot_reference_follows_plan_role_and_reference_owner_changes(self):
+        self.db.execute("INSERT INTO reference_images(id,character_id,source_uri,local_path,thumbnail_path,created_at) VALUES('ref','c','test://ref','','',1)")
+        self.db.execute("INSERT INTO project_shots(id,project_id,title,reference_id,created_at) VALUES('s','p','合影','ref',1)")
+        self.db.execute("UPDATE reference_images SET character_id='other' WHERE id='ref'")
+        self.assertEqual(self.db.execute('SELECT reference_id FROM project_shots').fetchone()[0], '')
+        self.db.execute("UPDATE reference_images SET character_id='c' WHERE id='ref'")
+        self.db.execute("UPDATE project_shots SET reference_id='ref'")
+        self.db.execute("UPDATE projects SET variant_id=NULL,character_id='other' WHERE id='p'")
+        self.assertEqual(self.db.execute('SELECT reference_id FROM project_shots').fetchone()[0], '')
+
 if __name__ == '__main__': unittest.main(verbosity=2)

@@ -35,7 +35,7 @@ export default function abilityTest(): void {
     beforeAll(async () => { if (!TestContext.value) { throw new Error('TestAbility context unavailable'); } context = TestContext.value; await db.open(context); });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('migrationAndCrudWorkOnNativeRdb', 0, async () => {
-      expect(db.getStore().version).assertEqual(6);
+      expect(db.getStore().version).assertEqual(7);
       await characters.save(character); await variants.save(variant); await projects.save(project); await assets.save(asset);
       expect((await characters.list())[0].name).assertEqual(character.name);
       expect((await projects.list())[0].variantId).assertEqual(variant.id);
@@ -55,12 +55,12 @@ export default function abilityTest(): void {
       const exported = await backup.exportMetadata();
       character.name = 'Changed'; await characters.save(character);
       const preview = await new MetadataBackupRepository(db).previewMetadata(exported);
-      expect(preview.version).assertEqual(6);
+      expect(preview.version).assertEqual(7);
       expect(preview.counts.find((count) => count.table === 'projects')?.incoming).assertEqual(1);
       expect((await characters.list())[0].name).assertEqual('Changed');
       await backup.restoreMetadata(exported);
       expect((await characters.list())[0].name).assertEqual('Verification Character');
-      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":6', '"version":99')); } catch (error) { rejected = true; }
+      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":7', '"version":99')); } catch (error) { rejected = true; }
       expect(rejected).assertTrue(); expect((await projects.list()).length).assertEqual(1);
     });
     it('invalidBackupForeignKeyIsRejectedBeforeReplacement', 0, async () => {

@@ -157,7 +157,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 
 | 目的地 | 路由参数 | 默认视图 | 返回恢复点 |
 |---|---|---|---|
-| 计划详情 | `ProjectRoute { id, section, focusTaskId?, outing, sheetKind }`，`section` = 0 概览 / 1 准备 / 2 打包 / 3 照片 | 从列表进 → 概览；从待办/打包/照片入口进 → 对应 section | 保留 section、Tab、筛选、滚动位置 |
+| 计划详情 | `ProjectRoute { id, section, focusTaskId?, outing, sheetKind, shotsOpen, focusShotId?, shotOffset }`，`section` = 0 概览 / 1 准备 / 2 打包 / 3 照片；拍摄字段仅为运行时 Sheet / 原行恢复状态 | 从列表进 → 概览；从待办/打包/照片入口进 → 对应 section；今天拍摄行 → 照片及所属拍摄清单 | 保留 section、Tab、筛选、滚动位置；编辑 / 查看参考图返回拍摄清单原行或附近偏移 |
 | 活动详情 | `EventRoute { id, dayMode }` | 从日程进 → 详情模式；从底条/首页卡片进 → 今天模式 | 保留来源；今天模式返回后底条仍在 |
 | 角色详情 | `CharacterRoute { id, section, variantId?, entriesOpen }` = 0 资料 / 1 履历 / 2 参考图；运行时保留来源角色库 / 计划路由引用 | 资料；从计划进入带版本 | 保留分段、版本、各段偏移与来源筛选 / 原行 |
 | 装备详情 | `AssetRoute { id, from: 'wardrobe'\|'project'\|'day'\|'tasks'\|'home'\|'collection', projectId?, sourceTab, section }`（运行时保留来源路由引用与恢复代次） | 资料 | 返回来源页对应位置 |
@@ -476,6 +476,7 @@ CREATE INDEX entries_scope_idx ON entries(scope_kind, scope_id);
 | 准备进度 | 已完成准备任务 / 当前准备任务数 | 0 项显示"尚未添加"，不显示已完成；在途计入分母不计入分子 |
 | 装备可用 | 满足当前可用规则的关联装备 / 关联装备数 | 展示待收货/维修/借出原因；不代替准备进度 |
 | 打包进度 | 已确认装包 / 当前打包项 | 常用物品与装备条目保持原关系 |
+| 拍摄进度 | 已拍事项 / 当前计划拍摄事项数 | 独立于准备、装包与照片阶段；全部已拍仍保留模块以便撤销，清单为空时今天模块消失 |
 | 逾期任务 | 未完成、有截止日期、早于本地今天、**非在途** | 无日期不逾期；完成/归档计划的准备事项排除 |
 | 在途任务 | 未完成且 `waiting_on` 或 `waiting_until` 非空 | 不计逾期 |
 | 即将到来的计划 | 显式目标日期，否则关联活动开始日期 | 标明日期来源；活动日期变更可预见地反映 |
@@ -492,6 +493,7 @@ CREATE INDEX entries_scope_idx ON entries(scope_kind, scope_id);
 PlanReadiness {
   prep:  { done, total, waiting, next }
   pack:  { packed, total }
+  shots: { items, done, total }
   photos:{ byStage }
   money: { spentCents, budgetCents?, budgetConfigured }
   blockers: []        // 在途项、装备不可用、缺日期

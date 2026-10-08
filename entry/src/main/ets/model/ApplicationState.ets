@@ -1,3 +1,5 @@
+import { ProjectShot } from './Shot';
+import { ShotRepository } from '../data/repository/ShotRepository';
 import { CharacterSummary, buildCharacterSummaries } from './CharacterLibrary';
 import { ProjectWork, buildProjectWork, workHistory } from './ProjectWork';
 import { PhotoImportJob, PhotoImportPorts } from './PhotoImport';
@@ -77,6 +79,7 @@ class DataSnapshot {
   team: TeamMember[] = [];
   expenses: Expense[] = [];
   references: ReferenceImage[] = [];
+  shots: ProjectShot[] = [];
   characters: Character[] = [];
   variants: CharacterVariant[] = [];
   projects: CosProject[] = [];
@@ -89,7 +92,7 @@ class DataSnapshot {
   links: ProjectAsset[] = [];
   diary: DiaryEntry[] = [];
 }
-const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary'];
+const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary', 'shots'];
 
 @ObservedV2
 export class AppState {
@@ -125,6 +128,7 @@ export class AppState {
   @Trace team: TeamMember[] = [];
   @Trace expenses: Expense[] = [];
   @Trace references: ReferenceImage[] = [];
+  @Trace shots: ProjectShot[] = [];
   @Trace diary: DiaryEntry[] = [];
   @Trace links: ProjectAsset[] = [];
   @Trace settings: AppSettings = new AppSettings();
@@ -138,6 +142,7 @@ export class AppState {
   private projectRepo = new CosProjectRepository(this.db);
   private assetRepo = new AssetRepository(this.db);
   private eventRepo = new CosEventRepository(this.db);
+  private shotRepo = new ShotRepository(this.db);
   private planningRepo = new PlanningRepository(this.db);
   private preparationRepo = new PreparationRepository(this.db);
   private checklistRepo = new ChecklistItemRepository(this.db);
@@ -289,6 +294,7 @@ export class AppState {
     if (scopes.includes('entries')) { snapshot.entries = await this.entryRepo.list(); }
     if (scopes.includes('team')) { snapshot.team = await this.planningRepo.team(); }
     if (scopes.includes('expenses')) { snapshot.expenses = await this.planningRepo.expenses(); }
+    if (scopes.includes('shots')) { snapshot.shots = await this.shotRepo.list(); }
     if (scopes.includes('references')) { snapshot.references = await this.planningRepo.references(); }
     if (scopes.includes('characters')) { snapshot.characters = await this.characterRepo.list(); }
     if (scopes.includes('variants')) { snapshot.variants = await this.variantRepo.list(); }
@@ -304,6 +310,7 @@ export class AppState {
     // Publish a coherent snapshot only after all dependent reads succeed.
     if (scopes.includes('team')) { this.team = snapshot.team; }
     if (scopes.includes('expenses')) { this.expenses = snapshot.expenses; }
+    if (scopes.includes('shots')) { this.shots = snapshot.shots; }
     if (scopes.includes('references')) { this.references = snapshot.references; }
     if (scopes.includes('characters')) { this.characters = snapshot.characters; }
     if (scopes.includes('variants')) { this.variants = snapshot.variants; }
@@ -325,7 +332,7 @@ export class AppState {
   get monthSpendingCents(): number { return this.monthLedger.totalCents; }
   @Computed
   get readinessPlans(): PlanReadiness[] {
-    return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate));
+    return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate, this.shots));
   }
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
   @Computed
@@ -461,6 +468,15 @@ export class AppState {
   removeEntry(entry: CollectedEntry): Promise<OperationResult> {
     return this.performResult(async () => { await this.entryRepo.remove(entry.id); await this.media?.remove(entry); }, true, ['entries']);
   }
+  async saveShot(shot: ProjectShot, create: boolean): Promise<boolean> {
+    return this.perform(async (): Promise<void> => { await this.shotRepo.save(shot, create); }, true, ['shots']);
+  }
+  async toggleShot(id: string, projectId: string, expected: boolean): Promise<OperationResult> {
+    return this.performResult(async (): Promise<void> => { await this.shotRepo.setDone(id, projectId, !expected, expected); }, true, ['shots']);
+  }
+  async removeShot(id: string, projectId: string): Promise<boolean> {
+    return this.perform(async (): Promise<void> => { await this.shotRepo.remove(id, projectId); }, true, ['shots']);
+  }
   async saveCharacter(item: Character): Promise<boolean> {
     return this.perform(async () => {
       item.name = requiredName(item.name);
@@ -489,7 +505,7 @@ export class AppState {
       if (item.status === ProjectStatus.READY || item.status === ProjectStatus.COMPLETED) {
         void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
-    }, true, ['projects', 'characters', 'diary', 'preparationCategories', 'preparationTasks']);
+    }, true, ['projects', 'characters', 'diary', 'preparationCategories', 'preparationTasks', 'shots']);
   }
   async saveAsset(item: Asset, projectId: string = ''): Promise<boolean> {
     return this.perform(async () => {
