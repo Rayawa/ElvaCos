@@ -7,6 +7,7 @@ export class LedgerRoute {
   @Trace endDate: string = '';
   @Trace chartZoom: number = 1;
   @Trace chartPan: number = 0;
+  @Trace restoreVersion: number = 0;
   sourceProjectId: string = '';
   offset: number = 0;
   constructor(projectId: string = '') { this.projectId = projectId; this.sourceProjectId = projectId; }

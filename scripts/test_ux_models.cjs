@@ -971,6 +971,54 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal((await db.sql('SELECT count(*) FROM characters')).rows[0][0], 1); assert.equal((await db.sql('SELECT count(*) FROM variants')).rows[0][0], 1);
     } finally { db.close(); }
   });
+  await test('named removal confirmation counts match actual plan cascades and keep reassigned collections and shared wardrobe records', async () => {
+    const { db, state, repo } = await shotsFixture();
+    const { CosProjectRepository, PhotoAssetRepository, DiaryEntryRepository, CharacterRepository } = require(root+'/data/repository/Repositories.ets');
+    const { PlanningRepository }=require(root+'/data/repository/PlanningRepository.ets'), { PreparationRepository }=require(root+'/data/repository/PreparationRepository.ets');
+    const plans=new CosProjectRepository(db), photosRepo=new PhotoAssetRepository(db), diaryRepo=new DiaryEntryRepository(db), planning=new PlanningRepository(db), prep=new PreparationRepository(db);
+    try {
+      await db.sql("INSERT INTO photos(id,project_id,source_uri,local_path,thumbnail_path,status,created_at) VALUES('impact-photo','p1','test://impact','','','Final',1)");
+      await db.sql("INSERT INTO preparation_categories(id,project_id,name) VALUES('impact-category','p1','测试分类')");
+      await db.sql("INSERT INTO preparation_tasks(id,project_id,category_id,label) VALUES('impact-task','p1','impact-category','准备任务')");
+      await db.sql("INSERT INTO project_assets VALUES('p1','shared')");
+      await db.sql("INSERT INTO checklist_items(id,project_id,asset_id,label) VALUES('impact-pack','p1','shared','打包项')");
+      await db.sql("INSERT INTO team_members(id,project_id,role,name) VALUES('impact-team','p1','摄影','团队成员')");
+      await db.sql("INSERT INTO expenses(id,project_id,name,category,amount_cents,date,created_at) VALUES('impact-expense','p1','车费','交通',123,'2026-10-08',1)");
+      await db.sql("INSERT INTO diary_entries(id,project_id,text,created_at) VALUES('impact-diary','p1','记录',1)");
+      await db.sql("INSERT INTO entries(id,kind,scope_kind,scope_id,text,created_at) VALUES('impact-entry','note','project','p1','凭证说明',1)");
+      await repo.save(Object.assign(new (require(root+'/model/Shot.ets').ProjectShot)(),{id:'impact-shot',projectId:'p1',title:'合影',referenceId:'plan-ref'}),true);
+      state.projects=await plans.list(); state.photos=await photosRepo.list(); state.references=await planning.references(); state.team=await planning.team(); state.expenses=await planning.expenses();
+      state.preparationCategories=await prep.categories(); state.preparationTasks=await prep.tasks(); state.diary=await diaryRepo.list(); state.shots=await repo.list();
+      state.entries=await state.entryRepo.list(); state.links=await state.relations.links(); state.checklist=[Object.assign(new ChecklistItem(),{id:'impact-pack',projectId:'p1',label:'打包项'})];
+      const before=JSON.stringify(state.projects); const impact=state.removalImpact('project','p1'); assert.equal(impact.title,'删除「p1」？');
+      for(const label of ['照片 1 张','参考图 1 张','准备任务 1 项','打包项 1 项','拍摄事项 1 项','花费 1 笔','团队分工 1 条','计划记录 1 条','解除 1 条装备关联','1 条所属收录回到未归位']) assert.ok(impact.detail.includes(label),label);
+      assert.equal(state.removalImpact('project','missing'),undefined); assert.equal(JSON.stringify(state.projects),before);
+      assert.match(state.removalImpact('project','p2').detail,/归档计划/);
+      state.characters=await new CharacterRepository(db).list(); assert.match(state.removalImpact('character','role').detail,/关联计划 3 份/);
+      assert.match(state.removalImpact('category','impact-category').detail,/1 项准备任务/); assert.match(state.removalImpact('reference','plan-ref').detail,/1 项拍摄事项保留/);
+      assert.match(state.removalImpact('expense','impact-expense').detail,/¥1.23/); assert.ok(state.removalImpact('photo','impact-photo').title.includes('p1'));
+      await plans.remove('p1');
+      for(const table of ['photos','preparation_categories','preparation_tasks','checklist_items','project_shots','expenses','team_members','diary_entries','project_assets']) assert.equal((await db.sql('SELECT count(*) FROM '+table)).rows[0][0],0,table);
+      assert.equal((await planning.references()).length,2); assert.equal((await state.assetRepo.list()).length,1); assert.deepEqual((await state.entryRepo.list()).map(e=>[e.id,e.scopeKind,e.scopeId]),[['impact-entry','global','']]);
+    } finally { db.close(); }
+  });
+  await test('completed plan archive preserves content and related records, keeps failed writes unchanged and never retries a committed archive after refresh failure', async () => {
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository,DiaryEntryRepository }=require(root+'/data/repository/Repositories.ets');
+    try {
+      state.projectRepo=new CosProjectRepository(db); state.diaryRepo=new DiaryEntryRepository(db);
+      await db.sql("UPDATE projects SET notes='保留说明',target_date='2026-10-08',shooting_time='09:30',budget_cents=500,budget_configured=1 WHERE id='p2'");
+      await db.sql("INSERT INTO photos(id,project_id,source_uri,local_path,thumbnail_path,status,created_at) VALUES('archive-photo','p2','test://archive','','','Final',1)");
+      await db.sql("INSERT INTO expenses(id,project_id,name,category,amount_cents,date,created_at) VALUES('archive-expense','p2','车费','交通',123,'2026-10-08',1)");
+      state.refresh=async()=>{state.projects=await state.projectRepo.list(); state.diary=await state.diaryRepo.list();}; await state.refresh();
+      assert.equal(await state.archiveProject('p1'),false); assert.equal(await state.archiveProject('missing'),false);
+      db.failSql='INSERT INTO projects'; assert.equal(await state.archiveProject('p2'),false); db.failSql=''; assert.equal((await db.sql("SELECT status FROM projects WHERE id='p2'")).rows[0][0],'Completed');
+      const original=state.projects.find(p=>p.id==='p2'); const refresh=state.refresh; state.refresh=async()=>{throw new Error('read failed');};
+      assert.equal(await state.archiveProject('p2'),true); assert.equal(state.lastOperation.status,'savedNotRefreshed'); assert.equal(original.status,'Completed');
+      assert.deepEqual((await db.sql("SELECT status,notes,target_date,shooting_time,budget_cents,budget_configured FROM projects WHERE id='p2'")).rows[0],['Archived','保留说明','2026-10-08','09:30',500,1]);
+      assert.equal((await db.sql('SELECT count(*) FROM photos')).rows[0][0],1); assert.equal((await db.sql('SELECT count(*) FROM expenses')).rows[0][0],1);
+      const history=(await db.sql('SELECT count(*) FROM diary_entries')).rows[0][0]; state.refresh=refresh; assert.equal(await state.reloadRecords(),true); assert.equal(await state.archiveProject('p2'),false); assert.equal((await db.sql('SELECT count(*) FROM diary_entries')).rows[0][0],history);
+    } finally { db.close(); }
+  });
   await test('role favorite writes preserve legacy fields and failure leaves the original flag and work history intact', async () => {
     const { CharacterRepository } = require(root + '/data/repository/Repositories.ets'), { db, state } = await wardrobeFixture();
     try {

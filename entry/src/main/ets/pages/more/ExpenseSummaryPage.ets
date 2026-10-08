@@ -28,8 +28,16 @@ export struct ExpenseSummary {
 
   private restoreTimer: number = -1;
   private restoring: boolean = true;
+  private measured: boolean = false;
   aboutToAppear(): void {
     if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); }
+    this.restoreScroll();
+  }
+  @Monitor('route.restoreVersion')
+  private restoreScroll(): void {
+    if (!this.measured) { return; }
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
+    this.restoring = true;
     this.restoreTimer = setTimeout((): void => {
       this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false }); this.restoring = false;
     }, 0);
@@ -41,7 +49,7 @@ export struct ExpenseSummary {
   @Monitor('route.projectId', 'route.category', 'route.range', 'route.startDate', 'route.endDate')
   private filterChanged(): void {
     this.route.offset = 0; this.route.chartZoom = 1; this.route.chartPan = 0;
-    if (!this.restoring) { this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false }); }
+    this.restoreScroll();
   }
   @Computed
   private get summary(): LedgerSummary {
@@ -188,6 +196,9 @@ export struct ExpenseSummary {
         .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
     }.id('expense-scroll').width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).transition(pageTransition())
       .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
-      .onDidScroll((): void => { if (!this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
+      .onAreaChange((_, area: Area): void => {
+        if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreScroll(); }
+      })
+      .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
   }
 }

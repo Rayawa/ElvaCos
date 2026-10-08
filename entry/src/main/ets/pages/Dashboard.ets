@@ -52,7 +52,7 @@ import { HdsActionTabs } from '../component/HdsActionTabs';
 import { HapticService } from '../common/HapticService';
 import { ProjectRoute } from '../model/ProjectRoute';
 import { EditDraft } from '../model/EditDraft';
-import { Character, CosProject, Asset, CosEvent, PhotoAsset, PhotoStatus } from '../model/Entities';
+import { Character, CosProject, Asset, CosEvent, PhotoAsset, PhotoStatus, ProjectStatus } from '../model/Entities';
 import { SystemCapability } from '../common/SystemCapability';
 import { HomePage } from './main/HomePage';
 import { CosPage } from './main/CosPage';
@@ -326,23 +326,11 @@ import { EmptyState } from '../component/Surfaces';
     this.formOpen = true;
   }
   private async remove(kind: string, id: string): Promise<void> {
-    const messages = new Map<string, string>([
-      ['project', '计划、清单、照片记录与应用内照片副本将删除。系统相册原图保留。'],
-      ['character', '角色及其版本将删除。仍有关联计划时无法删除。'],
-      ['asset', '衣柜装备与所有计划关联将删除，清单会保留名称。'],
-      ['event', '活动将删除，关联计划会保留。'],
-      ['photo', '照片记录与本地副本将删除，系统相册原图保留。'],
-      ['variant', '角色版本将删除；仍被计划使用时无法删除。'],
-      ['checklist', '此清单项将删除。'],
-      ['preparation', '此准备任务将删除，打包清单保留。'],
-      ['category', '此分类及其准备任务将删除，装备和打包清单保留。'],
-      ['team', '此成员的本机分工记录将删除。'],
-      ['expense', '此笔花费将删除，并从统计中移除。'],
-      ['reference', '此参考图记录与应用内副本将删除。系统相册原图保留。'],
-    ]);
     if (this.state.busy || this.state.staleScopes.length) { return; }
     const usage = this.state.assetUsage(id);
-    const accepted = await confirm(this.getUIContext(), kind === 'asset' ? '删除装备？' : '确认删除？', kind === 'asset' ? usage.removalMessage(this.state.assets.find((asset: Asset) => asset.id === id)?.name || '已失效装备') : messages.get(kind) || '记录将删除。', '删除');
+    const impact = this.state.removalImpact(kind, id);
+    if (kind !== 'asset' && !impact) { this.state.reportError('记录已不存在，请返回后重新查看'); return; }
+    const accepted = await confirm(this.getUIContext(), kind === 'asset' ? '删除装备？' : impact!.title, kind === 'asset' ? usage.removalMessage(this.state.assets.find((asset: Asset) => asset.id === id)?.name || '已失效装备') : impact!.detail, '删除');
     if (accepted && await (kind === 'asset' ? this.state.removeAsset(id, usage.removalKey) : this.state.remove(kind, id))) {
       if (kind === 'project' || kind === 'character' || kind === 'asset') {
         this.pruneInvalidDetails(kind, id);
@@ -605,6 +593,7 @@ import { EmptyState } from '../component/Surfaces';
         shown: (): void => {
           if (kind === 'inbox') { (param as InboxRoute).restoreVersion++; }
           if (kind === 'search') { (param as SearchRoute).restoreVersion++; }
+          if (kind === 'expenseStats') { (param as LedgerRoute).restoreVersion++; }
           if (kind === 'characters') { (param as PlanListRoute).restoreVersion++; }
           if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }
           if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
@@ -787,6 +776,9 @@ import { EmptyState } from '../component/Surfaces';
       tools.push({ value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: (): void => { route.outing = !route.outing; if (route.outing) { this.state.resume(); } else { this.state.suspend(); } } });
     } else if (route.section === 3) { tools.push({ value: '导入照片', icon: Icons.importPhoto, action: (): void => { this.state.importPhotos(route.id); } }); }
     if (!route.outing) {
+      if (this.state.projects.find((project: CosProject) => project.id === route.id)?.status === ProjectStatus.COMPLETED) {
+        tools.unshift({ value: '归档计划', icon: Icons.plan, action: (): void => { void this.state.archiveProject(route.id); } });
+      }
       tools.push({ value: '编辑计划', icon: Icons.edit, action: (): void => { this.edit('project', route.id); } });
       tools.push({ value: '分享', icon: Icons.share, action: (): void => { this.state.shareProject(route.id); } });
       tools.push({ value: '删除计划', icon: Icons.remove, action: (): void => { this.remove('project', route.id); } });

@@ -2,6 +2,7 @@ import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
 import { CollectedEntry } from '../../../main/ets/model/CollectedEntry';
 import { CosEvent } from '../../../main/ets/model/Entities';
+import { localDay } from '../../../main/ets/model/DayMode';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
 
@@ -187,6 +188,33 @@ export default function uiShellTest(): void {
         state.entries = oldEntries; state.events = oldEvents;
       }
     });
+    it('residentTodaySnackBarFloatsAboveStableTabsAndReturnsFromDayMode', 0, async () => {
+      const state = getApplicationState(); const oldEvents = state.events;
+      const event = new CosEvent(); event.id = 'ui-snackbar-' + Date.now(); event.name = '今日通知位置验证'; event.date = localDay(Date.now());
+      await tap('首页'); const before = await tabBounds();
+      try {
+        // Temporary metadata in memory: no business write and no persisted dismissal.
+        state.events = [event]; state.tickClock();
+        const enter = await driver.waitForComponent(ON.id('day-entry-bar').inWindow(bundle), 3000);
+        if (!enter) { throw new Error('Official resident SnackBar did not appear'); }
+        const close = await driver.findComponent(ON.id('day-entry-close').inWindow(bundle));
+        if (!close) { throw new Error('Official resident SnackBar close action is missing'); }
+        const after = await tabBounds();
+        expect(after.top).assertEqual(before.top); expect(after.bottom).assertEqual(before.bottom);
+        expect((await enter.getBounds()).bottom < after.top).assertTrue();
+        expect((await close.getBounds()).bottom < after.top).assertTrue();
+        await enter.click(); await driver.delayMs(500); await present('今天模式'); await present('现场');
+        expect((await driver.findComponents(ON.id('day-entry-bar').inWindow(bundle))).length).assertEqual(0);
+        await back();
+        if (!(await driver.waitForComponent(ON.id('day-entry-bar').inWindow(bundle), 3000))) { throw new Error('Today entry did not return to the root'); }
+        const returned = await tabBounds(); expect(returned.top).assertEqual(before.top); expect(returned.bottom).assertEqual(before.bottom);
+      } finally {
+        // Remove the fixture before pressing Back, so the test cannot dismiss it into Preferences.
+        state.events = oldEvents; state.tickClock(); await driver.delayMs(350);
+        for (let attempt = 0; attempt < 4 && !(await driver.findComponent(ON.id('main-tabs').inWindow(bundle))); attempt++) { await back(); }
+        await tap('首页');
+      }
+    });
     it('fixedChromeAndIndependentSettingsRespectSafeAreas', 0, async () => {
       await tap('衣柜');
       const before = await tabBounds();
@@ -310,9 +338,13 @@ export default function uiShellTest(): void {
       await present('expense-range'); await present('expense-scope');
       await (await driver.findComponent(ON.id('expense-scroll').inWindow(bundle))).scrollSearch(ON.text('花费明细').inWindow(bundle));
       await present('花费明细');
+      const before = await (await driver.findComponent(ON.text('花费明细').inWindow(bundle))).getBounds();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-expenses.png');
       await tap('记一笔'); await present('添加花费'); await present('实际花费（元） *'); await present('付款日期 *');
-      await tap('sheet-close'); await present('花费统计'); await back(); await present('新建计划');
+      await tap('sheet-close'); await present('花费统计');
+      const after = await (await driver.findComponent(ON.text('花费明细').inWindow(bundle))).getBounds();
+      expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
+      await back(); await present('新建计划');
     });
     it('everyRootHasSettingsAndDeferredAccountHasNoLoginAction', 0, async () => {
       const signedIn = getApplicationState().account.signedIn;

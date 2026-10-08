@@ -1,4 +1,5 @@
 import { SearchData } from './GlobalSearch';
+import { RemovalData, RemovalImpact, removalImpact } from './RemovalImpact';
 import { ProjectShot } from './Shot';
 import { ShotRepository } from '../data/repository/ShotRepository';
 import { CharacterSummary, buildCharacterSummaries } from './CharacterLibrary';
@@ -96,7 +97,7 @@ class DataSnapshot {
 const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary', 'shots'];
 
 @ObservedV2
-export class AppState implements SearchData {
+export class AppState implements SearchData, RemovalData {
   @Trace operationScope: string = '';
   @Trace lastOperation: OperationResult = { status: 'ok' };
   @Trace staleScopes: string[] = [];
@@ -518,6 +519,13 @@ export class AppState implements SearchData {
         void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
     }, true, ['projects', 'characters', 'diary', 'preparationCategories', 'preparationTasks', 'shots']);
+  }
+  removalImpact(kind: string, id: string): RemovalImpact | undefined { return removalImpact(this, kind, id); }
+  async archiveProject(id: string): Promise<boolean> {
+    const project = this.projects.find((item: CosProject) => item.id === id);
+    if (!project || project.status !== ProjectStatus.COMPLETED) { this.reportError('计划已变化，请重新查看当前状态'); return false; }
+    const copy = JSON.parse(JSON.stringify(project)) as CosProject; copy.status = ProjectStatus.ARCHIVED;
+    return this.saveProject(copy);
   }
   async saveAsset(item: Asset, projectId: string = ''): Promise<boolean> {
     return this.perform(async () => {

@@ -8,7 +8,7 @@
 
 | 能力 | 起始版本/限制 | API 23 基线策略 |
 |---|---|---|
-| HdsNavigation / HdsNavDestination / HdsTabs | HdsNavigation 18、HdsNavDestination/HdsTabs 20；UIDesign.HDSComponent.Core；Stage | API 23 直接使用；主路由覆盖式详情，详情 HdsTabs 动作，主页五 Tab 独立导航 |
+| HdsNavigation / HdsNavDestination / HdsTabs | HdsNavigation 18、HdsNavDestination/HdsTabs 20；UIDesign.HDSComponent.Core；Stage | API 23 直接使用；主路由覆盖式详情，详情使用标题菜单与分段，主页五 Tab 独立导航 |
 | TabSegmentButtonV2 $selectedIndex / onItemClicked | 18；ArkUI.Full；Stage；无新增权限；已核对本机 SDK @ohos.arkui.advanced.SegmentButtonV2.d.ets | 分别更新选中状态与处理点击反馈，直接复用 Dashboard 原调用方式 |
 | onAxisEvent / AxisEvent / getVerticalAxisValue / getHorizontalAxisValue | 17；ArkUI.ArkUI.Full；Stage；无额外权限；common.d.ts 核验；修饰键查询继承 BaseEvent（12） | 直接复制 Dashboard common/scroll.ets，五个主页和设置将滚轮 / 触控板纵向轴事件交给页面 Scroller；忽略 Ctrl、纯横向与无效值 |
 | ToolbarItem.symbolIcon / SymbolGlyphModifier | 12；ArkUI.Full；Stage；无额外权限 | Icons 集中提供原生 toolbar 加号/照片 Symbol，避免图片资源图标在详情工具栏缺失；其余语义图标保留原资源 |
