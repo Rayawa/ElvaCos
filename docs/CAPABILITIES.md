@@ -29,7 +29,7 @@
 | 应用接续 | 分布式能力、设备及权限约束 | P2，不在首版要求同步或账户 |
 | 系统 BackupExtensionAbility | 工程已有；应用沙箱由系统备份 | 保留，核对 include 配置；手工 RDB 备份标明媒体限制 |
 
-核心目标为 Phone；module 已声明 tablet/2in1。UI/数据 API 能在这些类型上使用，但当前握姿、触觉、近场分享根据 SysCap 和硬件返回判断支持情况，不单凭 deviceType。
+UX v2 的安装清单仅声明 Phone，Tablet / 2in1 在获得真实窗口和输入方式证据前不宣称支持。保留响应式组件；握姿、触觉、近场分享仍按 SysCap 和硬件返回判断能力，不单凭 deviceType。
 
 ## 官方来源
 
