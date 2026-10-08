@@ -1,3 +1,4 @@
+import { PhotoCollectionRoute, PhotoViewerRoute } from '../../model/PhotoCollection';
 import { formatTime } from '../../common/format';
 import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
@@ -21,6 +22,8 @@ export struct MePage {
   @Event open: (kind: string, id: string) => void = () => {};
   @Event destructive: (kind: string) => void = () => {};
   @Param section: number = 0;
+  @Local photoRoute: PhotoCollectionRoute = new PhotoCollectionRoute('', true);
+  @Event view: (route: PhotoViewerRoute) => void = () => {};
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
   @Local animStep: number = 0;
@@ -76,9 +79,8 @@ export struct MePage {
           entranceStep: this.animStep,
           scroller: this.scroller,
           state: this.state,
-          photos: this.state.photos.filter((p: PhotoAsset) => p.status === PhotoStatus.FINAL || p.status === PhotoStatus.PUBLISHED),
-          portfolio: true,
-          open: this.open,
+          photos: this.state.photos, route: this.photoRoute, from: 'portfolio', view: this.view,
+          showAlbum: (): void => { this.open('album', 'all'); },
           topInset: this.topInset,
           bottomInset: this.bottomInset,
           sidePadding: Theme.pagePadding,

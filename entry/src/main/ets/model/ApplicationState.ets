@@ -1,3 +1,4 @@
+import { AlbumSummary, buildAlbumSummary } from './AlbumSummary';
 import { MetadataBackupPreview } from './MetadataBackupPreview';
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
 import { LedgerRoute } from './LedgerRoute';
@@ -321,6 +322,8 @@ export class AppState {
     return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate));
   }
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
+  @Computed
+  get albumSummary(): AlbumSummary { return buildAlbumSummary(this.readinessPlans, this.projects, this.events, this.photos); }
   @Computed
   get actionablePlans(): PlanReadiness[] { return this.readinessPlans.filter((item: PlanReadiness) => item.active); }
   @Computed

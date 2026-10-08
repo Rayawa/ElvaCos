@@ -50,7 +50,7 @@ export default function localUnitTest(): void {
       expect(photoStage(photos, 1).length).assertEqual(2);
       expect(photoStage(photos, 2).length).assertEqual(1);
       expect(photoStage(photos, 3).length).assertEqual(1);
-      expect(photoStage(photos, 4).length).assertEqual(2);
+      expect(photoStage(photos, 5).length).assertEqual(2);
     });
     it('namesTrimWhitespaceAndRejectEmpty' , 0, () => { expect(requiredName('  Miku  ')).assertEqual('Miku'); let rejected = false; try { requiredName('  '); } catch (error) { rejected = true; } expect(rejected).assertTrue(); });
   });

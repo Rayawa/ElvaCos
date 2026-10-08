@@ -475,9 +475,93 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   await test('all photo surfaces share six disjoint stages and final includes published', () => {
     const distribution = photoDistribution(photos); assert.deepEqual(distribution.map(g => g.value), read().photos.byStage);
-    assert.equal(distribution.reduce((sum, g) => sum + g.value, 0), 8); assert.equal(photoStage(photos, 4).length, 2);
-    assert.equal(photoStage(photos, 5)[0].status, PhotoStatus.RETOUCHED); assert.equal(photoStage(photos, 6)[0].status, PhotoStatus.ARCHIVED);
-    assert.equal(portfolioStage(photos, 1).length, 2); assert.equal(portfolioStage(photos, 2)[0].status, PhotoStatus.PUBLISHED);
+    assert.equal(distribution.reduce((sum, g) => sum + g.value, 0), 8); assert.equal(photoStage(photos, 5).length, 2);
+    assert.equal(photoStage(photos, 4)[0].status, PhotoStatus.RETOUCHED); assert.equal(photoStage(photos, 6)[0].status, PhotoStatus.ARCHIVED);
+    assert.equal(portfolioStage(photos, 5).length, 2); assert.equal(portfolioStage(photos, 7)[0].status, PhotoStatus.PUBLISHED);
+  });
+  await test('album uses shared readiness counts and effective plan dates, including completed and undated plans', () => {
+    const { buildAlbumSummary } = require(root + '/model/AlbumSummary.ets');
+    const p2 = Object.assign(new CosProject(), { id: 'album-completed', name: '已完成', eventId: '', targetDate: '', status: ProjectStatus.COMPLETED });
+    const scoped = photos.map(photo => Object.assign(new PhotoAsset(), photo, { projectId: project.id }));
+    const second = Object.assign(new PhotoAsset(), { id: 'second-final', projectId: p2.id, status: PhotoStatus.FINAL, createdAt: Date.now() });
+    const readiness = [buildPlanReadiness(project, [], [], [], [], scoped, [], [event], '2026-12-31'), buildPlanReadiness(p2, [], [], [], [], [second], [], [], '2026-12-31')];
+    const summary = buildAlbumSummary(readiness, [p2, project], [event], [...scoped, second]);
+    assert.equal(summary.total, 9); assert.deepEqual(summary.counts, [2, 1, 1, 1, 3, 1]);
+    const first = summary.plans[0]; assert.equal(first.id, project.id); assert.equal(first.date, event.date); assert.deepEqual(first.counts, readiness[0].photos.byStage);
+    assert.equal(first.cover.status, PhotoStatus.FINAL); assert.equal(summary.plans[1].date, '');
+    first.counts[0] = 100; assert.equal(readiness[0].photos.byStage[0], 2);
+    const state = new AppState(); state.projects = [project, p2]; state.events = [event]; state.photos = [...scoped, second];
+    assert.deepEqual(state.albumSummary.counts, summary.counts);
+  });
+  await test('album queue, plan scope and portfolio all query the same photo states and one vocabulary', () => {
+    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/model/PhotoCollection.ets');
+    const { PHOTO_FILTER_LABELS, PHOTO_EDIT_STATUSES, photoStatusLabel } = require(root + '/model/PhotoStages.ets');
+    const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'album-' + index, projectId: index % 2 ? 'two' : 'one' }));
+    const route = new PhotoCollectionRoute();
+    assert.equal(selectPhotoCollection(input, route).length, 8);
+    route.queue = true; assert.equal(selectPhotoCollection(input, route).length, 3);
+    route.setFilter(3); assert.equal(selectPhotoCollection(input, route)[0].status, PhotoStatus.WAITING);
+    route.setPlan('one'); assert.equal(selectPhotoCollection(input, route).length, 0);
+    route.queue = false; route.setPlan(''); route.setPortfolio(true); assert.equal(selectPhotoCollection(input, route).length, 2);
+    route.setFilter(7); assert.deepEqual(selectPhotoCollection(input, route).map(photo => photo.status), [PhotoStatus.PUBLISHED]);
+    assert.deepEqual(PHOTO_FILTER_LABELS, ['全部', '待选', '已选', '待修', '已修', '成片', '归档', '已发布']);
+    assert.equal(new Set(PHOTO_EDIT_STATUSES.map(photoStatusLabel)).size, 7);
+    assert.equal(photoStatusLabel(PhotoStatus.IMPORTED), photoStatusLabel(PhotoStatus.RAW));
+  });
+  await test('photo batch freezes its actual selection, preserves it on failure, clears on committed success and explains filter changes', () => {
+    const { PhotoCollectionRoute } = require(root + '/model/PhotoCollection.ets');
+    const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'batch-' + index, projectId: project.id }));
+    const route = new PhotoCollectionRoute(project.id); route.selecting = true; route.targetStatus = PhotoStatus.WAITING; route.setFilter(1); route.selectAll(input);
+    assert.deepEqual(route.selectedIds, ['batch-0', 'batch-1']); const submitted = route.begin(input); assert.deepEqual(submitted, route.selectedIds);
+    submitted.pop(); route.setFilter(3); route.toggle('batch-0', input); route.selectAll([]);
+    assert.equal(route.filter, 1); assert.equal(route.selectedIds.length, 2);
+    route.finish(false); assert.deepEqual(route.selectedIds, ['batch-0', 'batch-1']); assert.equal(route.selecting, true);
+    route.begin(input); route.finish(true); assert.deepEqual(route.selectedIds, []); assert.equal(route.filter, 1); assert.equal(route.selecting, false); assert.equal(route.targetStatus, PhotoStatus.WAITING);
+    route.selecting = true; route.selectAll(input); route.setFilter(3); assert.deepEqual(route.selectedIds, []); assert.match(route.feedback, /已清空/);
+    route.selectAll(input); assert.equal(route.selectedIds.length, 1); route.setPlan('different'); assert.deepEqual(route.selectedIds, []);
+  });
+  await test('album mode and photo viewer retain separate filters, collection offsets and source thumbnail identities', () => {
+    const { AlbumRoute } = require(root + '/model/AlbumRoute.ets');
+    const { PhotoViewerRoute, returnToPhotoCollection } = require(root + '/model/PhotoCollection.ets');
+    const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'return-' + index, projectId: project.id }));
+    const route = new AlbumRoute(project.id); route.groupOffset = 450; route.byPlan.offset = 820; route.byPlan.setFilter(1); route.byPlan.offset = 820;
+    const viewer = new PhotoViewerRoute(input[0].id, 'album', route.byPlan, input);
+    assert.equal(viewer.context, route.byPlan); assert.equal(route.byPlan.anchorId, input[0].id); assert.deepEqual(viewer.visibleIds, ['return-0', 'return-1']);
+    returnToPhotoCollection(viewer, input); assert.equal(route.byPlan.offset, 820); assert.equal(route.byPlan.filter, 1); assert.equal(route.byPlan.restoreVersion, 1);
+    route.byPlan.selecting = true; route.byPlan.selectAll(input); route.showMode('queue'); assert.match(route.queue.feedback, /已清空/); assert.deepEqual(route.byPlan.selectedIds, []);
+    route.queue.setFilter(3); route.queue.offset = 600; route.showMode('byPlan'); assert.equal(route.collection.offset, 820); assert.equal(route.collection.filter, 1); assert.equal(route.groupOffset, 450);
+    input[0].status = PhotoStatus.FINAL; returnToPhotoCollection(viewer, input); assert.match(route.byPlan.feedback, /离开当前筛选/); assert.equal(route.byPlan.offset, 820);
+  });
+  await test('album removes only a deleted plan scope while preserving valid queue filters and restoring a reachable collection', () => {
+    const { AlbumRoute } = require(root + '/model/AlbumRoute.ets');
+    const route = new AlbumRoute('gone'); route.byPlan.filter = 5; route.byPlan.selectedIds = ['lost-photo'];
+    route.queue.planId = project.id; route.queue.filter = 3; route.queue.offset = 300;
+    route.reconcile([project], photos);
+    assert.equal(route.byPlan.planId, ''); assert.equal(route.byPlan.filter, 5); assert.deepEqual(route.byPlan.selectedIds, []); assert.match(route.byPlan.feedback, /已不存在/);
+    assert.equal(route.queue.planId, project.id); assert.equal(route.queue.filter, 3); assert.equal(route.queue.offset, 300);
+    route.reconcile([project], photos, project.id); assert.equal(route.queue.planId, ''); assert.equal(route.queue.filter, 3);
+  });
+  await test('actual photo batch repository rolls back invalid IDs and AppState refresh failure does not reapply the batch', async () => {
+    const { PhotoAssetRepository } = require(root + '/data/repository/Repositories.ets');
+    const { PhotoCollectionRoute } = require(root + '/model/PhotoCollection.ets');
+    const batchDb = new SqliteAdapter();
+    try {
+      for (const match of fs.readFileSync(root + '/data/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await batchDb.sql(match[1]);
+      await batchDb.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
+      await batchDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
+      for (const id of ['photo-a', 'photo-b']) await batchDb.sql("INSERT INTO photos VALUES(?,'plan',?,'','','Raw','',1)", [id, 'test://' + id]);
+      const repo = new PhotoAssetRepository(batchDb);
+      await assert.rejects(repo.setStatuses(['photo-a', 'missing'], PhotoStatus.FINAL), /已变化/);
+      assert.deepEqual((await batchDb.sql('SELECT status FROM photos')).rows, [['Raw'], ['Raw']]);
+      const state = new AppState(); state.photoRepo = repo; state.photos = await repo.list(); let reads = 0;
+      state.refresh = async () => { reads++; if (reads === 1) throw new Error('read failed'); state.photos = await repo.list(); };
+      const route = new PhotoCollectionRoute('plan'); route.selecting = true; route.selectAll(state.photos);
+      const ids = route.begin(state.photos); route.finish(await state.setPhotoStatuses(ids, PhotoStatus.WAITING));
+      assert.equal(state.lastOperation.status, 'savedNotRefreshed'); assert.deepEqual(route.selectedIds, []); assert.equal(route.selecting, false);
+      assert.deepEqual((await batchDb.sql('SELECT status FROM photos')).rows, [['WaitingForRetouch'], ['WaitingForRetouch']]);
+      batchDb.failSql = 'UPDATE photos'; assert.equal(await state.reloadRecords(), true); batchDb.failSql = '';
+      assert.equal(reads, 2); assert.equal(state.photos.every(photo => photo.status === PhotoStatus.WAITING), true);
+    } finally { batchDb.close(); }
   });
   await test('ledger periods use local calendar boundaries, inclusive endpoints and reject invalid custom ranges', () => {
     const route = new LedgerRoute();

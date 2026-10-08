@@ -14,8 +14,11 @@ export function photoStageCounts(photos: PhotoAsset[]): number[] {
   for (const photo of photos) { const index = photoStageIndex(photo.status); if (index >= 0) { counts[index]++; } }
   return counts;
 }
-// Existing filter indexes are runtime UI state, not persisted business values.
+export const PHOTO_FILTER_LABELS: string[] = ['全部'].concat(PHOTO_STAGE_LABELS).concat('已发布');
+export const PHOTO_EDIT_STATUSES: PhotoStatus[] = [PhotoStatus.RAW, PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED];
+export function photoStatusLabel(status: PhotoStatus): string { return status === PhotoStatus.PUBLISHED ? '已发布' : PHOTO_STAGE_LABELS[photoStageIndex(status)] || '状态未知'; }
+// Runtime filter indexes follow the stage vocabulary; no business migration.
 export function matchesPhotoFilter(status: PhotoStatus, filter: number): boolean {
   const stage = photoStageIndex(status);
-  return filter === 0 || stage === [0, 0, 1, 2, 4, 3, 5][filter] || (filter === 7 && status === PhotoStatus.PUBLISHED);
+  return filter === 0 || (filter >= 1 && filter <= 6 && stage === filter - 1) || (filter === 7 && status === PhotoStatus.PUBLISHED);
 }

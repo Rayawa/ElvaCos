@@ -9,6 +9,7 @@ export struct ManagedImage {
   @Event onFailure: () => void = () => {};
   @Param sourcePath: string = '';
   @Param label: string = '照片';
+  @Param failureText: string = '照片暂不可用';
   @Param fit: ImageFit = ImageFit.Cover;
   @Param ratio: number = 0.8;
   @Param radius: number = 14;
@@ -29,7 +30,7 @@ export struct ManagedImage {
           .accessibilityText(this.label).accessibilityDescription(this.loading ? '照片加载中' : '照片已加载')
         if (this.loading) { LoadingProgress().width(24).height(24).color(Theme.brand).accessibilityText('照片加载中') }
       } else {
-        Text('照片暂不可用').fontSize(13).fontColor(Theme.muted).textAlign(TextAlign.Center).accessibilityText(this.label + '，照片暂不可用')
+        Text(this.failureText).fontSize(13).fontColor(Theme.muted).textAlign(TextAlign.Center).accessibilityText(this.label + '，' + this.failureText)
       }
     }.width('100%')
       .aspectRatio(this.ratio > 0 ? this.ratio : this.loadedRatio)

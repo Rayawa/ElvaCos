@@ -7,7 +7,6 @@ import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
 import { Asset, PhotoAsset, CosProject } from '../../model/Entities';
 import { InteractiveCard, EmptyState, SectionHeading, StatusPill } from '../../component/Surfaces';
-import { PhotoGrid } from '../../component/PhotoGrid';
 import { vibration } from '../../common/vibration';
 import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 
@@ -25,7 +24,6 @@ export struct LibraryPage {
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
   @Local query: string = '';
-  @Local projectId: string = '';
   @Local animStep: number = 0;
   private enterPlayed: boolean = false;
   private enterTimers: number[] = [];
@@ -63,30 +61,21 @@ export struct LibraryPage {
       Text('¥' + (a.priceCents / 100).toFixed(2)).fontSize(14).fontColor(Theme.muted)
     }.width('100%')
   }
-  @Builder photoFilter() {
-    Select(new Array<SelectOption>({ value: '全部计划' })
-      .concat(this.state.projects.map((p: CosProject): SelectOption => { return { value: p.name }; })))
-      .value(this.state.projects.find((p: CosProject) => p.id === this.projectId)?.name || '全部计划')
-      .onSelect((i: number) => { vibration.dotVibration(); this.projectId = i === 0 ? '' : this.state.projects[i - 1].id; })
-      .accessibilityText('照片所属计划筛选')
-      .visualEffect(this.feedback.effect('select-1'))
-      .compositingFilter(this.feedback.filter('select-1'))
-      .attributeModifier(this.feedback.control('select-1'))
-  }
   build() {
     Column({ space: 12 }) {
       if (this.photos) {
-        PhotoGrid({
-          entranceStep: this.animStep,
-          scroller: this.scroller,
-          state: this.state,
-          photos: this.state.photos.filter((p: PhotoAsset) => !this.projectId || p.projectId === this.projectId),
-          open: this.open,
-          topInset: this.topInset,
-          bottomInset: this.bottomInset,
-          sidePadding: Theme.pagePadding,
-          header: (): void => { this.photoFilter(); }
-        }).layoutWeight(1)
+        Scroll(this.scroller) {
+          Column({ space: 16 }) {
+            Blank().height(this.topInset).width('100%')
+            SectionHeading({ title: '相册', trailing: this.state.albumSummary.total + ' 张照片' })
+            Text('按场次整理照片，或处理跨计划的待选与待修队列。').fontSize(16).fontColor(Theme.muted)
+            Button('打开相册').id('open-album').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent)
+              .onClick((): void => { this.open('album', 'all'); })
+            Button('查看待处理照片').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent)
+              .onClick((): void => { this.open('albumQueue', 'all'); })
+            Blank().height(this.bottomInset).width('100%')
+          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').alignItems(HorizontalAlign.Start)
+        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
       } else {
         Scroll(this.scroller) {
           Column({ space: 12 }) {

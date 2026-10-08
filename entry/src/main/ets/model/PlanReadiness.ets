@@ -44,6 +44,7 @@ export class MoneyReadiness {
 }
 export class PhotoReadiness {
   byStage: number[] = [0, 0, 0, 0, 0, 0];
+  get total(): number { return this.byStage.reduce((sum: number, count: number) => sum + count, 0); }
 }
 export class PlanReadiness {
   id: string = '';

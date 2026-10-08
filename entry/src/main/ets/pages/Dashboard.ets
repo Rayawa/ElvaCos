@@ -1,3 +1,6 @@
+import { AlbumRoute } from '../model/AlbumRoute';
+import { PhotoCollectionRoute, PhotoViewerRoute, returnToPhotoCollection } from '../model/PhotoCollection';
+import { AlbumPage } from './main/AlbumPage';
 import { BackupRestoreSheet } from '../component/BackupRestoreSheet';
 import { EventRoute, EventReturnPath } from '../model/EventRoute';
 import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
@@ -128,13 +131,19 @@ import { EmptyState } from '../component/Surfaces';
   /** 二级页面返回：Dashboard AppDetailPage 的 closePage 语义 + 显式返回振动。 */
   private closeDetail(): void {
     HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
-    if (this.detailStack.size() > 0) { this.detailStack.pop(); }
+    if (this.detailStack.size() > 0) {
+      const index = this.detailStack.size() - 1;
+      if (this.detailStack.getAllPathName()[index] === 'photo') { returnToPhotoCollection(this.detailStack.getParamByIndex(index) as PhotoViewerRoute, this.state.photos); }
+      this.detailStack.pop();
+    }
   }
   private open(kind: string, id: string): void {
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
+    if (kind === 'album' || kind === 'albumQueue') { this.detailStack.pushPathByName('album', new AlbumRoute(id === 'all' ? '' : id, kind === 'albumQueue')); return; }
+    if (kind === 'photo') { this.openPhoto(new PhotoViewerRoute(id, 'collection', new PhotoCollectionRoute(), this.state.photos)); return; }
     if (kind === 'characters') { this.detailStack.pushPathByName('characters', new PlanListRoute()); return; }
     if (kind === 'tasks') { this.detailStack.pushPathByName('tasks', new TaskRoute(id === 'all' ? '' : id)); return; }
     if (kind === 'expenseStats') {
@@ -159,6 +168,7 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
 
+  private openPhoto(route: PhotoViewerRoute): void { this.state.suspend(); this.detailStack.pushPathByName('photo', route); }
   private openEvent(id: string, dayMode: boolean, section: number = 0): void {
     const current = this.stacks[2].size() > 0 ? this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute : undefined;
     if (this.detailStack.size() === 0 && current && current.id === id) {
@@ -176,7 +186,7 @@ import { EmptyState } from '../component/Surfaces';
   }
   private openTaskItem(item: TaskQueueItem): void {
     if (item.source === 'asset') { this.open('asset', item.focusId); return; }
-    const route = new ProjectRoute(item.projectId, item.section); route.photoFilter = item.photoFilter;
+    const route = new ProjectRoute(item.projectId, item.section); route.photos.filter = item.photoFilter;
     if (item.source === 'preparation') { route.focusTaskId = item.focusId; }
     if (item.source === 'packing') { route.focusPackingId = item.focusId; }
     this.detailStack.pushPathByName('project', route);
@@ -257,10 +267,13 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
   private validDetailPath(name: string, param: Object, deletedKind: string = '', deletedId: string = ''): boolean {
-    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : param as string) === deletedId) { return false; }
+    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : name === 'photo' ? (param as PhotoViewerRoute).id : param as string) === deletedId) { return false; }
     if (name === 'project') { return this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id); }
     if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as string)); }
-    if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as string) && !(deletedKind === 'project' && photo.projectId === deletedId)); }
+    if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id && !(deletedKind === 'project' && photo.projectId === deletedId)); }
+    if (name === 'album') {
+      (param as AlbumRoute).reconcile(this.state.projects, this.state.photos, deletedKind === 'project' ? deletedId : '');
+    }
     if (name === 'reference') { return this.state.references.some((reference: ReferenceImage) => reference.id === (param as string) && !(deletedKind === 'project' && reference.projectId === deletedId) && !(deletedKind === 'character' && reference.characterId === deletedId)); }
     if (name === 'tasks' && (param as TaskRoute).projectId && (deletedKind === 'project' && (param as TaskRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as TaskRoute).projectId))) { (param as TaskRoute).projectId = ''; }
     if (name === 'expenseStats' && (param as LedgerRoute).projectId && (deletedKind === 'project' && (param as LedgerRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as LedgerRoute).projectId))) { (param as LedgerRoute).projectId = ''; }
@@ -268,7 +281,13 @@ import { EmptyState } from '../component/Surfaces';
   }
   private pruneInvalidDetails(deletedKind: string, deletedId: string): void {
     const indexes: number[] = [];
-    this.detailStack.getAllPathName().forEach((name: string, index: number): void => { if (!this.validDetailPath(name, this.detailStack.getParamByIndex(index) as Object, deletedKind, deletedId)) { indexes.push(index); } });
+    this.detailStack.getAllPathName().forEach((name: string, index: number): void => {
+      const param = this.detailStack.getParamByIndex(index) as Object;
+      if (!this.validDetailPath(name, param, deletedKind, deletedId)) {
+        if (name === 'photo') { (param as PhotoViewerRoute).context.feedback = '照片记录已不存在，已保留原范围与附近位置'; (param as PhotoViewerRoute).context.restoreVersion++; }
+        indexes.push(index);
+      }
+    });
     if (indexes.length) { this.detailStack.removeByIndexes(indexes); }
     for (let index = 0; index < this.stacks[2].size(); index++) {
       const route = this.stacks[2].getParamByIndex(index) as EventRoute;
@@ -349,10 +368,11 @@ import { EmptyState } from '../component/Surfaces';
             topInset: Theme.detailTopWithSegment,
             bottomInset: Theme.contentBottom,
             sidePadding: Theme.pagePadding,
-            initialFilter: (param as ProjectRoute).photoFilter,
-            filterChanged: (filter: number): void => { (param as ProjectRoute).photoFilter = filter; },
-            photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as ProjectRoute).id),
-            open: (k: string, id: string) => this.open(k, id)
+            route: (param as ProjectRoute).photos, from: 'project',
+            header: (): void => { this.projectPhotoHeader(param as ProjectRoute); },
+            addPhotos: (): void => { this.state.importPhotos((param as ProjectRoute).id); },
+            showAlbum: (): void => { this.open('album', (param as ProjectRoute).id); },
+            photos: this.state.photos, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }
           })
         }
         else {
@@ -395,13 +415,11 @@ import { EmptyState } from '../component/Surfaces';
         })
       }
       else if (kind === 'photo') {
-        PhotoDetail({
-          entrance: entrance,
-          state: this.state,
-          photo: this.state.photos.find((p: PhotoAsset) => p.id === (param as string)) || new PhotoAsset(),
-          open: (k: string, id: string) => this.open(k, id),
-          remove: (k: string, id: string) => this.remove(k, id)
-        })
+        if (this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id)) {
+          PhotoDetail({ entrance: entrance, state: this.state,
+            photo: this.state.photos.find((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id) as PhotoAsset,
+            open: (k: string, id: string): void => { this.open(k, id); }, remove: (k: string, id: string): void => { this.remove(k, id); } })
+        } else { EmptyState({ title: '照片记录已不存在', message: '可以返回原来的照片范围。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop }) }
       }
     }.width('100%').height('100%')
   }
@@ -410,7 +428,9 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'characters') {
       CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.contentBottom,
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
-    } else if (kind === 'project' || kind === 'expenseStats') {
+    } else if (kind === 'album') {
+      AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }, importPhotos: (id: string): void => { this.chooseImport(id); } })
+    } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
       TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
@@ -452,15 +472,18 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
+          kind === 'project' || kind === 'album' ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
-          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
-          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
+          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : undefined,
+          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
-        shown: (): void => { if (kind === 'project' && (param as ProjectRoute).outing) { this.state.resume(); } },
+        shown: (): void => {
+          if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).outing) { this.state.resume(); } }
+          if (kind === 'album') { (param as AlbumRoute).restoreVersion++; (param as AlbumRoute).collection.restoreVersion++; }
+        },
         hidden: (): void => {
           this.state.suspend();
         },
@@ -475,6 +498,7 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private destinationTitle(kind: string, id: string): string {
+    if (kind === 'album') { return '相册'; }
     if (kind === 'characters') { return '角色库'; }
     if (kind === 'privacy') { return '隐私政策'; }
     if (kind === 'settings') { return '设置'; }
@@ -488,7 +512,8 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'asset') { return this.state.assets.find((a: Asset) => a.id === id)?.name || '装备'; }
     return '照片';
   }
-  private chooseImport(): void {
+  private chooseImport(planId: string = ''): void {
+    if (planId && this.state.projects.some((project: CosProject) => project.id === planId)) { this.state.importPhotos(planId); return; }
     if (this.state.projects.length === 0) { this.edit('project'); this.state.reportNotice('先建立计划，再导入照片。'); }
     else { this.rootSheetKind = 'import'; this.importOpen = true; }
   }
@@ -541,17 +566,7 @@ import { EmptyState } from '../component/Surfaces';
       return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }];
     }
     if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: () => this.edit('event') }]; }
-    if (index === 3) {
-      return [{
-        value: this.libraryPhotos ? '导入照片' : '添加装备', icon: this.libraryPhotos ? Icons.importPhoto : Icons.add, action: () => {
-          if (this.libraryPhotos) {
-            this.chooseImport();
-          } else {
-            this.edit('asset');
-          }
-        }
-      }];
-    }
+    if (index === 3) { return this.libraryPhotos ? [] : [{ value: '添加装备', icon: Icons.add, action: (): void => { this.edit('asset'); } }]; }
     return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }, { value: '添加活动', icon: Icons.event, action: () => this.edit('event') }, { value: '导入照片', icon: Icons.importPhoto, action: () => this.chooseImport() }];
   }
   private rootMenus(index: number): HdsNavigationMenuItemOptions[] {
@@ -582,6 +597,24 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
+  @Builder albumSegment(route: AlbumRoute) {
+    HdsTitleBarSegment({ componentId: 'album-mode-segment', items: this.buildSegmentItems(['按场次', '待处理']), selectedIndexes: [route.mode === 'queue' ? 1 : 0],
+      experimentalWidth: Theme.titleSegmentWidth, minimumTargetHeight: 48,
+      onSelectedIndexChanged: (section: number): void => { route.showMode(section ? 'queue' : 'byPlan'); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
+  }
+  @Builder projectPhotoHeader(route: ProjectRoute) {
+    Column({ space: 8 }) {
+      Text(this.state.projectName(route.id)).fontSize(18).fontColor(Theme.ink)
+      Text('本计划照片 ' + this.state.readiness(route.id).photos.total + ' 张').fontSize(14).fontColor(Theme.muted)
+      Button('在相册查看本计划').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
+        .onClick((): void => { this.open('album', route.id); })
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+  private photoMenus(route: PhotoViewerRoute): HdsNavigationMenuItemOptions[] {
+    const photo = this.state.photos.find((photo: PhotoAsset) => photo.id === route.id); if (!photo) { return []; }
+    return [{ content: { label: '设为角色封面', icon: Icons.edit, isEnabled: !this.state.busy && !!photo.thumbnailPath, action: (): void => { this.setCover(photo); } } },
+      { content: { label: '删除照片', icon: Icons.remove, isEnabled: !this.state.busy, action: (): void => { this.remove('photo', route.id); } } }];
+  }
   private projectMenus(route: ProjectRoute): HdsNavigationMenuItemOptions[] {
     const tools: ToolbarItem[] = [];
     if (route.section === 1) {
@@ -774,6 +807,7 @@ import { EmptyState } from '../component/Surfaces';
         }
         else {
           MePage({
+            view: (route: PhotoViewerRoute): void => { this.openPhoto(route); },
             entranceSession: this.mainEntranceSession,
             scroller: this.pageScrollers[index],
             state: this.state,

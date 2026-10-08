@@ -88,22 +88,24 @@ export default function uiShellTest(): void {
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
       await tap('衣柜'); await tap('装备'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
-      await tap('照片'); await present('导入照片');
+      await tap('照片'); await present('打开相册'); await tap('打开相册'); await present('按场次'); await present('待处理');
+      const albumPlans = await driver.findComponents(ON.description('双击查看本场照片').inWindow(bundle));
+      if (albumPlans.length > 0) { await albumPlans[0].click(); }
       await driver.delayMs(1000);
-      if (!(await driver.findComponent(ON.text('每一张，都是一次登场').inWindow(bundle)))) {
+      if (albumPlans.length > 0 && !(await driver.findComponent(ON.text('这个范围还没有照片').inWindow(bundle)))) {
         const loadedPhotos = await driver.findComponents(ON.description('照片已加载').inWindow(bundle));
         expect(loadedPhotos.length > 0).assertTrue();
       }
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library-photos.png');
       const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
       if (photos.length > 0) {
-        await photos[0].click(); await driver.delayMs(500); await present('设为封面');
-        await detailActions();
+        await photos[0].click(); await driver.delayMs(500); await present('照片工作流');
+        expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
         expect((await driver.findComponents(ON.description('照片已加载').inWindow(bundle))).length > 0).assertTrue();
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-photo-detail.png');
         await back(); await driver.delayMs(350);
       }
-      await tap('我的'); await tap('时间轴'); await present('热爱的轨迹');
+      await back(); await driver.delayMs(350); await tap('我的'); await tap('时间轴'); await present('热爱的轨迹');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-timeline.png');
       await tap('作品'); await present('作品集');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-me.png');
@@ -191,10 +193,10 @@ export default function uiShellTest(): void {
         if (photos && photos.length > 0) {
           await tap('批量选片');
           const selectable = await driver.findComponents(ON.description('双击切换照片选择').inWindow(bundle));
-          await selectable[0].click(); await present('已选 1 张'); await present('应用');
+          await selectable[0].click(); await present('已选 1 张'); await present('photo-batch-apply');
           await tap('取消选择');
           const restored = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
-          await restored[0].click(); await driver.delayMs(350); await present('设为封面');
+          await restored[0].click(); await driver.delayMs(350); await present('照片工作流');
           await back(); await driver.delayMs(350); await present('批量选片');
         }
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-plan-photos.png');
@@ -217,12 +219,12 @@ export default function uiShellTest(): void {
       await tap('sheet-close'); await present('今天'); await tap('列表'); await present('日历'); await tap('首页');
     });
     it('photoImportPlanSheetCanBeClosedWithoutLaunchingPickerOrWritingData', 0, async () => {
-      await tap('衣柜'); await tap('照片'); await tap('导入照片');
+      await tap('衣柜'); await tap('照片'); await tap('打开相册'); await tap('导入照片');
       const form = await driver.findComponents(ON.text('新建计划').inWindow(bundle));
       if (form && form.length > 0) { await tap('sheet-close'); } else {
         await present('选择照片所属计划'); await tap('sheet-close'); await present('导入照片');
       }
-      await tap('首页');
+      await back(); await tap('首页');
     });
     it('expenseSummaryUsesCoveringRouteAndCancelableRecordSheet', 0, async () => {
       await tap('首页'); await tap('home-expenses'); await present('花费统计');

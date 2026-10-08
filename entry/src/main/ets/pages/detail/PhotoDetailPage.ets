@@ -1,3 +1,4 @@
+import { photoStatusLabel } from '../../model/PhotoStages';
 import { PHOTO_LABELS, PHOTO_STATUSES } from '../../common/constants';
 import { PressFeedback } from '../../common/pressFeedback';
 import { StaggerEntrance } from '../../common/motion';
@@ -47,7 +48,8 @@ export struct PhotoDetail {
         Column({ space: Theme.sectionSpacing }) {
           SectionHeading({ title: '照片工作流' })
           Select(PHOTO_LABELS.map((label: string): SelectOption => { return { value: label }; }))
-            .value(PHOTO_LABELS[PHOTO_STATUSES.indexOf(this.photo.status)])
+            .value(photoStatusLabel(this.photo.status))
+            .constraintSize({ minHeight: 48 }).enabled(!this.state.busy && !this.state.staleScopes.length)
             .onSelect((i: number) => { vibration.dotVibration(); this.state.setPhotoStatus(this.photo, PHOTO_STATUSES[i]); })
             .accessibilityText('照片业务状态')
             .visualEffect(this.feedback.effect('select-1'))

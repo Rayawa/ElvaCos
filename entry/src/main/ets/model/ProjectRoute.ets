@@ -1,3 +1,4 @@
+import { PhotoCollectionRoute } from './PhotoCollection';
 // Each detail destination keeps its own task view when another detail is opened.
 @ObservedV2
 export class ProjectRoute {
@@ -8,7 +9,7 @@ export class ProjectRoute {
   @Trace preparing: boolean = false;
   @Trace linking: boolean = false;
   @Trace expandedCategories: string[] = [];
-  @Trace photoFilter: number = 0;
+  @Trace photos: PhotoCollectionRoute;
   @Trace contextSheet: string = '';
   @Trace showCompleted: boolean = false;
   packingOrder: string[] = [];
@@ -16,5 +17,5 @@ export class ProjectRoute {
   focusPackingId: string = '';
   focusHandled: boolean = false;
   offsets: number[] = [0, 0, 0, 0];
-  constructor(id: string, section: number = 0) { this.id = id; this.section = section; }
+  constructor(id: string, section: number = 0) { this.id = id; this.section = section; this.photos = new PhotoCollectionRoute(id); }
 }

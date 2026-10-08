@@ -50,8 +50,8 @@ export default function uiPolishTest(): void {
       const photos = [PhotoStatus.RAW, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED]
         .map((status: PhotoStatus): PhotoAsset => { const photo = new PhotoAsset(); photo.status = status; return photo; });
       expect(portfolioStage(photos, 0).length).assertEqual(2);
-      expect(portfolioStage(photos, 1).length).assertEqual(2);
-      expect(portfolioStage(photos, 2)[0].status).assertEqual(PhotoStatus.PUBLISHED);
+      expect(portfolioStage(photos, 5).length).assertEqual(2);
+      expect(portfolioStage(photos, 7)[0].status).assertEqual(PhotoStatus.PUBLISHED);
       expect(portfolioStage([], 0).length).assertEqual(0);
     });
     it('homeShowsOneNextPlanAndItsEffectiveDate', 0, async () => {
