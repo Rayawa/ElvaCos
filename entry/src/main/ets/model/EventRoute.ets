@@ -8,6 +8,7 @@ export class EventRoute {
   id: string;
   @Trace dayMode: boolean;
   @Trace section: number = 0;
+  @Trace restoreVersion: number = 0;
   sourceTab: number = 2;
   returnPaths: EventReturnPath[] = [];
   offsets: number[] = [0, 0, 0, 0, 0, 0];

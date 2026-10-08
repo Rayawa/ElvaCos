@@ -28,6 +28,7 @@ export struct EventDetail {
   @Param event: CosEvent = new CosEvent();
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   @Event open: (kind: string, id: string) => void = () => {};
+  @Event openAsset: (id: string, projectId: string) => void = () => {};
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
   @Event back: () => void = () => {};
   @Local linking: boolean = false;
@@ -45,7 +46,7 @@ export struct EventDetail {
   private offsetIndex(): number { return this.route.dayMode ? 4 + this.route.section : this.route.section; }
   aboutToAppear(): void { this.displayedIndex = this.offsetIndex(); this.restoreScroll(); }
   aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } }
-  @Monitor('route.section', 'route.dayMode')
+  @Monitor('route.section', 'route.dayMode', 'route.restoreVersion')
   private viewChanged(): void {
     this.displayedIndex = this.offsetIndex(); this.restoreScroll();
   }
@@ -229,7 +230,7 @@ export struct EventDetail {
         Button((item.done ? '✓ 已装包 · ' : '○ 未装包 · ') + item.label).width('100%').constraintSize({ minHeight: 64 }).fontSize(18)
           .fontColor(item.done ? Theme.muted : Theme.ink).backgroundColor(Theme.surface).enabled(!this.state.busy)
           .onClick((): void => { this.state.toggleChecklist(item); }).accessibilityText(item.label + (item.done ? '，已装包，点击改为未装包' : '，未装包，点击确认装包'))
-        if (item.assetId) { Text((this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置') + ' · ' + (this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在')).fontColor(Theme.muted).fontSize(14) }
+        if (item.assetId) { Button((this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置') + ' · ' + (this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在')).fontColor(Theme.muted).fontSize(14).constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openAsset(item.assetId, project.id); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
       }, (item: ChecklistItem) => item.id)
       Button('打开出门清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('outing', project.id); })
     }.width('100%').alignItems(HorizontalAlign.Start)

@@ -21,6 +21,7 @@ export class TaskRoute {
   @Trace category: string = 'action';
   @Trace projectId: string = '';
   @Trace range: string = 'action';
+  @Trace restoreVersion: number = 0;
   offset: number = 0;
   constructor(projectId: string = '') { this.projectId = projectId; }
 }

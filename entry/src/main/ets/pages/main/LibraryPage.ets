@@ -1,113 +1,121 @@
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, ASSET_TYPES, ASSET_TYPE_LABELS } from '../../common/constants';
-import { PressFeedback } from '../../common/pressFeedback';
-import { MainEntranceSession } from '../../common/motion';
+import { MainEntranceSession, startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
 import { DashboardSearch } from '../../component/DashboardSearch';
 import { AppState } from '../../model/ApplicationState';
+import { WardrobeRoute, wardrobeAssets, wardrobeLocations } from '../../model/Wardrobe';
 import { Theme } from '../../common/Theme';
-import { Asset, PhotoAsset, CosProject } from '../../model/Entities';
-import { InteractiveCard, EmptyState, SectionHeading, StatusPill } from '../../component/Surfaces';
-import { vibration } from '../../common/vibration';
-import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
+import { Asset, AssetStatus, AssetType } from '../../model/Entities';
+import { EmptyState, SectionHeading, StatusPill } from '../../component/Surfaces';
 
 @ComponentV2
 export struct LibraryPage {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+  @Require @Param state: AppState;
+  @Require @Param route: WardrobeRoute;
   @Param scroller: Scroller = new Scroller();
   @Param topInset: number = 100;
   @Param bottomInset: number = 110;
-  @Require @Param state: AppState;
   @Event open: (kind: string, id: string) => void = () => {};
   @Event add: (kind: string, parent: string) => void = () => {};
   @Param photos: boolean = false;
   @Event selection: (value: boolean) => void = () => {};
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
-  @Local query: string = '';
   @Local animStep: number = 0;
   private enterPlayed: boolean = false;
   private enterTimers: number[] = [];
+  private measured: boolean = false;
+  private restoring: boolean = true;
+  private restoreTimer: number = -1;
   aboutToAppear(): void { if (this.active) { this.enter(); } }
   @Monitor('active')
-  activeChanged(): void { if (this.active) { this.enter(); } }
+  activeChanged(): void { if (this.active) { this.enter(); this.restoreOffset(); } }
+  @Monitor('route.restoreVersion')
+  restoreChanged(): void { this.restoreOffset(); }
+  @Monitor('photos')
+  modeChanged(): void { this.measured = false; this.restoring = true; }
   private enter(): void {
     if (this.enterPlayed) { return; }
     this.enterPlayed = true;
     if (!this.entranceSession.claim('LibraryPage')) { this.animStep = 2; return; }
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
-  aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private assets(): Asset[] { return this.state.assets.filter((a: Asset) => (a.name + a.location).includes(this.query)); }
-  @Builder assetContent(a: Asset) {
-    Row({ space: 14 }) {
-      Text(ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(a.type)])
-        .fontSize(13)
-        .fontColor(Theme.accent)
-        .width(52)
-        .height(56)
-        .backgroundColor(Theme.tint)
-        .textAlign(TextAlign.Center)
-        .borderRadius(16)
-        .visualEffect(this.feedback.effect('asset-type:' + a.id))
-        .compositingFilter(this.feedback.filter('asset-type:' + a.id))
-        .attributeModifier(this.feedback.control('asset-type:' + a.id))
-      Column({ space: 7 }) { Text(a.name)
-        .fontSize(19)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.ink); Text(a.location || '未记录存放位置')
-        .fontSize(12)
-        .fontColor(Theme.muted); StatusPill({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(a.status)] }) }.layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      Text('¥' + (a.priceCents / 100).toFixed(2)).fontSize(14).fontColor(Theme.muted)
-    }.width('100%')
+  aboutToDisappear(): void {
+    cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2;
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
+  }
+  private restoreOffset(): void {
+    if (!this.measured || this.photos) { return; }
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
+    this.restoring = true;
+    this.restoreTimer = setTimeout((): void => {
+      this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false });
+      if (this.route.anchorId) { try { this.getUIContext().getFocusController().requestFocus('wardrobe-asset:' + this.route.anchorId); } catch (error) {} }
+      this.restoring = false;
+    }, 0);
+  }
+  private assets(): Asset[] { return wardrobeAssets(this.state.assets, this.route); }
+  private locations(): string[] {
+    const values = wardrobeLocations(this.state.assets);
+    if (this.route.locationMode === 'named' && !values.includes(this.route.location)) { values.push(this.route.location); }
+    return values;
+  }
+  private locationLabels(): string[] { return ['全部位置', '未记录位置'].concat(this.locations().map((value: string) => '存放位置 · ' + value)); }
+  private locationIndex(): number { return this.route.locationMode === 'all' ? 0 : this.route.locationMode === 'unrecorded' ? 1 : this.locations().indexOf(this.route.location) + 2; }
+  @Builder controls() {
+    DashboardSearch({ value: this.route.query, placeholder: '搜索装备 / 存放位置', label: '搜索衣柜', changed: (value: string): void => { this.route.query = value; this.route.changed(); } })
+    Select(['全部类型'].concat(ASSET_TYPE_LABELS).map((label: string): SelectOption => { return { value: label }; }))
+      .value(this.route.type ? ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.route.type as AssetType)] : '全部类型').constraintSize({ minHeight: 48 })
+      .onSelect((index: number): void => { this.route.type = index ? ASSET_TYPES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备类型筛选')
+    Select(['全部状态'].concat(ASSET_STATUS_LABELS).map((label: string): SelectOption => { return { value: label }; }))
+      .value(this.route.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.route.status as AssetStatus)] : '全部状态').constraintSize({ minHeight: 48 })
+      .onSelect((index: number): void => { this.route.status = index ? ASSET_STATUSES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备状态筛选')
+    Select(this.locationLabels().map((label: string): SelectOption => { return { value: label }; })).value(this.locationLabels()[this.locationIndex()]).constraintSize({ minHeight: 48 })
+      .onSelect((index: number): void => { this.route.locationMode = index === 0 ? 'all' : index === 1 ? 'unrecorded' : 'named'; this.route.location = index > 1 ? this.locations()[index - 2] : ''; this.route.changed(); }).accessibilityText('衣柜存放位置筛选')
+    if (this.route.filtered) { Button('清除衣柜筛选').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.clear(); }) }
+    if (this.route.feedback) { Text(this.route.feedback).fontSize(14).fontColor(Theme.accent) }
+    SectionHeading({ title: '我的衣柜', trailing: this.assets().length + ' 件装备' })
+  }
+  @Builder assetContent(asset: Asset) {
+    Column({ space: 8 }) {
+      Row({ space: 12 }) {
+        Text(asset.name).fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+        StatusPill({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] })
+      }.width('100%')
+      Text(ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(asset.type)] + ' · ' + (asset.location.trim() || '未记录位置')).fontSize(14).fontColor(Theme.muted)
+      Text('使用计划 ' + this.state.assetUsage(asset.id).projects.length + ' 份' + (this.state.assetUsage(asset.id).projects.length ? ' · ' + this.state.assetUsage(asset.id).projects.slice(0, 2).map((project) => project.name).join(' / ') : '')).fontSize(14).fontColor(Theme.muted)
+      if (asset.status !== AssetStatus.OWNED) { Text('当前不可用 · 影响 ' + this.state.assetUsage(asset.id).activeProjects.length + ' 份进行中计划').fontSize(14).fontColor(Theme.accent) }
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
   build() {
-    Column({ space: 12 }) {
-      if (this.photos) {
-        Scroll(this.scroller) {
-          Column({ space: 16 }) {
-            Blank().height(this.topInset).width('100%')
-            SectionHeading({ title: '相册', trailing: this.state.albumSummary.total + ' 张照片' })
-            Text('按场次整理照片，或处理跨计划的待选与待修队列。').fontSize(16).fontColor(Theme.muted)
-            Button('打开相册').id('open-album').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent)
-              .onClick((): void => { this.open('album', 'all'); })
-            Button('查看待处理照片').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent)
-              .onClick((): void => { this.open('albumQueue', 'all'); })
-            Blank().height(this.bottomInset).width('100%')
-          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').alignItems(HorizontalAlign.Start)
-        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
-      } else {
-        Scroll(this.scroller) {
-          Column({ space: 12 }) {
-            Column({ space: 12 }) {
-              Blank().height(this.topInset).width('100%')
-              DashboardSearch({
-                value: this.query,
-                placeholder: '搜索装备 / 存放位置',
-                label: '搜索衣柜',
-                changed: (v: string): void => { this.query = v; }
-              })
-              SectionHeading({ title: '我的衣柜', trailing: `${this.assets().length} 件装备` })
-            }.
-          width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
-            Column({ space: 12 }) {
-              ForEach(this.assets(), (a: Asset) => { InteractiveCard({
-                  label: a.name,
-                  effects: this.state.settings.effects,
-                  action: () => this.open('asset', a.id),
-                  content: (): void => this.assetContent(a)
-                }) }, (a: Asset) => a.id)
-              if (this.assets().length === 0) { EmptyState({
-                  title: this.query ? '没有找到装备' : '让每一件装备有归处',
-                  message: this.query ? '换个名称或存放位置试试。' : '记录存放位置、状态和价格，再关联到计划。'
-                }) }
-            }.
-          width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-            Blank().height(this.bottomInset).width('100%')
-          }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
-        }.id('library-scroll').layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
-      }
-    }.width('100%').height('100%')
-      .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
+    if (this.photos) {
+      Scroll(this.scroller) {
+        Column({ space: 16 }) {
+          Blank().height(this.topInset).width('100%')
+          SectionHeading({ title: '相册', trailing: this.state.albumSummary.total + ' 张照片' })
+          Text('按场次整理照片，或处理跨计划的待选与待修队列。').fontSize(16).fontColor(Theme.muted)
+          Button('打开相册').id('open-album').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent).onClick((): void => { this.open('album', 'all'); })
+          Button('查看待处理照片').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('albumQueue', 'all'); })
+          Blank().height(this.bottomInset).width('100%')
+        }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').alignItems(HorizontalAlign.Start)
+      }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
+    } else {
+      List({ space: 12, scroller: this.scroller }) {
+        ListItem() { Column({ space: 12 }) { Blank().height(this.topInset).width('100%'); this.controls() }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0) }
+        ForEach(this.assets(), (asset: Asset) => {
+          ListItem() {
+            Button() { this.assetContent(asset) }.id('wardrobe-asset:' + asset.id).width('100%').constraintSize({ minHeight: 56 }).padding(16).backgroundColor(Theme.surface).borderRadius(12)
+              .onClick((): void => { this.route.anchorId = asset.id; this.open('asset', asset.id); }).accessibilityText('打开装备 ' + asset.name)
+          }.opacity(this.animStep >= 2 ? 1 : 0)
+        }, (asset: Asset) => asset.id)
+        if (!this.assets().length) {
+          ListItem() { EmptyState({ title: this.route.filtered ? '没有匹配的装备' : '让每一件装备有归处', message: this.route.filtered ? '名称、类型、状态与位置共同限定当前结果。' : '记录位置和真实状态，再复用到计划。', button: this.route.filtered ? '清除筛选' : '添加装备', action: (): void => { if (this.route.filtered) { this.route.clear(); } else { this.add('asset', ''); } } }) }
+        }
+        ListItem() { Column() { Blank().height(this.bottomInset).width('100%') }.width('100%') }
+      }.id('library-scroll').width('100%').height('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).scrollBar(BarState.Off).align(Alignment.Top)
+        .onAreaChange((_old: Area, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })
+        .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
+        .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
+    }
   }
 }

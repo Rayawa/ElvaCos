@@ -1,3 +1,5 @@
+import { AssetRoute } from '../model/AssetRoute';
+import { WardrobeRoute, assetUsesSegments } from '../model/Wardrobe';
 import { AlbumRoute } from '../model/AlbumRoute';
 import { PhotoCollectionRoute, PhotoViewerRoute, returnToPhotoCollection } from '../model/PhotoCollection';
 import { AlbumPage } from './main/AlbumPage';
@@ -77,6 +79,7 @@ import { EmptyState } from '../component/Surfaces';
   private tabsController: HdsTabsController = new HdsTabsController();
   @Local tab: number = 0;
   @Local planListRoute: PlanListRoute = new PlanListRoute();
+  @Local wardrobeRoute: WardrobeRoute = new WardrobeRoute();
   @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
   @Local meSection: number = 0;
   @Local libraryPhotos: boolean = false;
@@ -135,6 +138,7 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
     if (this.detailStack.size() > 0) {
       const index = this.detailStack.size() - 1;
+      if (this.detailStack.getAllPathName()[index] === 'asset') { const route = this.detailStack.getParamByIndex(index) as AssetRoute; route.restoreSource(); this.tab = route.sourceTab; this.tabsController.changeIndex(route.sourceTab); }
       if (this.detailStack.getAllPathName()[index] === 'photo') { returnToPhotoCollection(this.detailStack.getParamByIndex(index) as PhotoViewerRoute, this.state.photos); }
       this.detailStack.pop();
     }
@@ -143,6 +147,7 @@ import { EmptyState } from '../component/Surfaces';
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
+    if (kind === 'asset') { this.openAsset(id); return; }
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
     if (kind === 'album' || kind === 'albumQueue') { this.detailStack.pushPathByName('album', new AlbumRoute(id === 'all' ? '' : id, kind === 'albumQueue')); return; }
     if (kind === 'photo') { this.openPhoto(new PhotoViewerRoute(id, 'collection', new PhotoCollectionRoute(), this.state.photos)); return; }
@@ -170,6 +175,19 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
 
+  private openAsset(id: string, from: string = '', projectId: string = ''): void {
+    const top = this.detailStack.size() - 1;
+    const name = top >= 0 ? this.detailStack.getAllPathName()[top] : '';
+    const project = name === 'project' ? this.detailStack.getParamByIndex(top) as ProjectRoute : undefined;
+    const event = this.tab === 2 && this.stacks[2].size() > 0 ? this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute : undefined;
+    const origin = from || (project ? 'project' : !name && event?.dayMode ? 'day' : !name && this.tab === 3 ? 'wardrobe' : name === 'tasks' ? 'tasks' : !name && this.tab === 0 ? 'home' : 'collection');
+    const route = new AssetRoute(id, origin, projectId || project?.id || '', this.tab);
+    if (project) { route.project = project; }
+    if (name === 'tasks') { route.tasks = this.detailStack.getParamByIndex(top) as TaskRoute; }
+    if (origin === 'day' && event) { route.event = event; }
+    if (origin === 'wardrobe') { route.wardrobe = this.wardrobeRoute; route.wardrobe.anchorId = id; }
+    this.state.suspend(); this.detailStack.pushPathByName('asset', route);
+  }
   private openPhoto(route: PhotoViewerRoute): void { this.state.suspend(); this.detailStack.pushPathByName('photo', route); }
   private openEvent(id: string, dayMode: boolean, section: number = 0): void {
     const current = this.stacks[2].size() > 0 ? this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute : undefined;
@@ -187,7 +205,7 @@ import { EmptyState } from '../component/Surfaces';
     this.stacks[2].pushPathByName('event', route);
   }
   private openTaskItem(item: TaskQueueItem): void {
-    if (item.source === 'asset') { this.open('asset', item.focusId); return; }
+    if (item.source === 'asset') { this.openAsset(item.focusId, '', item.projectId); return; }
     const route = new ProjectRoute(item.projectId, item.section); route.photos.filter = item.photoFilter;
     if (item.source === 'preparation') { route.focusTaskId = item.focusId; }
     if (item.source === 'packing') { route.focusPackingId = item.focusId; }
@@ -214,7 +232,7 @@ import { EmptyState } from '../component/Surfaces';
   @Builder eventContent(route: EventRoute, entrance: StaggerEntrance) {
     if (this.state.events.some((event: CosEvent) => event.id === route.id)) {
       EventDetail({ state: this.state, event: this.state.events.find((event: CosEvent) => event.id === route.id) as CosEvent, route: route, entrance: entrance,
-        open: (kind: string, id: string): void => { this.open(kind, id); },
+        open: (kind: string, id: string): void => { this.open(kind, id); }, openAsset: (id: string, projectId: string): void => { this.openAsset(id, 'day', projectId); },
         edit: (kind: string, id: string, parent: string): void => { this.edit(kind, id, parent); }, back: (): void => { this.closeEvent(route); } })
     } else {
       EmptyState({ title: '活动已不存在', message: '关联计划仍保留，可以返回继续查看。', button: '返回', action: (): void => { this.closeEvent(route); } }).margin({ top: Theme.detailTop, left: Theme.pagePadding, right: Theme.pagePadding })
@@ -224,7 +242,7 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'event') {
       DetailDestination({ customTitle: (param as EventRoute).dayMode, titleOptions: SystemCapability.titleBar((param as EventRoute).dayMode ? '今天模式' : '', this.state.settings.effects, this.state.settings.materialLevel,
         (param as EventRoute).dayMode ? undefined : (): void => { this.eventSegment(param as EventRoute); }, this.eventMenus(param as EventRoute), false, (): void => { this.closeEvent(param as EventRoute); }),
-        back: (): void => { this.closeEvent(param as EventRoute); }, content: this.eventContent.bind(this, param as EventRoute) })
+        back: (): void => { this.closeEvent(param as EventRoute); }, shown: (): void => { (param as EventRoute).restoreVersion++; }, content: this.eventContent.bind(this, param as EventRoute) })
     }
   }
 
@@ -257,9 +275,11 @@ import { EmptyState } from '../component/Surfaces';
       ['expense', '此笔花费将删除，并从统计中移除。'],
       ['reference', '此参考图记录与应用内副本将删除。系统相册原图保留。'],
     ]);
-    const accepted = await confirm(this.getUIContext(), '确认删除？', messages.get(kind) || '记录将删除。', '删除');
-    if (accepted && await this.state.remove(kind, id)) {
-      if (kind === 'project' || kind === 'character') {
+    if (this.state.busy || this.state.staleScopes.length) { return; }
+    const usage = this.state.assetUsage(id);
+    const accepted = await confirm(this.getUIContext(), kind === 'asset' ? '删除装备？' : '确认删除？', kind === 'asset' ? usage.removalMessage(this.state.assets.find((asset: Asset) => asset.id === id)?.name || '已失效装备') : messages.get(kind) || '记录将删除。', '删除');
+    if (accepted && await (kind === 'asset' ? this.state.removeAsset(id, usage.removalKey) : this.state.remove(kind, id))) {
+      if (kind === 'project' || kind === 'character' || kind === 'asset') {
         this.pruneInvalidDetails(kind, id);
       } else if (kind === 'event') {
         const route = this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute;
@@ -270,8 +290,9 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
   private validDetailPath(name: string, param: Object, deletedKind: string = '', deletedId: string = ''): boolean {
-    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : name === 'photo' ? (param as PhotoViewerRoute).id : param as string) === deletedId) { return false; }
+    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : name === 'photo' ? (param as PhotoViewerRoute).id : name === 'asset' ? (param as AssetRoute).id : param as string) === deletedId) { return false; }
     if (name === 'project') { return this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id); }
+    if (name === 'asset') { return this.state.assets.some((asset: Asset) => asset.id === (param as AssetRoute).id); }
     if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as string)); }
     if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id && !(deletedKind === 'project' && photo.projectId === deletedId)); }
     if (name === 'album') {
@@ -287,6 +308,7 @@ import { EmptyState } from '../component/Surfaces';
     this.detailStack.getAllPathName().forEach((name: string, index: number): void => {
       const param = this.detailStack.getParamByIndex(index) as Object;
       if (!this.validDetailPath(name, param, deletedKind, deletedId)) {
+        if (name === 'asset') { (param as AssetRoute).restoreSource(true); }
         if (name === 'photo') { (param as PhotoViewerRoute).context.feedback = '照片记录已不存在，已保留原范围与附近位置'; (param as PhotoViewerRoute).context.restoreVersion++; }
         indexes.push(index);
       }
@@ -414,14 +436,11 @@ import { EmptyState } from '../component/Surfaces';
         })
       }
       else if (kind === 'asset') {
-        AssetDetail({
-          entrance: entrance,
-          state: this.state,
-          asset: this.state.assets.find((a: Asset) => a.id === (param as string)) || new Asset(),
-          open: (k: string, id: string) => this.open(k, id),
-          edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
-          remove: (k: string, id: string) => this.remove(k, id)
-        })
+        if (this.state.assets.some((asset: Asset) => asset.id === (param as AssetRoute).id)) {
+          AssetDetail({ entrance: entrance, state: this.state, route: param as AssetRoute,
+            asset: this.state.assets.find((asset: Asset) => asset.id === (param as AssetRoute).id) as Asset,
+            open: (kind: string, id: string): void => { this.open(kind, id); }, edit: (kind: string, id: string, parent: string): void => { this.edit(kind, id, parent); } })
+        } else { EmptyState({ title: '装备已不存在', message: '可以返回原来的计划或衣柜范围。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop }) }
       }
       else if (kind === 'photo') {
         if (this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id)) {
@@ -439,7 +458,7 @@ import { EmptyState } from '../component/Surfaces';
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
     } else if (kind === 'album') {
       AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }, importPhotos: (id: string): void => { this.chooseImport(id); } })
-    } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo') {
+    } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo' || kind === 'asset') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
       TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
@@ -481,15 +500,17 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' || kind === 'album' ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
+          kind === 'project' || kind === 'album' || kind === 'asset' && this.assetSegmented(param as AssetRoute) ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'asset' ? (param as AssetRoute).id : param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
-          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : undefined,
-          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
+          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
+          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
         shown: (): void => {
+          if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
+          if (kind === 'tasks') { (param as TaskRoute).restoreVersion++; }
           if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).outing) { this.state.resume(); } }
           if (kind === 'album') { (param as AlbumRoute).restoreVersion++; (param as AlbumRoute).collection.restoreVersion++; }
         },
@@ -616,6 +637,20 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
+  private assetSegmented(route: AssetRoute): boolean {
+    const asset = this.state.assets.find((item: Asset) => item.id === route.id);
+    return !!asset && (route.section === 1 || assetUsesSegments(asset, this.state.assetUsage(route.id)));
+  }
+  @Builder assetSegment(route: AssetRoute) {
+    HdsTitleBarSegment({ componentId: 'asset-detail-segment', items: this.buildSegmentItems(['资料', '使用计划']), selectedIndexes: [route.section], minimumTargetHeight: 48,
+      onSelectedIndexChanged: (section: number): void => { route.section = section; } })
+  }
+  private assetMenus(route: AssetRoute): HdsNavigationMenuItemOptions[] {
+    if (!this.state.assets.some((asset: Asset) => asset.id === route.id)) { return []; }
+    const enabled = !this.state.busy && !this.state.staleScopes.length;
+    return [{ content: { label: '编辑装备', icon: Icons.edit, isEnabled: enabled, action: (): void => { this.edit('asset', route.id); } } },
+      { content: { label: '删除装备', icon: Icons.remove, isEnabled: enabled, action: (): void => { void this.remove('asset', route.id); } } }];
+  }
   @Builder albumSegment(route: AlbumRoute) {
     HdsTitleBarSegment({ componentId: 'album-mode-segment', items: this.buildSegmentItems(['按场次', '待处理']), selectedIndexes: [route.mode === 'queue' ? 1 : 0],
       experimentalWidth: Theme.titleSegmentWidth, minimumTargetHeight: 48,
@@ -668,9 +703,7 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'character') {
       return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }];
     }
-    if (kind === 'asset') {
-      return [{ value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }];
-    }
+    if (kind === 'asset') { return []; }
     return [{
       value: '选中照片', icon: Icons.check, action: () => {
         const photo = this.state.photos.find((p: PhotoAsset) => p.id === id);
@@ -841,6 +874,7 @@ import { EmptyState } from '../component/Surfaces';
             topInset: Theme.contentTop,
             bottomInset: Theme.contentBottom,
             active: this.tab === index,
+            route: this.wardrobeRoute,
             photos: this.libraryPhotos,
             selection: (photos: boolean) => { this.libraryPhotos = photos; },
             open: (k: string, id: string) => this.open(k, id),

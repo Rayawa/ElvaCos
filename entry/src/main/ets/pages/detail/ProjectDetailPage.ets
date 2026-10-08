@@ -47,7 +47,7 @@ export struct ProjectDetail {
     if (!this.route.focusTaskId && !this.route.focusPackingId || this.route.focusHandled) { this.restoreOffset(); }
     if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
   aboutToDisappear(): void { if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } if (!this.entrance.managed) { this.entrance.reset(); } }
-  @Monitor('route.section')
+  @Monitor('route.section', 'route.restoreVersion')
   private sectionChanged(): void { this.displayedSection = this.route.section; this.restoreOffset(); }
   private restoreOffset(): void {
     if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } this.restoring = true;
@@ -71,8 +71,10 @@ export struct ProjectDetail {
     .sort((a: Asset, b: Asset) => Number(a.status === AssetStatus.OWNED) - Number(b.status === AssetStatus.OWNED) || a.name.localeCompare(b.name)); }
   private linked(asset: Asset): boolean { return this.state.projectAssets(this.project.id).some((a: Asset) => a.id === asset.id); }
   private location(item: ChecklistItem): string { return this.state.assets.find((a: Asset) => a.id === item.assetId)?.location || (item.assetId ? '存放位置待补充' : '随身物品'); }
+  private packingAssetStatus(item: ChecklistItem): string { const asset = this.state.assets.find((value: Asset) => value.id === item.assetId); return asset ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] : '装备已不存在'; }
   private async unlink(asset: Asset): Promise<void> {
-    if (await confirm(this.getUIContext(), '解除装备关联？', '本计划中对应的打包项也会移除，衣柜中的装备会保留。', '解除关联')) { await this.state.unlinkAsset(this.project.id, asset.id); }
+    const usage = this.state.assetUsage(asset.id); const ids = usage.checklist.filter((item: ChecklistItem) => item.projectId === this.project.id).map((item: ChecklistItem) => item.id);
+    if (await confirm(this.getUIContext(), '解除装备关联？', usage.unlinkMessage(this.project), '解除关联')) { await this.state.unlinkAsset(this.project.id, asset.id, ids); }
   }
 
   @Builder linkSheet() {
@@ -506,7 +508,9 @@ export struct ProjectDetail {
             .fontSize(this.route.outing ? 20 : 16)
             .fontColor(item.done ? Theme.muted : Theme.ink)
             .decoration({ type: item.done ? TextDecorationType.LineThrough : TextDecorationType.None })
-          Text(this.location(item)).fontSize(12).fontColor(Theme.muted)
+          if (item.assetId) { Button(this.location(item) + ' · ' + this.packingAssetStatus(item))
+            .constraintSize({ minHeight: this.route.outing ? 64 : 48 }).fontSize(14).fontColor(Theme.accent).onClick((): void => { this.open('asset', item.assetId); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
+          else { Text(this.location(item)).fontSize(14).fontColor(Theme.muted) }
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         if (!this.route.outing) { Button('−')
           .backgroundColor(Theme.bg)
@@ -529,6 +533,7 @@ export struct ProjectDetail {
         Blank().height(this.topInset).width('100%')
         Column({ space: 10 }) {
           this.header()
+          if (this.state.error) { Text(this.state.error).fontSize(14).fontColor(Theme.danger) }
           if (this.route.section === 1) { this.preparation() }
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 1 ? 1 : 0).translate({ y: this.entrance.step >= 1 ? 0 : 20 })

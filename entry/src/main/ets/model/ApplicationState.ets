@@ -1,4 +1,5 @@
 import { PhotoImportJob, PhotoImportPorts } from './PhotoImport';
+import { AssetUsage, buildAssetUsage } from './Wardrobe';
 import { AlbumSummary, buildAlbumSummary } from './AlbumSummary';
 import { MetadataBackupPreview } from './MetadataBackupPreview';
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
@@ -612,8 +613,17 @@ export class AppState {
   async linkAsset(projectId: string, asset: Asset): Promise<boolean> {
     return this.perform(async () => { await this.relations.link(projectId, asset); }, true, ['links', 'checklist']);
   }
-  async unlinkAsset(projectId: string, assetId: string): Promise<boolean> {
-    return this.perform(async () => { await this.relations.unlink(projectId, assetId); }, true, ['links', 'checklist']);
+  async unlinkAsset(projectId: string, assetId: string, checklistIds?: string[]): Promise<boolean> {
+    return this.perform(async () => { await this.relations.unlink(projectId, assetId, checklistIds); this.reportNotice('已解除本计划关联，衣柜装备保留'); }, true, ['links', 'checklist']);
+  }
+  @Computed
+  get assetUsages(): AssetUsage[] {
+    const readiness = this.readinessPlans;
+    return this.assets.map((asset: Asset) => buildAssetUsage(asset.id, this.projects, this.links, this.checklist, this.entries, readiness));
+  }
+  assetUsage(id: string): AssetUsage { return this.assetUsages.find((usage: AssetUsage) => usage.id === id) || new AssetUsage(); }
+  async removeAsset(id: string, removalKey: string): Promise<boolean> {
+    return this.perform(async () => { await this.assetRepo.remove(id, removalKey); this.reportNotice('装备已删除，打包项保留，关联收录回到未归位'); }, true, ['assets', 'links', 'checklist', 'entries']);
   }
   async generateChecklist(projectId: string): Promise<boolean> {
     return this.perform(async () => {

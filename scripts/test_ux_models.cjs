@@ -557,6 +557,117 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(route.queue.planId, project.id); assert.equal(route.queue.filter, 3); assert.equal(route.queue.offset, 300);
     route.reconcile([project], photos, project.id); assert.equal(route.queue.planId, ''); assert.equal(route.queue.filter, 3);
   });
+  await test('wardrobe composes search, type, status and exact location without inventing an empty location', () => {
+    const { WardrobeRoute, wardrobeAssets, wardrobeLocations } = require(root + '/model/Wardrobe.ets');
+    const route = new WardrobeRoute(); const data = [
+      Object.assign(new Asset(), { id: 'a', name: 'Blue 假发', brand: '店铺', type: entities.AssetType.WIG, status: AssetStatus.ORDERED, location: ' 衣柜上层 ' }),
+      Object.assign(new Asset(), { id: 'b', name: '蓝假发', type: entities.AssetType.WIG, status: AssetStatus.OWNED, location: '衣柜上层' }),
+      Object.assign(new Asset(), { id: 'c', name: '鞋', type: entities.AssetType.SHOES, status: AssetStatus.LENT, location: '  ' }),
+      Object.assign(new Asset(), { id: 'd', name: '道具', location: '未记录位置' })
+    ];
+    assert.deepEqual(wardrobeLocations(data), ['未记录位置', '衣柜上层']); route.query = 'blue'; route.type = entities.AssetType.WIG; route.status = AssetStatus.ORDERED; route.locationMode = 'named'; route.location = '衣柜上层';
+    assert.deepEqual(wardrobeAssets(data, route).map(asset => asset.id), ['a']); assert.equal(data[0].status, AssetStatus.ORDERED); assert.equal(data[0].location, ' 衣柜上层 ');
+    route.clear(); route.locationMode = 'unrecorded'; assert.deepEqual(wardrobeAssets(data, route).map(asset => asset.id), ['c']);
+    route.locationMode = 'named'; route.location = '未记录位置'; assert.deepEqual(wardrobeAssets(data, route).map(asset => asset.id), ['d']);
+    route.location = '已移走的位置'; route.offset = 900; route.anchorId = 'a'; assert.deepEqual(wardrobeAssets(data, route), []); assert.equal(route.filtered, true); route.changed(); assert.equal(route.offset, 0); assert.equal(route.anchorId, '');
+    route.clear(); assert.equal(route.filtered, false); assert.equal(wardrobeAssets(data, route).length, 4);
+  });
+  await test('asset usage shares active plan semantics and counts exact packing and collection impact', () => {
+    const { buildAssetUsage, assetUsesSegments, assetRemovalKey } = require(root + '/model/Wardrobe.ets');
+    const a = Object.assign(new Asset(), { id: 'shared', status: AssetStatus.REPAIR, priceCents: 10000 });
+    const plans = [Object.assign(new CosProject(), { id: 'live' }), Object.assign(new CosProject(), { id: 'done', status: ProjectStatus.COMPLETED }), Object.assign(new CosProject(), { id: 'archive', status: ProjectStatus.ARCHIVED })];
+    const links = plans.map(plan => Object.assign(new ProjectAsset(), { projectId: plan.id, assetId: a.id }));
+    const packing = plans.map(plan => Object.assign(new ChecklistItem(), { id: 'pack-' + plan.id, projectId: plan.id, assetId: a.id, done: true }));
+    const entries = [{ id: 'note', scopeKind: 'asset', scopeId: a.id }];
+    const readiness = plans.map(plan => buildPlanReadiness(plan, [], packing, [a], links, [], [], [], '2026-10-08'));
+    const usage = buildAssetUsage(a.id, plans, links, packing, entries, readiness);
+    assert.equal(usage.projects.length, 3); assert.deepEqual(usage.activeProjects.map(plan => plan.id), ['live']); assert.equal(usage.checklist.length, 3); assert.deepEqual(usage.entryIds, ['note']);
+    assert.equal(readiness.every(plan => plan.equipment.available === 0 && plan.pack.packed === 1 && plan.prep.total === 0 && plan.money.spentCents === 0), true);
+    assert.match(usage.removalMessage('假发'), /3 份计划关联/); assert.match(usage.removalMessage('假发'), /3 条打包项/); assert.match(usage.unlinkMessage(plans[0]), /1 条对应打包项/);
+    assert.equal(usage.removalKey, assetRemovalKey(plans.map(plan => plan.id).reverse(), packing.map(item => item.id).reverse(), ['note']));
+    assert.equal(assetUsesSegments(a, usage), true);
+    const brief = buildAssetUsage(a.id, [plans[0]], [links[0]], [], [], [readiness[0]]); assert.equal(assetUsesSegments(a, brief), false); a.notes = '较长资料'; assert.equal(assetUsesSegments(a, brief), true);
+  });
+  await test('asset return routes restore wardrobe, plan, day and task contexts without changing their views', () => {
+    const { AssetRoute } = require(root + '/model/AssetRoute.ets'), { WardrobeRoute } = require(root + '/model/Wardrobe.ets');
+    const { ProjectRoute } = require(root + '/model/ProjectRoute.ets'), { EventRoute } = require(root + '/model/EventRoute.ets');
+    const wardrobe = new WardrobeRoute(); Object.assign(wardrobe, { query: '假发', status: AssetStatus.REPAIR, offset: 800, anchorId: 'a' });
+    const plan = new ProjectRoute('p', 2); plan.outing = true; plan.offsets[2] = 900; plan.expandedCategories = ['category'];
+    const dayRoute = new EventRoute('event', true, 1); dayRoute.offsets[5] = 500;
+    const tasksRoute = new TaskRoute('p'); tasksRoute.category = 'waiting'; tasksRoute.range = 'all'; tasksRoute.offset = 700;
+    const route = new AssetRoute('a', 'wardrobe', '', 3); route.wardrobe = wardrobe; route.project = plan; route.event = dayRoute; route.tasks = tasksRoute; route.section = 1; route.offsets[1] = 400;
+    route.restoreSource(); assert.equal(wardrobe.restoreVersion, 1); assert.equal(plan.restoreVersion, 1); assert.equal(dayRoute.restoreVersion, 1); assert.equal(tasksRoute.restoreVersion, 1);
+    assert.equal(wardrobe.offset, 800); assert.equal(wardrobe.query, '假发'); assert.equal(wardrobe.status, AssetStatus.REPAIR); assert.equal(plan.section, 2); assert.equal(plan.outing, true); assert.equal(plan.offsets[2], 900);
+    assert.equal(dayRoute.dayMode, true); assert.equal(dayRoute.section, 1); assert.equal(dayRoute.offsets[5], 500); assert.equal(tasksRoute.category, 'waiting'); assert.equal(tasksRoute.offset, 700);
+    route.restoreSource(true); assert.equal(wardrobe.anchorId, ''); assert.match(wardrobe.feedback, /已删除/); assert.equal(wardrobe.offset, 800); assert.equal(route.offsets[1], 400);
+  });
+  async function wardrobeFixture() {
+    const { AssetRepository, RelationRepository } = require(root + '/data/repository/Repositories.ets');
+    const { EntryRepository } = require(root + '/data/repository/EntryRepository.ets'); const db = new SqliteAdapter();
+    for (const match of fs.readFileSync(root + '/data/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
+    await db.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
+    for (const [id, status] of [['p1', 'Preparing'], ['p2', 'Completed'], ['p3', 'Preparing']]) await db.sql('INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES(?,\'role\',?,?,1,1)', [id, id, status]);
+    const assets = new AssetRepository(db), relations = new RelationRepository(db), entries = new EntryRepository(db);
+    const item = Object.assign(new Asset(), { id: 'shared', name: '假发', status: AssetStatus.ORDERED, location: '', priceCents: 10000 }); await assets.save(item);
+    const state = new AppState(); state.assetRepo = assets; state.relations = relations; state.entryRepo = entries;
+    async function refresh() { state.assets = await assets.list(); state.links = await relations.links(); state.checklist = (await db.sql('SELECT * FROM checklist_items')).rows.map(row => Object.assign(new ChecklistItem(), { id: row[0], projectId: row[1], assetId: row[2] || '', label: row[3], done: row[4] === 1, sortOrder: row[5] })); state.entries = await entries.list(); }
+    state.projects = ['p1', 'p2', 'p3'].map(id => Object.assign(new CosProject(), { id, characterId: 'role', status: id === 'p2' ? ProjectStatus.COMPLETED : ProjectStatus.PREPARING }));
+    state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
+  }
+  await test('actual asset links are atomic, idempotent and use the current name; unlink only removes one plan packing context', async () => {
+    const fixture = await wardrobeFixture(), { db, relations, item } = fixture;
+    try {
+      db.failSql = 'INSERT OR IGNORE INTO checklist_items'; await assert.rejects(relations.link('p1', item)); db.failSql = '';
+      assert.equal((await relations.links()).length, 0); assert.equal((await db.sql('SELECT count(*) FROM checklist_items')).rows[0][0], 0);
+      await db.sql("UPDATE assets SET name='当前假发' WHERE id='shared'"); await relations.link('p1', item); await relations.link('p1', item); await relations.link('p2', item);
+      assert.equal((await relations.links()).length, 2); assert.deepEqual((await db.sql('SELECT label FROM checklist_items')).rows, [['当前假发'], ['当前假发']]);
+      await db.sql("UPDATE checklist_items SET done=1 WHERE project_id='p2'");
+      await assert.rejects(relations.unlink('p1', item.id, ['changed']), /已变化/); assert.equal((await relations.links()).length, 2);
+      const id = (await db.sql("SELECT id FROM checklist_items WHERE project_id='p1'")).rows[0][0];
+      db.failSql = 'DELETE FROM checklist_items'; await assert.rejects(relations.unlink('p1', item.id, [id])); db.failSql = ''; assert.equal((await relations.links()).length, 2);
+      await relations.unlink('p1', item.id, [id]); assert.deepEqual((await relations.links()).map(link => link.projectId), ['p2']);
+      assert.deepEqual((await db.sql('SELECT project_id,done FROM checklist_items')).rows, [['p2', 1]]); assert.equal((await db.sql('SELECT count(*) FROM assets')).rows[0][0], 1);
+      await assert.rejects(relations.unlink('p1', item.id, []), /关联已变化/); await assert.rejects(relations.link('p1', Object.assign(new Asset(), { id: 'missing' })), /已不存在/);
+      const created = Object.assign(new Asset(), { id: 'new-for-plan', name: '新装备', status: AssetStatus.ORDERED });
+      await assert.rejects(fixture.assets.save(created, 'missing-plan')); assert.equal((await fixture.assets.list()).length, 1);
+      db.failSql = 'INSERT INTO checklist_items'; await assert.rejects(fixture.assets.save(created, 'p3')); db.failSql = ''; assert.equal((await fixture.assets.list()).length, 1);
+      await fixture.assets.save(created, 'p3'); assert.equal((await fixture.assets.list()).find(asset => asset.id === created.id).status, AssetStatus.ORDERED);
+      assert.deepEqual((await db.sql("SELECT project_id,label,done FROM checklist_items WHERE asset_id='new-for-plan'")).rows, [['p3', '新装备', 0]]);
+    } finally { db.close(); }
+  });
+  await test('asset deletion validates its reviewed impact, rolls back failures and retains packing labels, confirmations and expenses', async () => {
+    const { CollectedEntry } = require(root + '/model/CollectedEntry.ets'); const f = await wardrobeFixture(), { db, assets, relations, entries, state, item, refresh } = f;
+    try {
+      await relations.link('p1', item); await relations.link('p2', item); await db.sql("UPDATE checklist_items SET done=1 WHERE project_id='p1'");
+      await entries.save(Object.assign(new CollectedEntry(), { id: 'note', scopeKind: 'asset', scopeId: item.id, text: '保留收录' }));
+      await db.sql("INSERT INTO expenses(id,project_id,name,category,amount_cents,date,notes,created_at) VALUES('expense','p1','假发','其他',500,'2026-10-08','',1)");
+      await refresh(); const reviewed = state.assetUsage(item.id); assert.equal(reviewed.projects.length, 2); assert.equal(reviewed.activeProjects.length, 1);
+      await relations.link('p3', item); await assert.rejects(assets.remove(item.id, reviewed.removalKey), /关联已变化/); assert.equal((await assets.list()).length, 1);
+      await refresh(); const current = state.assetUsage(item.id); db.failSql = 'DELETE FROM assets'; await assert.rejects(assets.remove(item.id, current.removalKey)); db.failSql = '';
+      assert.equal((await relations.links()).length, 3); assert.equal((await entries.list())[0].scopeKind, 'asset');
+      await assets.remove(item.id, current.removalKey); assert.equal((await assets.list()).length, 0); assert.equal((await relations.links()).length, 0);
+      assert.deepEqual((await db.sql('SELECT asset_id,label,done FROM checklist_items ORDER BY project_id')).rows, [[null, '假发', 1], [null, '假发', 0], [null, '假发', 0]]);
+      assert.equal((await entries.list())[0].scopeKind, 'global'); assert.equal((await entries.list())[0].text, '保留收录'); assert.equal((await db.sql('SELECT amount_cents FROM expenses')).rows[0][0], 500);
+      await assert.rejects(assets.remove(item.id, current.removalKey), /不存在/);
+    } finally { db.close(); }
+  });
+  await test('AppState shared asset changes update every plan while preserving prep and packing; committed relation failures only reload', async () => {
+    const f = await wardrobeFixture(), { db, state, item, refresh } = f;
+    try {
+      assert.equal(await state.linkAsset('p1', item), true); assert.equal(await state.linkAsset('p3', item), true);
+      await db.sql("UPDATE checklist_items SET done=1 WHERE project_id='p1'"); await refresh();
+      assert.equal(state.assetUsage(item.id).activeProjects.length, 2); assert.equal(state.readiness('p1').equipment.available, 0); assert.equal(state.readiness('p3').equipment.available, 0);
+      assert.equal(await state.saveAsset(Object.assign(new Asset(), item, { status: AssetStatus.OWNED })), true);
+      assert.equal(state.readiness('p1').equipment.available, 1); assert.equal(state.readiness('p3').equipment.available, 1); assert.equal(state.readiness('p1').pack.packed, 1); assert.equal(state.readiness('p3').pack.packed, 0); assert.equal(state.readiness('p1').prep.total, 0); assert.equal(state.readiness('p1').money.spentCents, 0);
+      let reads = 0; state.refresh = async () => { reads++; if (reads === 1) throw new Error('read failed'); await refresh(); };
+      assert.equal(await state.linkAsset('p2', item), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed');
+      db.failSql = 'INSERT OR IGNORE'; assert.equal(await state.reloadRecords(), true); db.failSql = ''; assert.equal((await db.sql('SELECT count(*) FROM checklist_items')).rows[0][0], 3);
+      state.refresh = refresh; const usage = state.assetUsage(item.id); db.failSql = 'DELETE FROM assets'; assert.equal(await state.removeAsset(item.id, usage.removalKey), false); db.failSql = ''; assert.equal(state.assets.length, 1);
+      reads = 0; state.refresh = async () => { reads++; if (reads === 1) throw new Error('read failed'); await refresh(); };
+      assert.equal(await state.removeAsset(item.id, usage.removalKey), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed'); db.failSql = 'DELETE FROM assets'; assert.equal(await state.reloadRecords(), true); db.failSql = '';
+      assert.equal(state.assets.length, 0); assert.equal(state.links.length, 0); assert.equal(state.checklist.length, 3); assert.equal(state.checklist.every(item => !item.assetId), true);
+    } finally { db.close(); }
+  });
   await test('photo import tracks progress, preserves successes and retries only failed sources', async () => {
     const { PhotoImportJob } = require(root + '/model/PhotoImport.ets');
     const job = new PhotoImportJob(), committed = new Map(); let unavailable = true, readFailure = true; const calls = [], removed = [];

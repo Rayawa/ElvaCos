@@ -1,3 +1,4 @@
+import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
 import { AccountService } from '../../../main/ets/common/AccountService';
 import { CosEvent } from '../../../main/ets/model/Entities';
@@ -88,6 +89,16 @@ export default function uiShellTest(): void {
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
       await tap('衣柜'); await tap('装备'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
+      await present('全部类型'); await present('全部状态'); await present('全部位置');
+      const asset = getApplicationState().assets[0];
+      if (asset) {
+        const wardrobe = await driver.findComponent(ON.id('library-scroll').inWindow(bundle));
+        await wardrobe.scrollSearch(ON.id('wardrobe-asset:' + asset.id).inWindow(bundle)); await tap('wardrobe-asset:' + asset.id);
+        expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
+        if (await driver.findComponent(ON.id('asset-detail-segment').inWindow(bundle))) { await tap('使用计划'); }
+        await present('加入计划'); await tap('加入计划'); await present('选择计划加入装备'); await tap('sheet-close'); await back();
+        await present('全部类型'); await present('全部状态'); await present('全部位置');
+      }
       await tap('照片'); await present('打开相册'); await tap('打开相册'); await present('按场次'); await present('待处理');
       const albumPlans = await driver.findComponents(ON.description('双击查看本场照片').inWindow(bundle));
       if (albumPlans.length > 0) { await albumPlans[0].click(); }

@@ -11,6 +11,7 @@ export class ProjectRoute {
   @Trace expandedCategories: string[] = [];
   @Trace photos: PhotoCollectionRoute;
   @Trace contextSheet: string = '';
+  @Trace restoreVersion: number = 0;
   @Trace showCompleted: boolean = false;
   packingOrder: string[] = [];
   focusTaskId: string = '';

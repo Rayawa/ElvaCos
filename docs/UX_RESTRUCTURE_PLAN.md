@@ -160,7 +160,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 | 计划详情 | `ProjectRoute { id, section, focusTaskId?, outing, sheetKind }`，`section` = 0 概览 / 1 准备 / 2 打包 / 3 照片 | 从列表进 → 概览；从待办/打包/照片入口进 → 对应 section | 保留 section、Tab、筛选、滚动位置 |
 | 活动详情 | `EventRoute { id, dayMode }` | 从日程进 → 详情模式；从底条/首页卡片进 → 今天模式 | 保留来源；今天模式返回后底条仍在 |
 | 角色详情 | `CharacterRoute { id, section }` = 0 资料 / 1 履历 / 2 参考图 | 资料 | 保留 section |
-| 装备详情 | `AssetRoute { id, from: 'wardrobe'\|'project'\|'day', projectId? }` | 资料 | 返回来源页对应位置 |
+| 装备详情 | `AssetRoute { id, from: 'wardrobe'\|'project'\|'day'\|'tasks'\|'home'\|'collection', projectId?, sourceTab, section }`（运行时保留来源路由引用与恢复代次） | 资料 | 返回来源页对应位置 |
 | 照片查看 | `PhotoViewerRoute { id, from, filterContext }` | 原图 | **回到原缩略图位置**（新增要求） |
 | 相册 | `AlbumRoute { mode: 'byPlan'\|'queue', planId?, status? }` | byPlan | 保留 mode 与筛选 |
 | 完整待办 | `TaskRoute { category, projectId?, range?, focusId? }` | 需要行动 | 保留筛选 |

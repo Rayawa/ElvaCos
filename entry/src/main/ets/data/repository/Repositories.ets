@@ -1,4 +1,5 @@
 import { checkSchedule } from '../../model/Schedule';
+import { assetRemovalKey } from '../../model/Wardrobe';
 import { PreparationBundle } from '../../model/Preparation';
 import { insertPreparation } from './PreparationRepository';
 import { relationalStore } from '@kit.ArkData';
@@ -196,7 +197,24 @@ export class AssetRepository {
       }
     });
   }
-  async remove(id: string): Promise<void> { await this.db.getStore().executeSql('DELETE FROM assets WHERE id=?', [id]); }
+  private async relationIds(sql: string, id: string, column: string): Promise<string[]> {
+    const ids: string[] = []; const rows = await this.db.getStore().querySql(sql, [id]);
+    try { while (rows.goToNextRow()) { ids.push(str(rows, column)); } } finally { rows.close(); }
+    return ids;
+  }
+  async remove(id: string, expectedKey?: string): Promise<void> {
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      const rows = await this.db.getStore().querySql('SELECT id FROM assets WHERE id=?', [id]);
+      try { if (rows.rowCount !== 1) { throw new Error('装备已不存在'); } } finally { rows.close(); }
+      if (expectedKey !== undefined) {
+        const projectIds = await this.relationIds('SELECT project_id FROM project_assets WHERE asset_id=?', id, 'project_id');
+        const checklistIds = await this.relationIds('SELECT id FROM checklist_items WHERE asset_id=?', id, 'id');
+        const entryIds = await this.relationIds("SELECT id FROM entries WHERE scope_kind='asset' AND scope_id=?", id, 'id');
+        if (assetRemovalKey(projectIds, checklistIds, entryIds) !== expectedKey) { throw new Error('装备关联已变化，请核对影响后重新确认删除'); }
+      }
+      await tx.execute('DELETE FROM assets WHERE id=?', [id]);
+    });
+  }
 }
 
 export class CosEventRepository {
@@ -403,10 +421,13 @@ export class RelationRepository {
   }
   async link(projectId: string, asset: Asset): Promise<void> {
     await this.db.transaction(async (tx: WriteTransaction) => {
+      const rows = await this.db.getStore().querySql('SELECT name FROM assets WHERE id=?', [asset.id]);
+      let name: string;
+      try { if (!rows.goToNextRow()) { throw new Error('装备已不存在，请重新选择'); } name = str(rows, 'name'); } finally { rows.close(); }
       await tx.execute('INSERT OR IGNORE INTO project_assets VALUES (?,?)', [projectId, asset.id]);
       // The partial unique index makes repeated automatic generation idempotent.
       const item = new ChecklistItem();
-      await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, asset.name]);
+      await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, name]);
     });
   }
   async generateChecklist(projectId: string, assets: Asset[], existing: ChecklistItem[]): Promise<void> {
@@ -423,8 +444,16 @@ export class RelationRepository {
       }
     });
   }
-  async unlink(projectId: string, assetId: string): Promise<void> {
+  async unlink(projectId: string, assetId: string, checklistIds?: string[]): Promise<void> {
     await this.db.transaction(async (tx: WriteTransaction) => {
+      if (checklistIds) {
+        const link = await this.db.getStore().querySql('SELECT project_id FROM project_assets WHERE project_id=? AND asset_id=?', [projectId, assetId]);
+        try { if (link.rowCount !== 1) { throw new Error('计划关联已变化，请重新核对'); } } finally { link.close(); }
+        const current: string[] = [];
+        const rows = await this.db.getStore().querySql('SELECT id FROM checklist_items WHERE project_id=? AND asset_id=?', [projectId, assetId]);
+        try { while (rows.goToNextRow()) { current.push(str(rows, 'id')); } } finally { rows.close(); }
+        if (JSON.stringify(current.sort()) !== JSON.stringify(checklistIds.slice().sort())) { throw new Error('对应打包项已变化，请核对后重新确认解除'); }
+      }
       await tx.execute('DELETE FROM project_assets WHERE project_id=? AND asset_id=?', [projectId, assetId]);
       await tx.execute('DELETE FROM checklist_items WHERE project_id=? AND asset_id=?', [projectId, assetId]);
     });

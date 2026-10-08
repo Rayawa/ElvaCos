@@ -17,12 +17,18 @@ export struct TasksPage {
   @Event addPlan: () => void = () => {};
   private scroller: Scroller = new Scroller();
   private restoreTimer: number = -1;
-  aboutToAppear(): void {
-    this.restoreTimer = setTimeout((): void => { this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false }); }, 0);
+  private measured: boolean = false;
+  private restoring: boolean = true;
+  private restoreOffset(): void {
+    if (!this.measured) { return; }
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } this.restoring = true;
+    this.restoreTimer = setTimeout((): void => { this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offset, animation: false }); this.restoring = false; }, 0);
   }
+  @Monitor('route.restoreVersion')
+  restoreChanged(): void { this.restoreOffset(); }
   aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } }
   @Monitor('route.category', 'route.projectId', 'route.range')
-  private filterChanged(): void { this.route.offset = 0; this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false }); }
+  private filterChanged(): void { this.route.offset = 0; this.restoreOffset(); }
   private items(): TaskQueueItem[] { return filterTaskQueue(this.state.taskQueue, this.route, this.state.localDate); }
   private projectOptions(): SelectOption[] {
     const options: SelectOption[] = [{ value: '全部计划' }];
@@ -66,6 +72,7 @@ export struct TasksPage {
         Blank().height(Theme.contentBottom).width('100%')
       }.width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
-      .onDidScroll((): void => { this.route.offset = this.scroller.currentOffset().yOffset; })
+      .onAreaChange((_old: Area, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })
+      .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
   }
 }
