@@ -707,6 +707,29 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.queue.setFilter(3); route.queue.offset = 600; route.showMode('byPlan'); assert.equal(route.collection.offset, 820); assert.equal(route.collection.filter, 1); assert.equal(route.groupOffset, 450);
     input[0].status = PhotoStatus.FINAL; returnToPhotoCollection(viewer, input); assert.match(route.byPlan.feedback, /离开当前筛选/); assert.equal(route.byPlan.offset, 820);
   });
+  await test('native secondary view gates keep the active photo collection during actual batch submission and release after failure or commit', async () => {
+    const { AlbumRoute } = require(root + '/model/AlbumRoute.ets');
+    const { ProjectRoute } = require(root + '/model/ProjectRoute.ets');
+    const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'view-gate-' + index, projectId: project.id }));
+    const album = new AlbumRoute(project.id); album.byPlan.offset = 480; album.byPlan.filter = 1;
+    const plan = new ProjectRoute(project.id, 3); plan.photos.offset = 620; plan.photos.filter = 1;
+    for (const collection of [album.collection, plan.photos]) { collection.selecting = true; collection.selectAll(input); assert.equal(collection.begin(input).length, 2); }
+    assert.equal(album.canShowMode('queue'), false); assert.equal(album.canShowMode('byPlan'), true); assert.equal(album.canShowMode('invalid'), false);
+    const version = album.restoreVersion; album.showMode('queue');
+    assert.equal(album.mode, 'byPlan'); assert.equal(album.restoreVersion, version); assert.deepEqual(album.collection.selectedIds, ['view-gate-0', 'view-gate-1']);
+    assert.equal(album.collection.offset, 480); assert.equal(album.collection.filter, 1);
+    assert.equal(plan.canShowSection(0), false); assert.equal(plan.canShowSection(3), true);
+    assert.equal(plan.canShowSection(-1), false); assert.equal(plan.canShowSection(4), false); assert.equal(plan.canShowSection(1.5), false);
+    await Promise.resolve(); // The same route objects remain locked across an asynchronous write boundary.
+    assert.equal(album.canShowMode('queue'), false); assert.equal(plan.canShowSection(1), false);
+    album.collection.finish(false); plan.photos.finish(false);
+    assert.equal(album.canShowMode('queue'), true); assert.equal(plan.canShowSection(0), true);
+    assert.deepEqual(album.collection.selectedIds, ['view-gate-0', 'view-gate-1']); assert.equal(plan.photos.selectedIds.length, 2);
+    assert.equal(album.collection.offset, 480); assert.equal(plan.photos.offset, 620);
+    album.collection.begin(input); plan.photos.begin(input); album.collection.finish(true); plan.photos.finish(true);
+    album.showMode('queue'); assert.equal(album.mode, 'queue'); assert.equal(album.restoreVersion, version + 1);
+    assert.deepEqual(album.byPlan.selectedIds, []); assert.deepEqual(plan.photos.selectedIds, []); assert.equal(plan.canShowSection(2), true);
+  });
   await test('album removes only a deleted plan scope while preserving valid queue filters and restoring a reachable collection', () => {
     const { AlbumRoute } = require(root + '/model/AlbumRoute.ets');
     const route = new AlbumRoute('gone'); route.byPlan.filter = 5; route.byPlan.selectedIds = ['lost-photo'];
@@ -844,6 +867,34 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.projects = ['p1', 'p2', 'p3'].map(id => Object.assign(new CosProject(), { id, characterId: 'role', status: id === 'p2' ? ProjectStatus.COMPLETED : ProjectStatus.PREPARING }));
     state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
   }
+  await test('entry writes retain source on failure and image repair cancellation never saves edits or repeats a committed repair', async () => {
+    const f = await wardrobeFixture(), { db, entries, state, refresh } = f;
+    const { CollectedEntry } = require(root + '/model/CollectedEntry.ets');
+    try {
+      const original = Object.assign(new CollectedEntry(), { id: 'repair-entry', kind: 'image', title: '原收录', localPath: '/old/image', thumbnailPath: '/old/thumb' });
+      await entries.save(original); await refresh();
+      const edited = Object.assign(new CollectedEntry(), original, { title: '尚未提交的标题' });
+      let reads = 0, imports = 0; const removed = [];
+      state.refresh = async () => { reads++; await refresh(); };
+      state.media = { select: async () => [], import: async () => { imports++; return Object.assign(new PhotoAsset(), { id: 'picked-image', localPath: '/new/image', thumbnailPath: '/new/thumb' }); }, remove: async item => { removed.push(item.localPath); } };
+      assert.equal(await state.repairEntryImage(edited), false); assert.equal(state.error, ''); assert.equal(reads, 0); assert.equal(imports, 0);
+      assert.equal((await entries.list())[0].title, '原收录'); assert.equal((await entries.list())[0].localPath, '/old/image'); assert.equal(edited.title, '尚未提交的标题');
+      assert.equal((await state.captureEntryImage()).status, 'ok'); assert.equal(reads, 0); assert.equal((await entries.list()).length, 1); assert.deepEqual(removed, []);
+      const badLink = Object.assign(new CollectedEntry(), edited, { url: 'not-a-url' });
+      const invalid = await state.saveEntry(badLink); assert.equal(invalid.status, 'failed'); assert.match(invalid.detail, /链接需要/); assert.equal((await entries.list())[0].url, ''); assert.equal(badLink.url, 'not-a-url');
+      db.failSql = 'INSERT INTO entries';
+      const captured = await state.captureEntry('尚未存下的文字'); assert.equal(captured.status, 'failed'); assert.match(captured.detail, /injected/); assert.equal((await entries.list()).length, 1);
+      state.media.select = async () => ['picked://replacement'];
+      assert.equal(await state.repairEntryImage(edited), false); assert.match(state.error, /injected/); assert.equal((await entries.list())[0].title, '原收录'); assert.deepEqual(removed, ['/new/image']);
+      db.failSql = '';
+      let afterWrite = true; state.refresh = async () => { if (afterWrite) { afterWrite = false; throw new Error('refresh failed'); } await refresh(); };
+      assert.equal(await state.repairEntryImage(edited), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed');
+      assert.equal((await entries.list())[0].title, edited.title); assert.equal((await entries.list())[0].localPath, '/new/image'); assert.deepEqual(removed, ['/new/image', '/old/image']);
+      const beforeReload = imports; db.failSql = 'INSERT INTO entries'; state.media.select = async () => { throw new Error('reload must not reopen picker'); };
+      assert.equal(await state.reloadRecords(), true); assert.equal(imports, beforeReload); assert.equal(state.entries[0].title, edited.title); assert.equal(state.entries.length, 1);
+      db.failSql = '';
+    } finally { db.close(); }
+  });
   async function shotsFixture() {
     const fixture = await wardrobeFixture(), { db, state } = fixture;
     const { ShotRepository } = require(root + '/data/repository/ShotRepository.ets'), { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');

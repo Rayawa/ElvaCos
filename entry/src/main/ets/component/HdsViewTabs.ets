@@ -15,6 +15,7 @@ export struct HdsViewTabs {
   @Param availableWidth: number = 360;
   @Param haptic: boolean = true;
   @Param hapticLevel: number = 1;
+  @Event canChange: (index: number) => boolean = () => true;
   @Event changed: (index: number) => void = () => {};
   @BuilderParam content: () => void = this.emptyContent;
   private controller: HdsTabsController = new HdsTabsController();
@@ -35,7 +36,12 @@ export struct HdsViewTabs {
       .scrollable(false).barOverlap(true).animationDuration(0)
       .blurStrategy(this.effects ? BlurStrategy.ENABLE : BlurStrategy.DISABLE)
       .barFloatingStyle(SystemCapability.tabs(this.effects, this.materialLevel))
-      .onChange((index: number): void => { if (index !== this.selectedIndex) { this.changed(index); } })
+      .onContentWillChange((_current: number, coming: number): boolean => { return coming === this.selectedIndex || this.canChange(coming); })
+      .onChange((index: number): void => {
+        if (index === this.selectedIndex) { return; }
+        if (this.canChange(index)) { this.changed(index); }
+        else { this.controller.changeIndex(this.selectedIndex); }
+      })
       .onTabBarClick((): void => { HapticService.confirm(this.haptic, this.hapticLevel); })
       .width('100%').height('100%').backgroundColor(Theme.bg)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])

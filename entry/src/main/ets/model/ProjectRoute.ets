@@ -25,5 +25,6 @@ export class ProjectRoute {
   focusHandled: boolean = false;
   entries: InboxRoute;
   offsets: number[] = [0, 0, 0, 0];
+  canShowSection(section: number): boolean { return Number.isInteger(section) && section >= 0 && section <= 3 && (section === this.section || !this.photos.submitting); }
   constructor(id: string, section: number = 0) { this.id = id; this.entries = new InboxRoute('project', id); this.section = section; this.photos = new PhotoCollectionRoute(id); }
 }

@@ -187,6 +187,18 @@ export default function uiShellTest(): void {
         const eventAfter = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
         expect(Math.abs(eventAfter.top - eventBefore.top) <= 2 && Math.abs(eventAfter.bottom - eventBefore.bottom) <= 2).assertTrue();
         await (await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350);
+        await (await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle))).scrollSearch(ON.id(id).inWindow(bundle)); await tap(id);
+        const editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
+        await editor.scrollSearch(ON.id('entry-input:url').inWindow(bundle));
+        const urlInput = await driver.findComponent(ON.id('entry-input:url').inWindow(bundle)); await urlInput.inputText('not-a-url');
+        await editor.scrollSearch(ON.text('保存修改').inWindow(bundle)); await tap('保存修改');
+        await present('entry-action-error'); await driver.delayMs(2300);
+        expect(await (await driver.findComponent(ON.id('entry-action-error').inWindow(bundle))).getText()).assertEqual('链接需要以 https:// 或 http:// 开头');
+        await editor.scrollSearch(ON.id('entry-input:url').inWindow(bundle));
+        expect(await (await driver.findComponent(ON.id('entry-input:url').inWindow(bundle))).getText()).assertEqual('not-a-url');
+        expect(state.entries.find((entry: CollectedEntry): boolean => entry.id === 'ui-inbox-context-30')!.url).assertEqual('');
+        await editor.scrollToTop(1000); await driver.delayMs(350); await tap('sheet-close'); await present('放弃本次修改？'); await tap('放弃修改');
+        await (await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350);
         await tap('entry-kind-filter'); await tap('链接'); await present('没有匹配的收录'); await tap('entry-kind-filter'); await tap('地图');
         await present('entry-kind-filter'); await back(); await present(id);
         const after = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();

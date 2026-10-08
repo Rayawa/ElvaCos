@@ -38,6 +38,7 @@ export struct EventDetail {
   @Local configuring: boolean = false;
   @Local recording: boolean = false;
   @Local recordKind: number = 0;
+  @Local recordError: string = '';
   @Local recordText: string = '';
   @Local viewing: boolean = false;
   @Local credential: CollectedEntry = new CollectedEntry();
@@ -91,7 +92,15 @@ export struct EventDetail {
     else { this.state.importPhotos(project.id); }
   }
   private async captureText(): Promise<void> {
-    if (operationCommitted(await this.state.captureEntry(this.recordText, 'event', this.event.id))) { this.recordText = ''; }
+    this.recordError = '';
+    const result = await this.state.captureEntry(this.recordText, 'event', this.event.id);
+    if (operationCommitted(result)) { this.recordText = ''; }
+    else { this.recordError = result.detail || '收录未保存，请重试'; }
+  }
+  private async captureImage(): Promise<void> {
+    this.recordError = '';
+    const result = await this.state.captureEntryImage('event', this.event.id);
+    if (!operationCommitted(result)) { this.recordError = result.detail || '图片未收录，请重试'; }
   }
   private async canCloseSheet(): Promise<boolean> {
     if (this.state.busy) { return false; }
@@ -152,8 +161,9 @@ export struct EventDetail {
         Column({ space: 12 }) {
           if (this.recordKind === 1) {
             TextArea({ text: this.recordText, placeholder: '粘贴链接或写一句话' }).height(120).enabled(!this.state.busy).onChange((value: string): void => { this.recordText = value; })
+            if (this.recordError) { Text(this.recordError).id('day-record-error').fontSize(14).fontColor(Theme.danger).accessibilityText(this.recordError) }
             Button('收录').width('100%').constraintSize({ minHeight: 64 }).enabled(!this.state.busy && Boolean(this.recordText.trim())).onClick((): void => { this.captureText(); })
-            Button('存一张图').width('100%').constraintSize({ minHeight: 64 }).enabled(!this.state.busy).onClick((): void => { this.state.captureEntryImage('event', this.event.id); })
+            Button('存一张图').width('100%').constraintSize({ minHeight: 64 }).enabled(!this.state.busy).onClick((): void => { void this.captureImage(); })
             Text('直接归到本次活动，标题和类型可以以后补充。').fontColor(Theme.muted)
           } else {
             ForEach(this.projects(), (project: CosProject) => {
@@ -221,7 +231,7 @@ export struct EventDetail {
         Button('返回').constraintSize({ minHeight: 64, minWidth: 64 }).onClick((): void => { this.back(); }).accessibilityText('返回来源页面')
         Text(dayTitle(this.event, this.state.clockTime)).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink).layoutWeight(1)
         Select([{ value: '记一笔' }, { value: '收录一条' }, { value: '传照片' }]).value('记').height(64).constraintSize({ minWidth: 64 })
-          .onSelect((index: number): void => { this.recordKind = index; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
+          .onSelect((index: number): void => { this.recordKind = index; this.recordError = ''; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
       }.width('100%')
       Text((this.event.venue || this.event.city || '地点待定') + ' · ' + eventTimeLabel(this.event) + (dayNumber(this.event, this.state.clockTime) ? ' · ' + dayNumber(this.event, this.state.clockTime) : '')).fontSize(15).fontColor(Theme.muted).width('100%')
     }.padding({ top: 16, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 12 }).width('100%').backgroundColor(Theme.bg)

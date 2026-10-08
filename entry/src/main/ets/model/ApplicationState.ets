@@ -451,7 +451,7 @@ export class AppState implements SearchData, RemovalData {
   captureEntryImage(scopeKind: string = 'global', scopeId: string = ''): Promise<OperationResult> {
     return this.performResult(async () => {
       if (!this.media) { throw new Error('图片选择暂不可用，请重试'); }
-      const uris = await this.media.select(1); if (!uris.length) { return; }
+      const uris = await this.media.select(1); if (!uris.length) { this.operationRefreshNeeded = false; return; }
       const media = await this.media.import(uris[0], '');
       const entry = new CollectedEntry(); entry.id = media.id; entry.kind = 'image';
       entry.scopeKind = scopeKind; entry.scopeId = scopeId; entry.localPath = media.localPath; entry.thumbnailPath = media.thumbnailPath;
@@ -459,16 +459,19 @@ export class AppState implements SearchData, RemovalData {
       catch (error) { await this.media.remove(media); throw error as Error; }
     }, true, ['entries']);
   }
-  repairEntryImage(entry: CollectedEntry): Promise<OperationResult> {
-    return this.performResult(async () => {
+  async repairEntryImage(entry: CollectedEntry): Promise<boolean> {
+    let repaired = false;
+    const success = await this.perform(async () => {
       if (!this.media || !this.entries.some((item: CollectedEntry) => item.id === entry.id)) { throw new Error('收录已不存在，请重新加载'); }
-      const uris = await this.media.select(1); if (!uris.length) { return; }
+      const uris = await this.media.select(1); if (!uris.length) { this.operationRefreshNeeded = false; return; }
       const media = await this.media.import(uris[0], '');
       const copy = JSON.parse(JSON.stringify(entry)) as CollectedEntry; copy.localPath = media.localPath; copy.thumbnailPath = media.thumbnailPath;
       try { await this.entryRepo.save(copy); }
       catch (error) { await this.media.remove(media); throw error as Error; }
+      repaired = true;
       await this.media.remove(entry);
     }, true, ['entries']);
+    return success && repaired;
   }
   convertEntry(entry: CollectedEntry, kind: string, scopeKind: string, scopeId: string, amount: string, date: string): Promise<OperationResult> {
     return this.performResult(async () => {

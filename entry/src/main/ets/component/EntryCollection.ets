@@ -18,6 +18,8 @@ export struct EntryCollection {
   @Require @Param state: AppState;
   @Param route: InboxRoute = new InboxRoute();
   @Event open: (kind: string, id: string) => void = () => {};
+  @Local captureError: string = '';
+  @Local actionError: string = '';
   @Local editing: boolean = false;
   @Local entry: CollectedEntry = new CollectedEntry();
   @Local title: string = '';
@@ -55,17 +57,25 @@ export struct EntryCollection {
     return owners.filter((owner: EntryOwner) => owner.name.toLocaleLowerCase().includes(this.ownerQuery.toLocaleLowerCase()));
   }
   private async capture(value: string): Promise<void> {
-    if (operationCommitted(await this.state.captureEntry(value, this.route.scopeKind, this.route.scopeId))) { if (value === this.route.content) { this.route.content = ''; } }
+    this.captureError = '';
+    const result = await this.state.captureEntry(value, this.route.scopeKind, this.route.scopeId);
+    if (operationCommitted(result)) { if (value === this.route.content) { this.route.content = ''; } }
+    else { this.captureError = result.detail || '收录未保存，请重试'; }
+  }
+  private async captureImage(): Promise<void> {
+    this.captureError = '';
+    const result = await this.state.captureEntryImage(this.route.scopeKind, this.route.scopeId);
+    if (!operationCommitted(result)) { this.captureError = result.detail || '图片未收录，请重试'; }
   }
   private async paste(): Promise<void> {
     if (this.state.busy) { return; }
     try { const data = await pasteboard.getSystemPasteboard().getData(); await this.capture(data.getPrimaryText()); }
-    catch (error) { this.state.reportError('未能读取剪贴板，可以在输入框中手动粘贴后收录'); }
+    catch (error) { this.captureError = '未能读取剪贴板，可以在输入框中手动粘贴后收录'; this.state.reportError(this.captureError); }
   }
   private begin(entry: CollectedEntry): void {
     this.route.anchorId = entry.id;
     if (this.route.scopeKind === 'global' && entry.scopeKind !== 'global') { this.open('inbox', entry.scopeKind + '|' + entry.scopeId); return; }
-    this.entry = entry; this.title = entry.title; this.text = entry.text; this.url = entry.url; this.entryKind = entry.kind;
+    this.actionError = ''; this.entry = entry; this.title = entry.title; this.text = entry.text; this.url = entry.url; this.entryKind = entry.kind;
     this.pinned = entry.pinned; this.assigning = false; this.conversion = ''; this.targetId = ''; this.ownerQuery = ''; this.editing = true;
   }
   private editedEntry(): CollectedEntry {
@@ -87,22 +97,34 @@ export struct EntryCollection {
     return options;
   }
   private async save(): Promise<void> {
-    if (operationCommitted(await this.state.saveEntry(this.editedEntry()))) { this.editing = false; }
+    this.actionError = '';
+    const result = await this.state.saveEntry(this.editedEntry());
+    if (operationCommitted(result)) { this.editing = false; }
+    else { this.actionError = result.detail || '修改未保存，请重试'; }
   }
   private async assign(): Promise<void> {
-    if (this.conversion) {
-      if (operationCommitted(await this.state.convertEntry(this.editedEntry(), this.conversion, this.targetKind, this.targetId, this.amount, this.date))) { this.editing = false; }
-    } else {
-      const entry = this.editedEntry(); entry.scopeKind = this.targetKind; entry.scopeId = this.targetKind === 'global' ? '' : this.targetId;
-      if (operationCommitted(await this.state.saveEntry(entry))) { this.editing = false; }
-    }
+    this.actionError = '';
+    const entry = this.editedEntry();
+    if (!this.conversion) { entry.scopeKind = this.targetKind; entry.scopeId = this.targetKind === 'global' ? '' : this.targetId; }
+    const result = this.conversion ? await this.state.convertEntry(entry, this.conversion, this.targetKind, this.targetId, this.amount, this.date) : await this.state.saveEntry(entry);
+    if (operationCommitted(result)) { this.editing = false; }
+    else { this.actionError = result.detail || '整理未保存，请重试'; }
   }
   private async remove(): Promise<void> {
     if (!await confirm(this.getUIContext(), '删除这条收录？', entryTitle(this.entry).slice(0, 80) + ' 的记录与应用内图片副本将删除，系统相册原图保留。', '删除')) { return; }
-    if (operationCommitted(await this.state.removeEntry(this.entry))) { this.editing = false; }
+    this.actionError = '';
+    const result = await this.state.removeEntry(this.entry);
+    if (operationCommitted(result)) { this.editing = false; }
+    else { this.actionError = result.detail || '收录未删除，原条目保留'; }
   }
   private async repair(): Promise<void> {
-    if (operationCommitted(await this.state.repairEntryImage(this.editedEntry()))) { this.editing = false; }
+    if (this.state.busy) { return; }
+    this.actionError = '';
+    if (await this.state.repairEntryImage(this.editedEntry())) { this.editing = false; }
+    else if (this.state.error) { this.actionError = this.state.error; }
+  }
+  @Builder failure() {
+    if (this.actionError) { Text(this.actionError).id('entry-action-error').fontSize(14).fontColor(Theme.danger).accessibilityText(this.actionError) }
   }
   private async openLink(): Promise<void> {
     try { await (this.getUIContext().getHostContext() as common.UIAbilityContext).openLink(this.entry.url, { appLinkingOnly: false }); }
@@ -119,7 +141,7 @@ export struct EntryCollection {
         .onSelect((index: number): void => { this.targetKind = this.assignmentScopes()[index]; this.targetId = ''; })
     }
     if (this.targetKind !== 'global') {
-      TextInput({ placeholder: '搜索归属对象', text: this.ownerQuery }).onChange((value: string): void => { this.ownerQuery = value; }).accessibilityText('搜索归属对象')
+      TextInput({ placeholder: '搜索归属对象', text: this.ownerQuery }).enabled(!this.state.busy).onChange((value: string): void => { this.ownerQuery = value; }).accessibilityText('搜索归属对象')
       ForEach(this.owners(), (owner: EntryOwner) => {
         Button((this.targetId === owner.id ? '✓ ' : '') + owner.name).width('100%').constraintSize({ minHeight: 48 })
           .backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy)
@@ -128,10 +150,11 @@ export struct EntryCollection {
       if (this.owners().length === 0) { Text('没有匹配的对象，请更换搜索或先创建对象。').fontColor(Theme.muted) }
     }
     if (this.conversion === 'expense') {
-      Field({ label: '金额（元）', value: this.amount, change: (value: string): void => { this.amount = value; } })
-      Field({ label: '记账日期（YYYY-MM-DD）', value: this.date, change: (value: string): void => { this.date = value; } })
+      Field({ label: '金额（元）', value: this.amount, change: (value: string): void => { this.amount = value; } }).enabled(!this.state.busy)
+      Field({ label: '记账日期（YYYY-MM-DD）', value: this.date, change: (value: string): void => { this.date = value; } }).enabled(!this.state.busy)
     }
     if (this.conversion) { Text('转换成功后，这条收录会移至目标功能；失败时原条目保留。').fontSize(13).fontColor(Theme.muted) }
+    this.failure()
     Button(this.state.busy ? '保存中…' : this.conversion ? '确认转换' : '确认归位')
       .width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent)
       .enabled(!this.state.busy && (this.targetKind === 'global' || Boolean(this.targetId)))
@@ -150,34 +173,36 @@ export struct EntryCollection {
           }
           Select(ENTRY_KIND_LABELS.map((label: string): SelectOption => ({ value: label }))).value(ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.entryKind)])
             .enabled(!this.state.busy).onSelect((index: number): void => { this.entryKind = ENTRY_KINDS[index]; })
-          Field({ label: '标题（可选）', value: this.title, change: (value: string): void => { this.title = value; } })
-          Field({ label: '链接（可选）', value: this.url, change: (value: string): void => { this.url = value; } })
-          TextArea({ text: this.text, placeholder: '正文或想法（可选）' }).height(120).onChange((value: string): void => { this.text = value; })
+          Field({ label: '标题（可选）', value: this.title, change: (value: string): void => { this.title = value; } }).enabled(!this.state.busy)
+          Field({ componentId: 'entry-input:url', label: '链接（可选）', value: this.url, change: (value: string): void => { this.url = value; } }).enabled(!this.state.busy)
+          TextArea({ text: this.text, placeholder: '正文或想法（可选）' }).height(120).enabled(!this.state.busy).onChange((value: string): void => { this.text = value; })
           if (this.entry.url) {
             Text(this.entry.url).fontColor(Theme.accent).copyOption(CopyOptions.LocalDevice)
             Button('打开链接').onClick((): void => { this.openLink(); }).fontColor(Theme.accent).backgroundColor(Theme.tint)
           }
           Row({ space: 12 }) { Text('置顶').fontColor(Theme.ink); Toggle({ type: ToggleType.Switch, isOn: this.pinned }).enabled(!this.state.busy).onChange((value: boolean): void => { this.pinned = value; }) }
+          this.failure()
           Button(this.state.busy ? '保存中…' : '保存修改').width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent).enabled(!this.state.busy).onClick((): void => { this.save(); })
           Button('归位或转换').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(!this.state.busy).onClick((): void => { this.assigning = true; this.targetKind = 'event'; this.targetId = ''; this.conversion = ''; })
           Button('删除收录').width('100%').fontColor(Theme.danger).backgroundColor(Theme.surface).enabled(!this.state.busy).onClick((): void => { this.remove(); })
         }
       }.width('100%').padding(24).alignItems(HorizontalAlign.Start)
-    }.height('100%').width('100%').backgroundColor(Theme.surface)
+    }.id('entry-editor-scroll').height('100%').width('100%').backgroundColor(Theme.surface)
   }
   build() {
     Column({ space: 16 }) {
-      TextArea({ text: this.route.content, placeholder: '粘贴链接或写一句话，直接收录' }).height(100).onChange((value: string): void => { this.route.content = value; }).accessibilityText('收录内容')
+      TextArea({ text: this.route.content, placeholder: '粘贴链接或写一句话，直接收录' }).height(100).enabled(!this.state.busy).onChange((value: string): void => { this.route.content = value; }).accessibilityText('收录内容')
       Flex({ wrap: FlexWrap.Wrap }) {
         Button(this.state.busy ? '收录中…' : '收录').enabled(!this.state.busy && this.route.content.trim().length > 0).backgroundColor(Theme.brand).fontColor(Theme.onAccent)
           .onClick((): void => { this.capture(this.route.content); }).margin({ right: 8, bottom: 8 })
         PasteButton().onClick((_event: ClickEvent, result: PasteButtonOnClickResult): void => {
           if (result === PasteButtonOnClickResult.SUCCESS) { this.paste(); }
-          else { this.state.reportError('未获粘贴授权，可以手动粘贴到输入框'); }
+          else { this.captureError = '未获粘贴授权，可以手动粘贴到输入框'; this.state.reportError(this.captureError); }
         })
         Button('存一张图').enabled(!this.state.busy).backgroundColor(Theme.tint).fontColor(Theme.accent)
-          .onClick((): void => { this.state.captureEntryImage(this.route.scopeKind, this.route.scopeId); }).margin({ bottom: 8 })
+          .onClick((): void => { void this.captureImage(); }).margin({ bottom: 8 })
       }.width('100%')
+      if (this.captureError) { Text(this.captureError).id('entry-capture-error').fontSize(14).fontColor(Theme.danger).accessibilityText(this.captureError) }
       if (this.route.scopeKind === 'global') {
         Select([{ value: '未归位' }, { value: '全部收录' }]).value(this.route.untriagedOnly ? '未归位' : '全部收录').id('entry-scope-filter')
           .onSelect((index: number): void => { this.route.setUntriagedOnly(index === 0); })
@@ -200,7 +225,7 @@ export struct EntryCollection {
         }.id('entry-row:' + entry.id).width('100%').backgroundColor(Theme.surface).constraintSize({ minHeight: 64 })
           .onClick((): void => { this.begin(entry); }).accessibilityText(entryTitle(entry) + '，' + this.ownerName(entry))
       }, (entry: CollectedEntry) => entry.id)
-      if (this.visible.length === 0) { EmptyState({ title: this.route.kind ? '没有匹配的收录' : '先存下，再慢慢整理', message: '上方可直接粘贴、写一句话或选择图片。', button: this.route.kind ? '清除类型筛选' : '存一张图', action: (): void => { if (this.route.kind) { this.route.setKind(''); } else { this.state.captureEntryImage(this.route.scopeKind, this.route.scopeId); } } }) }
+      if (this.visible.length === 0) { EmptyState({ title: this.route.kind ? '没有匹配的收录' : '先存下，再慢慢整理', message: '上方可直接粘贴、写一句话或选择图片。', button: this.route.kind ? '清除类型筛选' : '存一张图', action: (): void => { if (this.route.kind) { this.route.setKind(''); } else { void this.captureImage(); } } }) }
     }.width('100%').alignItems(HorizontalAlign.Start)
       .bindSheet(this.editing, this.editor(), this.sheetOptions())
   }

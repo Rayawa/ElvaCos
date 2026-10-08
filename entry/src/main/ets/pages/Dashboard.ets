@@ -543,7 +543,13 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'album') { return (param as AlbumRoute).mode === 'queue' ? 1 : 0; }
     return (param as SearchRoute).section;
   }
+  private canChangeView(kind: string, param: Object, index: number): boolean {
+    if (kind === 'album') { return (param as AlbumRoute).canShowMode(index ? 'queue' : 'byPlan'); }
+    if (kind === 'project') { return (param as ProjectRoute).canShowSection(index); }
+    return true;
+  }
   private changeView(kind: string, param: Object, index: number): void {
+    if (!this.canChangeView(kind, param, index)) { return; }
     if (kind === 'project') { const route = param as ProjectRoute; route.section = index; route.outing = false; this.state.suspend(); }
     else if (kind === 'character') { (param as CharacterRoute).section = index; }
     else if (kind === 'asset') { (param as AssetRoute).section = index; }
@@ -555,6 +561,7 @@ import { EmptyState } from '../component/Surfaces';
       HdsViewTabs({ labels: this.viewLabels(kind, param), icons: this.viewIcons(kind), selectedIndex: this.viewIndex(kind, param),
         componentId: kind + '-view-tabs', effects: this.state.settings.effects, materialLevel: this.state.settings.materialLevel,
         availableWidth: this.viewportWidth, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+        canChange: (index: number): boolean => { return this.canChangeView(kind, param, index); },
         changed: (index: number): void => { this.changeView(kind, param, index); },
         content: this.destinationPage.bind(this, kind, param, entrance) })
     } else { this.destinationPage(kind, param, entrance) }

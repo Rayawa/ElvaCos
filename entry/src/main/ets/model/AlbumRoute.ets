@@ -17,8 +17,9 @@ export class AlbumRoute {
       collection.reconcile(photos);
     });
   }
+  canShowMode(mode: string): boolean { return ['byPlan', 'queue'].includes(mode) && (mode === this.mode || !this.collection.submitting); }
   showMode(mode: string): void {
-    if (!['byPlan', 'queue'].includes(mode) || mode === this.mode || this.collection.submitting) { return; }
+    if (mode === this.mode || !this.canShowMode(mode)) { return; }
     const hadSelection = this.collection.selectedIds.length > 0;
     this.collection.clearSelection(); this.mode = mode; if (hadSelection) { this.collection.feedback = '模式已改变，已清空照片选择'; } this.restoreVersion++;
   }
