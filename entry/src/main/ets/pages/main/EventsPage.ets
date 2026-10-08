@@ -2,8 +2,13 @@ import { today, daysUntil } from '../../common/format';
 import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
+import { ScheduleRoute } from '../../model/ScheduleRoute';
+import { ScheduleView, buildScheduleView } from '../../model/ScheduleView';
+import { TaskQueueItem } from '../../model/TaskQueue';
+import { ScheduleDayList } from '../../component/ScheduleDayList';
+import { DateField } from '../../component/DateField';
 import { EventCalendar } from '../../component/EventCalendar';
-import { eventEnd, eventDateLabel, eventTimeLabel, scheduleGroups, ScheduleGroup } from '../../model/Schedule';
+import { eventEnd, eventDateLabel, ScheduleGroup } from '../../model/Schedule';
 import { vibration } from '../../common/vibration';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
@@ -20,33 +25,45 @@ export struct EventsPage {
   @Require @Param state: AppState;
   @Event open: (kind: string, id: string) => void = () => {};
   @Event add: (kind: string, parent: string) => void = () => {};
-  @Event filterChanged: (filter: number) => void = () => {};
-  @Param filter: number = 0;
+  @Require @Param route: ScheduleRoute;
+  @Event openTask: (item: TaskQueueItem) => void = () => {};
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
-  @Param calendar: boolean = false;
-  @Local typeFilter: string = '';
+  private displayedMode: number = 0;
+  private restoring: boolean = true;
+  private restoreTimer: number = -1;
   @Local animStep: number = 0;
   private enterPlayed: boolean = false;
   private enterTimers: number[] = [];
-  aboutToAppear(): void { if (this.active) { this.enter(); } }
+  aboutToAppear(): void { this.restore(); if (this.active) { this.enter(); } }
   @Monitor('active')
-  activeChanged(): void { if (this.active) { this.enter(); } }
+  activeChanged(): void { if (this.active) { this.enter(); this.restore(); } }
   private enter(): void {
     if (this.enterPlayed) { return; }
     this.enterPlayed = true;
     if (!this.entranceSession.claim('EventsPage')) { this.animStep = 2; return; }
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
-  aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private groups(): ScheduleGroup[] {
-    const groups = scheduleGroups(this.state.events.filter((event: CosEvent) => !this.typeFilter || event.eventType === this.typeFilter), this.state.localDate);
-    if (this.filter === 1) { return [groups[3]]; }
-    if (this.filter === 2) { return [groups[2]]; }
-    if (this.filter === 3) { return [groups[0]]; }
-    if (this.filter === 4) { return [groups[1]]; }
-    return groups;
+  aboutToDisappear(): void {
+    cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2;
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; }
   }
+  @Monitor('route.calendar')
+  private modeChanged(): void { this.restore(); }
+  private restore(): void {
+    this.restoring = true; this.displayedMode = this.route.calendar ? 1 : 0;
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
+    this.restoreTimer = setTimeout((): void => {
+      this.restoreTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offsets[this.displayedMode], animation: false }); this.restoring = false;
+    }, 0);
+  }
+  private resetPosition(): void {
+    this.route.offsets[this.route.calendar ? 1 : 0] = 0;
+    if (!this.restoring) { this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false }); }
+  }
+  @Computed
+  private get view(): ScheduleView { return buildScheduleView(this.state.events, this.state.readinessPlans, this.state.projects, this.route, this.state.localDate); }
+  private groups(): ScheduleGroup[] { return this.view.groups; }
   private events(): CosEvent[] { return this.groups().reduce((events: CosEvent[], group: ScheduleGroup) => events.concat(group.events), []); }
   private typeOptions(): SelectOption[] { const options: SelectOption[] = [{ value: '全部类型' }]; return options.concat(this.types().map((type: string): SelectOption => { return { value: type }; })); }
   private types(): string[] { return Array.from(new Set(this.state.events.map((event: CosEvent) => event.eventType))); }
@@ -75,11 +92,11 @@ export struct EventsPage {
           Column({ space: 14 }) {
             Blank().height(this.topInset).width('100%')
             Row({ space: 8 }) {
-              SectionHeading({ title: '活动安排', trailing: this.calendar ? '' : this.events().length + ' 场' }).layoutWeight(1)
-              if (!this.calendar) {
+              SectionHeading({ title: '活动安排', trailing: this.route.calendar ? '' : this.events().length + ' 场' }).layoutWeight(1)
+              if (!this.route.calendar && !this.route.dateFocused) {
                 Select([{ value: '全部日期' }, { value: '已结束' }, { value: '日期待定' }, { value: '今天' }, { value: '即将到来' }])
-                  .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.filter])
-                  .onSelect((index: number): void => { vibration.dotVibration(); this.filterChanged(index); })
+                  .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.route.filter])
+                  .onSelect((index: number): void => { vibration.dotVibration(); this.route.filter = index; this.route.dateFocused = false; this.resetPosition(); })
                   .id('event-list-filter')
                   .accessibilityText('活动日期筛选')
                   .visualEffect(this.feedback.effect('select-1'))
@@ -87,16 +104,31 @@ export struct EventsPage {
                   .attributeModifier(this.feedback.control('select-1'))
               }
             }.width('100%')
+            if (!this.route.calendar) {
+              DateField({ label: '查看某一天（可选）', value: this.route.dateFocused ? this.route.selectedDate : '', optional: true,
+                change: (value: string): void => { if (value) { this.route.selectDate(value); } else { this.route.clearDate(); } this.resetPosition(); } })
+              if (!this.route.dateFocused && this.route.filter === 0) { Text('当前按日期分组查看全部安排。').fontSize(14).fontColor(Theme.muted) }
+            }
             Select(this.typeOptions())
-              .value(this.typeFilter || '全部类型').onSelect((index: number): void => { this.typeFilter = index === 0 ? '' : this.types()[index - 1]; }).accessibilityText('活动类型筛选')
+              .value(this.route.eventType || '全部类型').onSelect((index: number): void => { this.route.eventType = index === 0 ? '' : this.types()[index - 1]; this.resetPosition(); }).accessibilityText('活动类型筛选')
           }.
         width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 14 }) {
-            if (this.calendar) { EventCalendar({
-                state: this.state, eventType: this.typeFilter,
+            if (this.view.pendingCount > 0 && (this.route.calendar || this.route.dateFocused)) {
+              Button('日期待定 · ' + this.view.pendingCount + ' 场活动').id('schedule-pending-entry').width('100%').constraintSize({ minHeight: 48 })
+                .backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.route.showPending(); this.resetPosition(); })
+            }
+            if (this.route.eventType) { Text('活动类型筛选只影响活动，准备任务截止项仍按所选日期显示。').fontSize(14).fontColor(Theme.muted) }
+            if (this.route.calendar) { EventCalendar({
+                state: this.state, route: this.route, view: this.view,
+                openTask: (item: TaskQueueItem): void => { this.openTask(item); },
                 open: (kind: string, id: string): void => this.open(kind, id),
                 add: (kind: string, parent: string): void => this.add(kind, parent)
-              }) } else {
+              }) } else if (this.route.dateFocused) {
+              ScheduleDayList({ state: this.state, date: this.route.selectedDate, events: this.view.selectedEvents, tasks: this.view.selectedTasks,
+                open: (kind: string, id: string): void => { this.open(kind, id); }, openTask: (item: TaskQueueItem): void => { this.openTask(item); },
+                add: (kind: string, parent: string): void => { this.add(kind, parent); } })
+            } else {
             ForEach(this.groups(), (group: ScheduleGroup) => {
               if (group.events.length > 0) { SectionHeading({ title: group.label, trailing: group.events.length + ' 场' }) }
               ForEach(group.events, (e: CosEvent) => { InteractiveCard({
@@ -110,7 +142,7 @@ export struct EventsPage {
                 title: this.state.events.length ? '没有匹配的活动' : '下一场见面，值得期待',
                 message: this.state.events.length ? '可以清除日期和类型筛选，查看全部活动。' : '记录活动日期，关联准备中的计划。',
                 button: this.state.events.length ? '清除筛选' : '＋ 添加活动',
-                action: (): void => { if (this.state.events.length) { this.typeFilter = ''; this.filterChanged(0); } else { this.add('event', ''); } }
+                action: (): void => { if (this.state.events.length) { this.route.eventType = ''; this.route.clearDate(); this.resetPosition(); } else { this.add('event', ''); } }
               }) }
             }
           }.
@@ -118,6 +150,7 @@ export struct EventsPage {
           Blank().height(this.bottomInset).width('100%')
         }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
+        .onDidScroll((): void => { if (!this.restoring) { this.route.offsets[this.displayedMode] = this.scroller.currentOffset().yOffset; } })
     }.width('100%').height('100%')
       .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
   }

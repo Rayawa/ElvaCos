@@ -1,6 +1,8 @@
 import { EventRoute, EventReturnPath } from '../model/EventRoute';
 import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
 import { LedgerRoute } from '../model/LedgerRoute';
+import { ScheduleRoute } from '../model/ScheduleRoute';
+import { today } from '../common/format';
 import { PlanListRoute } from '../model/PlanListRoute';
 import { TasksPage } from './more/TasksPage';
 import { dayTitle } from '../model/DayMode';
@@ -69,8 +71,7 @@ import { EmptyState } from '../component/Surfaces';
   private tabsController: HdsTabsController = new HdsTabsController();
   @Local tab: number = 0;
   @Local planListRoute: PlanListRoute = new PlanListRoute();
-  @Local eventCalendar: boolean = false;
-  @Local eventFilter: number = 0;
+  @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
   @Local meSection: number = 0;
   @Local libraryPhotos: boolean = false;
   @Local rootSheetKind: string = 'form';
@@ -613,7 +614,7 @@ import { EmptyState } from '../component/Surfaces';
 
   private segmentSelection(index: number): number {
     if (index === 1) { return this.planListRoute.section; }
-    if (index === 2) { return this.eventCalendar ? 1 : 0; }
+    if (index === 2) { return this.scheduleRoute.calendar ? 1 : 0; }
     if (index === 3) { return this.libraryPhotos ? 1 : 0; }
     return this.meSection;
   }
@@ -637,7 +638,7 @@ import { EmptyState } from '../component/Surfaces';
         experimentalWidth: Theme.titleSegmentWidth,
         onSelectedIndexChanged: (selected: number): void => {
           if (index === 1) { this.planListRoute.status = ''; this.planListRoute.section = selected; }
-          else if (index === 2) { this.eventCalendar = selected === 1; }
+          else if (index === 2) { this.scheduleRoute.showCalendar(selected === 1); }
           else if (index === 3) { this.libraryPhotos = selected === 1; }
           else { this.meSection = selected; }
         },
@@ -720,9 +721,8 @@ import { EmptyState } from '../component/Surfaces';
             topInset: Theme.contentTop,
             bottomInset: Theme.contentBottom,
             active: this.tab === index,
-            calendar: this.eventCalendar,
-            filter: this.eventFilter,
-            filterChanged: (filter: number): void => { this.eventFilter = filter; },
+            route: this.scheduleRoute,
+            openTask: (item: TaskQueueItem): void => { this.openTaskItem(item); },
             open: (k: string, id: string) => this.open(k, id),
             add: (k: string, parent: string) => this.edit(k, '', parent)
           })

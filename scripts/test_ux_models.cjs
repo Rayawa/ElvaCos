@@ -30,6 +30,8 @@ const root = path.resolve(__dirname, '../entry/src/main/ets');
 const entities = require(root + '/model/Entities.ets');
 const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistItem, PhotoAsset, PhotoStatus, CosEvent } = entities;
 const day = require(root + '/model/DayMode.ets');
+const { ScheduleRoute } = require(root + '/model/ScheduleRoute.ets');
+const { deadlineTasksOnDate, buildScheduleView, scheduleTaskRoute } = require(root + '/model/ScheduleView.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
 const { EventSaveCoordinator } = require(root + '/common/EventSaveCoordinator.ets');
 const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/model/TaskQueue.ets');
@@ -159,6 +161,48 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const future = Object.assign(new CosEvent(), { id: 'future', date: '2026-10-12' });
     const ended = Object.assign(new CosEvent(), { id: 'ended', date: '2026-10-01' });
     assert.deepEqual(scheduleGroups([future, ended, pending, dayEvent], '2026-10-09').map(g => g.events.map(e => e.id)), [['day'], ['future'], ['pending'], ['ended']]);
+  });
+  await test('schedule route shares its selected day across modes, clamps month navigation and retains source offsets', () => {
+    const route = new ScheduleRoute('2024-01-31');
+    assert.equal(route.dateFocused, false); assert.equal(route.calendar, false);
+    route.offsets = [240, 110]; route.showCalendar(true); route.moveMonth(1);
+    assert.equal(route.selectedDate, '2024-02-29'); assert.equal(route.month, 1);
+    route.showCalendar(false); assert.equal(route.selectedDate, '2024-02-29'); assert.equal(route.dateFocused, true);
+    route.selectDate('2026-12-31'); route.moveMonth(1); assert.equal(route.selectedDate, '2027-01-31');
+    route.selectDate('invalid'); assert.equal(route.selectedDate, '2027-01-31');
+    route.showPending(); assert.equal(route.calendar, false); assert.equal(route.dateFocused, false); assert.equal(route.filter, 2);
+    assert.equal(route.selectedDate, '2027-01-31'); assert.deepEqual(route.offsets, [240, 110]);
+    route.clearDate(); assert.equal(route.filter, 0);
+  });
+  await test('schedule cells and selected-day list share multi-day events, actual task deadlines and pending-date access', () => {
+    const ongoing = Object.assign(new CosEvent(), { id: 'ongoing', date: '2026-12-30', dateMode: 'multiple', endDate: '2027-01-02', eventType: '漫展' });
+    const shoot = Object.assign(new CosEvent(), { id: 'shoot', date: '2026-12-31', eventType: '拍摄' });
+    const pending = Object.assign(new CosEvent(), { id: 'pending', dateMode: 'pending', eventType: '漫展' });
+    const route = new ScheduleRoute('2026-12-31'); route.selectDate('2026-12-31');
+    const model = () => buildScheduleView([ongoing, shoot, pending], [read()], [project], route, '2026-12-31');
+    let view = model(); const cell = view.days.find(item => item.day.date === route.selectedDate);
+    assert.strictEqual(view.selectedEvents, cell.events); assert.strictEqual(view.selectedTasks, cell.tasks);
+    assert.deepEqual(view.selectedEvents.map(item => item.id).sort(), ['ongoing', 'shoot']);
+    assert.deepEqual(view.selectedTasks.map(item => item.task.id), ['today']); assert.equal(view.pendingCount, 1);
+    assert.strictEqual(view.groups[0].events, view.selectedEvents);
+    route.showCalendar(true); route.showCalendar(false); assert.deepEqual(model().selectedTasks.map(item => item.task.id), ['today']);
+    route.eventType = '漫展'; view = model(); assert.deepEqual(view.selectedEvents.map(item => item.id), ['ongoing']); assert.equal(view.selectedTasks.length, 1);
+    route.showPending(); view = model(); assert.deepEqual(view.groups[0].events.map(item => item.id), ['pending']);
+    route.selectDate('2027-01-02'); assert.deepEqual(model().selectedEvents.map(item => item.id), ['ongoing']);
+    route.selectDate('2027-01-03'); assert.deepEqual(model().selectedEvents, []);
+  });
+  await test('deadline task rows stay stable after completion, retain waiting semantics and route to the exact preparation item', () => {
+    const p = Object.assign(new CosProject(), { id: 'calendar-plan', name: '日历计划' });
+    const localTasks = [Object.assign(new PreparationTask(), { id: 'normal', projectId: p.id, label: '普通任务', dueDate: '2026-10-01', sortOrder: 0 }), Object.assign(new PreparationTask(), { id: 'waiting', projectId: p.id, label: '等待任务', dueDate: '2026-10-01', waitingOn: '快递', waitingUntil: '2026-10-03', sortOrder: 1 }), Object.assign(new PreparationTask(), { id: 'undated', projectId: p.id })];
+    const plans = () => [buildPlanReadiness(p, localTasks, [], [], [], [], [], [], '2026-10-08')];
+    const items = () => deadlineTasksOnDate(plans(), [p], '2026-10-01');
+    let rows = items(); assert.deepEqual(rows.map(item => item.task.id), ['normal', 'waiting']);
+    assert.equal(rows[0].overdue, true); assert.equal(rows[1].waiting, true); assert.equal(rows[1].overdue, false);
+    assert.deepEqual(deadlineTasksOnDate(plans(), [p], '2026-10-03'), []);
+    const target = scheduleTaskRoute(rows[1]); assert.equal(target.projectId, p.id); assert.equal(target.focusId, 'waiting'); assert.equal(target.section, 1); assert.equal(target.source, 'preparation');
+    localTasks[0].done = true; rows = items(); assert.deepEqual(rows.map(item => item.task.id), ['normal', 'waiting']); assert.equal(rows[0].task.done, true); assert.equal(rows[0].overdue, false);
+    p.status = ProjectStatus.COMPLETED; assert.deepEqual(items(), []);
+    p.status = ProjectStatus.ARCHIVED; assert.deepEqual(items(), []);
   });
   await test('notification publishing failure preserves reminder intent and can be retried', async () => {
     const event = Object.assign(new CosEvent(), { date: '2027-01-01', reminderMinutes: 30 });

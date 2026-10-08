@@ -5,6 +5,7 @@ import { planDate } from './Rules';
 import { photoStageCounts } from './PhotoStages';
 
 export class PreparationReadiness {
+  items: PreparationTask[] = [];
   done: number = 0;
   total: number = 0;
   waiting: number = 0;
@@ -67,6 +68,7 @@ export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[]
   const week = new Date(date + 'T12:00:00'); week.setDate(week.getDate() + 7);
   const weekEnd = String(week.getFullYear()) + '-' + String(week.getMonth() + 1).padStart(2, '0') + '-' + String(week.getDate()).padStart(2, '0');
   const preparation = tasks.filter((task: PreparationTask) => task.projectId === project.id);
+  result.prep.items = preparation;
   result.prep.total = preparation.length;
   result.prep.done = preparation.filter((task: PreparationTask) => task.done).length;
   for (const task of preparation) {

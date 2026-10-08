@@ -83,7 +83,8 @@ export default function uiShellTest(): void {
       await tap('计划'); await present('新建计划');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
       await tap('活动'); await present('添加活动');
-      await tap('日历'); await present('今天'); await tap('列表'); await present('event-list-filter');
+      await tap('日历'); await present('今天'); await tap('今天'); await tap('列表'); await present('查看某一天（可选）');
+      await tap('清除'); await present('event-list-filter');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
       await tap('衣柜'); await tap('装备'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
