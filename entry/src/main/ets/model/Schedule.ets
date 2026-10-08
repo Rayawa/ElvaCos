@@ -3,30 +3,35 @@ import { CosEvent } from './Entities';
 import { validDate, requiredName } from './Rules';
 
 export function validTime(value: string): boolean { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
+export class ScheduleError extends Error {
+  field: string;
+  constructor(field: string, message: string) { super(message); this.field = field; }
+}
 export function checkSchedule(event: CosEvent): void {
-  requiredName(event.eventType);
-  if (!DATE_MODES.includes(event.dateMode) || !TIME_MODES.includes(event.timeMode)) { throw new Error('活动日期或时间模式无效'); }
+  try { requiredName(event.eventType); } catch (error) { throw new ScheduleError('type', (error as Error).message); }
+  if (!DATE_MODES.includes(event.dateMode)) { throw new ScheduleError('dateMode', '活动日期模式无效'); }
+  if (!TIME_MODES.includes(event.timeMode)) { throw new ScheduleError('timeMode', '活动时间模式无效'); }
   if (event.dateMode === 'pending') {
     if (event.date || event.endDate || event.timeMode !== 'none' || event.startTime || event.endTime || event.reminderMinutes !== -1) {
-      throw new Error('日期待定时请关闭时间与提醒');
+      throw new ScheduleError('dateMode', '日期待定时请关闭时间与提醒');
     }
     return;
   }
-  if (!validDate(event.date)) { throw new Error('活动日期格式为 YYYY-MM-DD'); }
+  if (!validDate(event.date)) { throw new ScheduleError('date', '活动日期格式为 YYYY-MM-DD'); }
   if (event.dateMode === 'multiple') {
-    if (!validDate(event.endDate) || event.endDate < event.date) { throw new Error('结束日期应不早于开始日期'); }
-  } else if (event.endDate) { throw new Error('单日活动无需结束日期'); }
+    if (!validDate(event.endDate) || event.endDate < event.date) { throw new ScheduleError('endDate', '结束日期应不早于开始日期'); }
+  } else if (event.endDate) { throw new ScheduleError('dateMode', '单日活动无需结束日期'); }
   if (event.timeMode === 'none') {
-    if (event.startTime || event.endTime) { throw new Error('不标记时间时请清除时间'); }
+    if (event.startTime || event.endTime) { throw new ScheduleError('timeMode', '不标记时间时请清除时间'); }
   } else {
-    if (!validTime(event.startTime)) { throw new Error('开始时间格式为 HH:mm'); }
+    if (!validTime(event.startTime)) { throw new ScheduleError('startTime', '开始时间格式为 HH:mm'); }
     if (event.timeMode === 'range') {
       if (!validTime(event.endTime) || ((event.dateMode === 'single' || event.endDate === event.date) && event.endTime <= event.startTime)) {
-        throw new Error('结束时间应晚于开始时间');
+        throw new ScheduleError('endTime', '结束时间应晚于开始时间');
       }
-    } else if (event.endTime) { throw new Error('仅标记开始时间时无需结束时间'); }
+    } else if (event.endTime) { throw new ScheduleError('timeMode', '仅标记开始时间时无需结束时间'); }
   }
-  if (![-1, 0, 30, 60, 1440].includes(event.reminderMinutes)) { throw new Error('提醒提前时间无效'); }
+  if (![-1, 0, 30, 60, 1440].includes(event.reminderMinutes)) { throw new ScheduleError('reminderMinutes', '提醒提前时间无效'); }
 }
 export function eventEnd(event: CosEvent): string { return event.dateMode === 'multiple' ? event.endDate : event.date; }
 export function eventDateLabel(event: CosEvent): string {

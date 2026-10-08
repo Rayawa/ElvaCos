@@ -131,6 +131,10 @@ export struct FactRow {
 export struct Field {
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
+  @Param componentId: string = '';
+  @Param error: string = '';
+  @Event focused: () => void = () => {};
+  @Event area: (value: Area) => void = () => {};
   @Param value: string = '';
   @Param placeholder: string = '';
   @Param multiline: boolean = false;
@@ -144,6 +148,7 @@ export struct Field {
           .maxLength(2000)
           .backgroundColor(Theme.bg)
           .fontColor(Theme.ink)
+          .id(this.componentId).onFocus((): void => { this.focused(); })
           .onChange((value: string) => this.change(value))
           .accessibilityText(this.label)
           .visualEffect(this.feedback.effect('textarea-3'))
@@ -155,12 +160,14 @@ export struct Field {
           .maxLength(1000)
           .backgroundColor(Theme.bg)
           .fontColor(Theme.ink)
+          .id(this.componentId).onFocus((): void => { this.focused(); })
           .onChange((value: string) => this.change(value))
           .accessibilityText(this.label)
           .visualEffect(this.feedback.effect('textinput-4'))
           .compositingFilter(this.feedback.filter('textinput-4'))
           .attributeModifier(this.feedback.control('textinput-4'))
       }
-    }.width('100%').alignItems(HorizontalAlign.Start)
+      if (this.error) { Text(this.error).fontSize(14).fontColor(Theme.danger).accessibilityText(this.label + '，' + this.error) }
+    }.width('100%').alignItems(HorizontalAlign.Start).onAreaChange((_, value: Area): void => { this.area(value); })
   }
 }

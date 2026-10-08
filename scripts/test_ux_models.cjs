@@ -19,6 +19,7 @@ Module._load = function (id, parent, isMain) {
   if (id === 'BuildProfile') return { DEBUG: false };
   if (parent?.filename.endsWith('/model/ApplicationState.ets')) {
     if (id === '../common/storage') return {};
+    if (id === '../common/formDrafts') return { formDraftStore: { clear: async () => {} } };
     const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'ShareService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
     if (nativeService) return { [nativeService]: class { static async confirm() {} } };
   }
@@ -43,6 +44,9 @@ const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistIt
 const day = require(root + '/model/DayMode.ets');
 const { PreparationUndo, PREPARATION_UNDO_MS, usablePreparationUndo, visiblePreparationUndos, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, homeTaskCapacity } = require(root + '/model/HomeSummary.ets');
 const { AppState } = require(root + '/model/ApplicationState.ets');
+const { EditDraft } = require(root + '/model/EditDraft.ets');
+const { FormDraftStore, formDraftKey } = require(root + '/model/FormDraftStore.ets');
+const { FormSession } = require(root + '/model/FormSession.ets');
 const { ScheduleRoute } = require(root + '/model/ScheduleRoute.ets');
 const { deadlineTasksOnDate, buildScheduleView, scheduleTaskRoute } = require(root + '/model/ScheduleView.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
@@ -301,6 +305,108 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.category = 'preparation'; route.range = 'undated'; assert.deepEqual(filterTaskQueue(queue, route, '2026-12-31').map(item => item.focusId), ['undated']);
     route.range = 'all'; route.projectId = 'missing'; assert.equal(filterTaskQueue(queue, route, '2026-12-31').length, 0);
   });
+  await test('form snapshots preserve creation IDs and business changes while ignoring view expansion', () => {
+    const state = new AppState(); const draft = EditDraft.make(state, 'project');
+    const original = draft.fingerprint(); draft.advanced = true; draft.preparationExpanded = true;
+    assert.equal(draft.fingerprint(), original);
+    draft.characterName = '角色'; draft.name = '漫展计划'; draft.money = '0'; draft.budgetEdited = true;
+    const restored = EditDraft.fromJSON(draft.serialize());
+    assert.equal(restored.creationId, draft.creationId); assert.equal(restored.creationCharacterId, draft.creationCharacterId);
+    assert.equal(restored.fingerprint(), draft.fingerprint()); assert.equal(restored.money, '0');
+    assert.equal(restored.preparationKeys.length, draft.preparationKeys.length);
+    assert.notEqual(restored.preparationKeys, draft.preparationKeys);
+    assert.notEqual(draft.fingerprint(), original);
+    const fresh = EditDraft.make(state, 'project'); assert.equal(fresh.fingerprint(), original);
+    assert.throws(() => EditDraft.fromJSON('{}'), /草稿/);
+    const broken = JSON.parse(draft.serialize()); broken.notes = 4;
+    assert.throws(() => EditDraft.fromJSON(JSON.stringify(broken)), /草稿字段/);
+  });
+  await test('form validation identifies exact schedule fields and rejects stale owners without creating replacements', async () => {
+    const state = new AppState(); state.projects = [project];
+    const missing = EditDraft.make(state, 'project', 'deleted');
+    assert.equal(missing.issues(state)[0].field, 'object'); assert.equal(await missing.save(state), false);
+    const expense = EditDraft.make(state, 'expense'); expense.name = '摄影'; expense.money = '12.34';
+    assert.equal(expense.issues(state)[0].field, 'parentId'); expense.parentId = project.id;
+    assert.deepEqual(expense.issues(state), []); expense.money = '-1'; assert.equal(expense.issues(state)[0].field, 'money');
+    const event = EditDraft.make(state, 'event'); event.name = '漫展'; event.dateMode = 'multiple'; event.date = '2026-10-08'; event.endDate = '2026-10-07';
+    assert.equal(event.issues(state)[0].field, 'endDate');
+    event.endDate = event.date; event.timeMode = 'range'; event.startTime = '09:00'; event.endTime = '08:00';
+    assert.equal(event.issues(state)[0].field, 'endTime');
+    event.endTime = '10:00'; assert.deepEqual(event.issues(state), []);
+    event.timeMode = 'invalid'; assert.equal(event.issues(state)[0].field, 'timeMode');
+    const preparation = EditDraft.make(state, 'preparation', '', project.id); preparation.name = '任务';
+    assert.equal(preparation.issues(state)[0].field, 'categoryId');
+  });
+  await test('form drafts persist separately by object context and recover only after explicit selection', async () => {
+    let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
+    const state = new AppState(); const first = new FormSession(EditDraft.make(state, 'event', '', '2026-10-08'), store);
+    await first.initialize(state); first.draft.name = '保留活动'; first.draft.notes = '未提交';
+    assert.equal(first.dirty, true); assert.equal(await first.flush(), true);
+    assert.equal(state.events.length, 0); assert.equal(first.savedAt > 0, true);
+    const other = new FormSession(EditDraft.make(state, 'event', '', '2026-10-09'), store);
+    await other.initialize(state); assert.equal(other.pendingRestore, undefined);
+    const reopened = new FormSession(EditDraft.make(state, 'event', '', '2026-10-08'), store);
+    await reopened.initialize(state); assert.equal(reopened.draft.name, ''); assert.equal(reopened.pendingRestore.payload.includes('未提交'), true);
+    assert.equal(await reopened.finish(false), true); // untouched close keeps the saved draft
+    const selected = new FormSession(EditDraft.make(state, 'event', '', '2026-10-08'), store);
+    await selected.initialize(state); selected.restore();
+    assert.equal(selected.draft.name, '保留活动'); assert.equal(selected.recoveredAt, first.savedAt);
+    assert.equal(selected.pendingRestore, undefined); assert.equal(selected.dirty, true);
+    assert.equal(await selected.finish(true), true); assert.equal(await store.load(formDraftKey(first.draft)), undefined);
+    assert.equal(await selected.flush(), true); assert.equal(await store.load(formDraftKey(first.draft)), undefined);
+  });
+  await test('a global expense draft keeps its recovery context after the user selects a plan', async () => {
+    let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
+    const state = new AppState(); state.projects = [project];
+    const draft = EditDraft.make(state, 'expense'); const key = formDraftKey(draft);
+    const session = new FormSession(draft, store); await session.initialize(state);
+    draft.parentId = project.id; draft.name = '摄影费'; draft.money = '12.34'; await session.flush();
+    assert.equal(EditDraft.fromJSON((await store.load(key)).payload).parentId, project.id);
+    const reopened = new FormSession(EditDraft.make(state, 'expense'), store); await reopened.initialize(state); reopened.restore();
+    assert.equal(reopened.draft.parentId, project.id); assert.deepEqual(reopened.draft.issues(state), []);
+    assert.equal(state.expenses.length, 0); await reopened.finish(true); assert.equal(await store.load(key), undefined);
+  });
+  await test('draft queues serialize cleanup after pending writes and retain failed drafts for retry', async () => {
+    let text = '', failed = false, release;
+    const gate = new Promise(resolve => { release = resolve; }); let block = true;
+    const store = new FormDraftStore({ read: async () => text, write: async value => { if (block) await gate; if (failed) throw new Error('full'); text = value; } });
+    const state = new AppState(); const session = new FormSession(EditDraft.make(state, 'character'), store); await session.initialize(state);
+    session.draft.name = '草稿'; const write = session.flush(); const finish = session.finish(true); release();
+    assert.equal(await write, true); assert.equal(await finish, true); assert.equal((await store.load(formDraftKey(session.draft))), undefined);
+    block = false;
+    const retry = new FormSession(EditDraft.make(state, 'character'), store); await retry.initialize(state); retry.draft.name = '再次输入';
+    failed = true; assert.equal(await retry.flush(), false); assert.equal(retry.error.includes('尚未保存'), true);
+    failed = false; assert.equal(await retry.flush(), true); failed = true;
+    assert.equal(await retry.finish(true), false); assert.equal(retry.dirty, true);
+    failed = false; assert.equal(await retry.finish(true), true);
+  });
+  await test('unread recovery cannot be overwritten; explicit bypass preserves old drafts and allows local input', async () => {
+    let text = 'broken JSON'; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
+    const state = new AppState(); const session = new FormSession(EditDraft.make(state, 'character'), store);
+    await session.initialize(state); assert.equal(session.recoveryChecked, false);
+    session.draft.name = '未覆盖'; assert.equal(await session.flush(), false); assert.equal(text, 'broken JSON');
+    session.ignoreRecovery(); assert.equal(session.recoveryChecked, true); assert.equal(session.skipDrafts, true);
+    assert.equal(await session.flush(), true); assert.equal(text, 'broken JSON');
+    assert.equal(await session.finish(true), true); assert.equal(text, 'broken JSON');
+    await store.clear();
+    const retry = new FormSession(EditDraft.make(state, 'character'), store); await retry.initialize(state);
+    assert.equal(retry.recoveryChecked, true); assert.equal(retry.pendingRestore, undefined);
+  });
+  await test('restoring an edit notices source changes; a committed create draft is never replayed', async () => {
+    let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
+    const state = new AppState(); const character = Object.assign(new entities.Character(), { id: 'draft-character', name: '原名' }); state.characters = [character];
+    const edit = new FormSession(EditDraft.make(state, 'character', character.id), store); await edit.initialize(state); edit.draft.name = '未提交名字'; await edit.flush();
+    character.name = '另一处已改'; const reopened = new FormSession(EditDraft.make(state, 'character', character.id), store); await reopened.initialize(state); reopened.restore();
+    assert.equal(reopened.sourceChanged, true); assert.equal(reopened.draft.name, '未提交名字'); assert.equal(character.name, '另一处已改');
+    const creating = new FormSession(EditDraft.make(state, 'character'), store); await creating.initialize(state); creating.draft.name = '新角色'; await creating.flush();
+    const committed = Object.assign(new entities.Character(), { id: creating.draft.creationId, name: '新角色' }); state.characters.push(committed);
+    assert.equal(await creating.draft.save(state), false); assert.equal(state.characters.length, 2);
+    const next = new FormSession(EditDraft.make(state, 'character'), store); await next.initialize(state);
+    assert.equal(next.pendingRestore, undefined); assert.equal(next.error.includes('上次创建已保存'), true);
+    assert.equal(await store.load(formDraftKey(creating.draft)), undefined);
+    text = 'bad json'; await assert.rejects(store.load(formDraftKey(next.draft)));
+    assert.equal(text, 'bad json'); await store.clear(); assert.equal(text, '');
+  });
   await test('home summary keeps waiting first and stable rows through completion, undo and retirement', () => {
     const queue = buildTaskQueue([read()], [project], '2026-12-31');
     const snapshot = homeCandidates(queue);
@@ -499,6 +605,25 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal((await state.undoHomePreparation(state.preparationUndos[0].id)).status, 'failed');
       assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, true);
       await db.sql('DELETE FROM preparation_tasks WHERE id=?', [item.id]);
+    });
+    await test('a project draft uses its persisted IDs in the real transaction and is recognized after an interrupted cleanup', async () => {
+      const { CosProjectRepository, CharacterRepository, DiaryEntryRepository } = require(root + '/data/repository/Repositories.ets');
+      const state = new AppState();
+      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.diaryRepo = new DiaryEntryRepository(db); state.preparationRepo = preparations;
+      let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
+      const draft = EditDraft.make(state, 'project'); const session = new FormSession(draft, store); await session.initialize(state);
+      draft.name = '恢复验证计划'; draft.characterName = '恢复验证角色'; await session.flush();
+      const savedDraft = (await store.load(formDraftKey(draft))).payload; const id = draft.creationId, characterId = draft.creationCharacterId;
+      assert.equal(await draft.save(state), true); assert.equal(draft.id, id);
+      assert.equal((await db.sql('SELECT character_id FROM projects WHERE id=?', [id])).rows[0][0], characterId);
+      assert.equal((await db.sql('SELECT name FROM characters WHERE id=?', [characterId])).rows[0][0], '恢复验证角色');
+      // Simulate process termination after the transaction, before deleting its draft.
+      const interrupted = EditDraft.fromJSON(savedDraft); assert.equal(interrupted.id, '');
+      assert.equal(await interrupted.save(state), false);
+      assert.equal((await db.sql('SELECT count(*) FROM projects WHERE id=?', [id])).rows[0][0], 1);
+      const reopening = new FormSession(EditDraft.make(state, 'project'), store); await reopening.initialize(state);
+      assert.equal(reopening.pendingRestore, undefined); assert.equal(reopening.error.includes('上次创建已保存'), true);
+      await db.sql('DELETE FROM projects WHERE id=?', [id]); await db.sql('DELETE FROM characters WHERE id=?', [characterId]);
     });
     const { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');
     const backup = new MetadataBackupRepository(db);

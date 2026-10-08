@@ -201,6 +201,14 @@ export async function getUsername(): Promise<string> {
     return deviceName;
 }
 
+// Form drafts are local preferences, separate from saved business records.
+export async function getFormDraftData(): Promise<string> {
+    return String(await (await ensureReady()).get('form_drafts_v1', ''));
+}
+export async function setFormDraftData(value: string): Promise<void> {
+    await (await ensureReady()).set('form_drafts_v1', value);
+}
+
 export async function getDayModules(): Promise<DayModulePreferences> {
     const s = await ensureReady(); return parseDayModules(await s.get('day_mode_modules', '{}') as string);
 }

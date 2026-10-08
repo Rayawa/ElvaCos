@@ -1,6 +1,7 @@
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
 import { LedgerRoute } from './LedgerRoute';
 import { PreparationUndo, usablePreparationUndo } from './HomeSummary';
+import { formDraftStore } from '../common/formDrafts';
 import { CollectedEntry, entryFromText } from './CollectedEntry';
 import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
@@ -582,9 +583,10 @@ export class AppState {
     }, true, ['preparationCategories', 'preparationTasks']);
   }
   preparationPercent(projectId: string): number { return this.readiness(projectId).prep.percent; }
-  async addChecklist(projectId: string, label: string): Promise<boolean> {
+  async addChecklist(projectId: string, label: string, id: string = ''): Promise<boolean> {
     return this.perform(async () => {
       const item = new ChecklistItem();
+      if (id) { item.id = id; }
       item.projectId = projectId;
       item.label = requiredName(label);
       item.sortOrder = this.checklist.length;
@@ -788,8 +790,9 @@ export class AppState {
       if (this.context) { restored = await new BackupService(this.db, this.context).restore(); }
       if (restored) {
         this.preparationUndos = [];
+        const draftsCleared = await this.clearFormDrafts('元数据已恢复');
         const canceled = await this.cancelEventReminders();
-        this.reportNotice('元数据已恢复。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。'));
+        this.reportNotice('元数据已恢复。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。') + (draftsCleared ? '' : '本地草稿清理未完成，请勿恢复旧草稿。'));
       }
     });
     return success && restored;
@@ -807,7 +810,11 @@ export class AppState {
     return canceled;
   }
   async clearData(): Promise<boolean> {
-    return this.perform(async () => { await this.relations.clear(); this.preparationUndos = []; await this.cancelEventReminders(); await this.media?.collect([]); });
+    return this.perform(async () => { await this.relations.clear(); this.preparationUndos = []; await this.clearFormDrafts('正式记录已清空'); await this.cancelEventReminders(); await this.media?.collect([]); });
+  }
+  private async clearFormDrafts(message: string): Promise<boolean> {
+    try { await formDraftStore.clear(); return true; }
+    catch (error) { this.operationPartial = true; this.reportNotice(message + '；本地草稿清理未完成，请勿恢复旧草稿。'); return false; }
   }
   projectAssets(id: string): Asset[] {
     const ids = this.links.filter((p: ProjectAsset) => p.projectId === id)

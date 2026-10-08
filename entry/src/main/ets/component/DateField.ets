@@ -8,6 +8,9 @@ import { validTime } from '../model/Schedule';
 export struct DateField {
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
+  @Param componentId: string = '';
+  @Param error: string = '';
+  @Event area: (value: Area) => void = () => {};
   @Param value: string = '';
   @Param time: boolean = false;
   @Param optional: boolean = false;
@@ -34,7 +37,7 @@ export struct DateField {
       Text(this.label).fontColor(Theme.muted).fontSize(13)
       Row({ space: 8 }) {
         Button(this.value || (this.optional ? '暂不设置' : this.time ? '选择时间' : '选择日期'))
-          .layoutWeight(1)
+          .id(this.componentId).layoutWeight(1)
           .constraintSize({ minHeight: 48 })
           .backgroundColor(Theme.bg)
           .fontColor(this.value ? Theme.ink : Theme.muted)
@@ -52,6 +55,7 @@ export struct DateField {
           .compositingFilter(this.feedback.filter('button-2'))
           .attributeModifier(this.feedback.control('button-2')) }
       }.width('100%')
-    }.width('100%').alignItems(HorizontalAlign.Start)
+      if (this.error) { Text(this.error).fontSize(14).fontColor(Theme.danger).accessibilityText(this.label + '，' + this.error) }
+    }.width('100%').alignItems(HorizontalAlign.Start).onAreaChange((_, value: Area): void => { this.area(value); })
   }
 }

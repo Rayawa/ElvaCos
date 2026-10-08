@@ -10,7 +10,7 @@ export struct SheetHeader {
   @Param hint: string = '';
   @Param haptic: boolean = true;
   @Param hapticLevel: number = 1;
-  @Param closeSize: number = 36;
+  @Param closeSize: number = 48;
   @Event close: () => void = () => {};
 
   build() {
@@ -43,6 +43,8 @@ export struct SheetHeader {
         this.close();
       })
       .accessibilityText('关闭')
+      .focusable(true)
+      .accessibilityRole(AccessibilityRoleType.BUTTON)
       .accessibilityLevel('yes').visualEffect(this.feedback.effect('stack-1', true)).compositingFilter(this.feedback.filter('stack-1', true)).attributeModifier(this.feedback.control('stack-1', true))
     }
     .width('100%')

@@ -149,14 +149,17 @@ export default function uiShellTest(): void {
       expect(firstFieldBounds.top - formTitleBounds.bottom < (formTitleBounds.bottom - formTitleBounds.top) * 1.5).assertTrue();
       await tap('保存');
       await driver.delayMs(250);
-      const fieldAfterError = await driver.findComponent(ON.text('名称 *').inWindow(bundle));
-      expect((await fieldAfterError.getBounds()).top).assertEqual(firstFieldBounds.top);
+      await present('名称需要 1–80 个字');
+      const fieldAfterError = await driver.findComponent(ON.id('form-input:name').inWindow(bundle));
+      const fieldBounds = await fieldAfterError.getBounds();
+      const viewport = await (await driver.findComponent(ON.id('form-scroll').inWindow(bundle))).getBounds();
+      expect(fieldBounds.top >= viewport.top && fieldBounds.bottom <= viewport.bottom).assertTrue();
       expect((await (await driver.findComponent(ON.text('添加角色').inWindow(bundle))).getBounds()).top).assertEqual(formTitleBounds.top);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-form.png');
       await tap('sheet-close'); await present('添加角色');
     });
     it('newPlanCreatesRoleInlineAndCanBeCanceledWithoutWrites', 0, async () => {
-      await tap('首页'); await tap('新建计划'); await present('新建 Cos 计划');
+      await tap('首页'); await tap('新建计划'); await present('新建计划');
       await present('计划名称 *'); await present('创建计划并开始准备');
       const selector = await driver.findComponent(ON.type('Select').inWindow(bundle));
       await selector.click(); await driver.delayMs(250); await tap('＋ 创建新角色');
@@ -164,7 +167,11 @@ export default function uiShellTest(): void {
       await tap('创建计划并开始准备'); await driver.delayMs(300);
       await present('角色名称 *');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-new-plan.png');
-      await tap('sheet-close'); await present('新建计划');
+      await (await driver.findComponent(ON.id('form-input:characterName').inWindow(bundle))).inputText('未提交验证角色');
+      await driver.delayMs(500); await back();
+      await tap('sheet-close'); await present('继续编辑'); await tap('继续编辑');
+      expect(await (await driver.findComponent(ON.id('form-input:characterName').inWindow(bundle))).getText()).assertEqual('未提交验证角色');
+      await tap('sheet-close'); await present('放弃修改'); await tap('放弃修改'); await present('新建计划');
     });
     it('planViewsUseContextualActionsAndReturnToTheirTaskView', 0, async () => {
       await tap('Cos'); await tap('计划');
@@ -200,8 +207,8 @@ export default function uiShellTest(): void {
       await tap('活动'); await tap('日历'); await present('今天'); await present('calendar-previous'); await present('calendar-next');
       await tap('calendar-next'); await tap('今天');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-calendar.png');
-      await tap('添加活动'); await present('添加活动'); await present('event-date-mode');
-      const mode = await driver.findComponent(ON.id('event-date-mode').inWindow(bundle));
+      await tap('添加活动'); await present('添加活动'); await present('form-input:dateMode');
+      const mode = await driver.findComponent(ON.id('form-input:dateMode').inWindow(bundle));
       await mode.click(); await tap('日期待定');
       expect(((await driver.findComponents(ON.text('日期 *').inWindow(bundle)))?.length || 0)).assertEqual(0);
       expect(((await driver.findComponents(ON.id('event-device-calendar').inWindow(bundle)))?.length || 0)).assertEqual(0);
@@ -211,7 +218,7 @@ export default function uiShellTest(): void {
     });
     it('photoImportPlanSheetCanBeClosedWithoutLaunchingPickerOrWritingData', 0, async () => {
       await tap('衣柜'); await tap('照片'); await tap('导入照片');
-      const form = await driver.findComponents(ON.text('新建 Cos 计划').inWindow(bundle));
+      const form = await driver.findComponents(ON.text('新建计划').inWindow(bundle));
       if (form && form.length > 0) { await tap('sheet-close'); } else {
         await present('选择照片所属计划'); await tap('sheet-close'); await present('导入照片');
       }

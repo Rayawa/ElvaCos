@@ -55,6 +55,8 @@ import { AssetDetail } from './detail/AssetDetailPage';
 import { EventDetail } from './detail/EventDetailPage';
 import { PhotoDetail } from './detail/PhotoDetailPage';
 import { PhotoGrid } from '../component/PhotoGrid';
+import { FormSession } from '../model/FormSession';
+import { formDraftStore } from '../common/formDrafts';
 import { FormEditor } from '../component/FormEditor';
 import { EmptyState } from '../component/Surfaces';
 
@@ -77,7 +79,8 @@ import { EmptyState } from '../component/Surfaces';
   @Local rootSheetKind: string = 'form';
   @Local importOpen: boolean = false;
   @Local formOpen: boolean = false;
-  @Local draft: EditDraft = new EditDraft();
+  @Local formSession: FormSession = new FormSession(new EditDraft(), formDraftStore);
+  private checkingFormClose: boolean = false;
   @Local viewportWidth: number = 360;
   private clockTimer: number = -1;
   private startupTimer: number = -1;
@@ -107,6 +110,7 @@ import { EmptyState } from '../component/Surfaces';
     if (this.clockTimer >= 0) { clearInterval(this.clockTimer); this.clockTimer = -1; }
     if (this.startupTimer >= 0) { clearTimeout(this.startupTimer); this.startupTimer = -1; }
     if (this.maintenanceTimer >= 0) { clearTimeout(this.maintenanceTimer); this.maintenanceTimer = -1; }
+    if (this.formOpen) { void this.formSession.flush(); }
     this.state.suspend();
   }
 
@@ -219,7 +223,8 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.confirm(this.state.settings.haptic);
     if (!this.state.staleScopes.length) { this.state.error = ''; }
     this.rootSheetKind = 'form';
-    this.draft = EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent);
+    this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent), formDraftStore);
+    void this.formSession.initialize(this.state);
     this.formOpen = true;
   }
   private async remove(kind: string, id: string): Promise<void> {
@@ -284,13 +289,36 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
 
+  private async allowFormClose(): Promise<boolean> {
+    if (this.state.busy || this.formSession.submitting || this.checkingFormClose) { return false; }
+    this.checkingFormClose = true;
+    try {
+      if (this.formSession.dirty) {
+        const message = this.formSession.skipDrafts ? '本次输入将放弃，现有本地草稿保留。' : '本次未保存的修改和对应本地草稿将放弃，正式记录保留。';
+        const accepted = await confirm(this.getUIContext(), '放弃本次修改？', message, '放弃修改', '继续编辑');
+        if (!accepted) { return false; }
+        return this.formSession.finish(true);
+      }
+      return this.formSession.finish(false);
+    } finally { this.checkingFormClose = false; }
+  }
+  private rootSheetOptions(): SheetOptions {
+    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; }, this.sheetEntrance, this.getUIContext());
+    if (this.rootSheetKind === 'form') {
+      options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
+      options.onWillDismiss = (action: DismissSheetAction): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { action.dismiss(); } }); };
+    }
+    return options;
+  }
+
   @Builder rootSheet() {
     if (this.rootSheetKind === 'form') { this.form() } else { this.importSheet() }
   }
   @Builder form() {
     FormEditor({
       entrance: this.sheetEntrance,
-      state: this.state, draft: this.draft,
+      state: this.state, draft: this.formSession.draft, session: this.formSession,
+      close: (): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { this.formOpen = false; } }); },
       done: (): void => { this.formOpen = false; },
       saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('projectPreparation', id); } },
     })
@@ -842,10 +870,7 @@ import { EmptyState } from '../component/Surfaces';
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), appSheetOptions((): void => {
-        this.importOpen = false;
-        this.formOpen = false;
-      }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), this.rootSheetOptions())
     }
   }
 }
