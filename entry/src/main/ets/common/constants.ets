@@ -77,7 +77,7 @@ export const ASSET_TYPE_LABELS: string[] = ['服装', '假发', '鞋', '道具',
 export const ASSET_STATUSES: AssetStatus[] = [AssetStatus.WISH, AssetStatus.ORDERED, AssetStatus.OWNED, AssetStatus.REPAIR, AssetStatus.LENT, AssetStatus.RETIRED];
 export const ASSET_STATUS_LABELS: string[] = ['想买', '已下单', '可用', '待维修', '已借出', '已退役'];
 export const PHOTO_STATUSES: PhotoStatus[] = [PhotoStatus.IMPORTED, PhotoStatus.RAW, PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED];
-export const PHOTO_LABELS: string[] = ['已导入', '原片', '已选中', '待修图', '已精修', '最终作品', '已发布', '已归档'];
+export const PHOTO_LABELS: string[] = ['待选', '待选', '已选', '待修', '已修', '成片', '已发布', '归档'];
 export const TEAM_ROLES: string[] = ['毛娘', '妆娘', '摄影', '后勤', '后期', '其他'];
 export const EXPENSE_CATEGORIES: string[] = ['服装', '假发', '美瞳', '妆造', '摄影', '后期', '门票', '交通', '住宿', '道具', '其他'];
 export const DATE_MODES: string[] = ['pending', 'single', 'multiple'];
@@ -129,7 +129,7 @@ export const SUPPORTS_HARMONY_API_23: boolean = deviceInfo.sdkApiVersion >= 23 &
 export const HDS_MATERIAL_TYPE_ADAPTIVE: number = 100;
 export const HDS_TITLE_SIZE_SMALL: number = 0;
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const MIN_SPLIT_HEIGHT = 600;
 export const LAYOUT_CONTENT_TOP: number = 100;
 export const LAYOUT_DETAIL_TOP: number = 90;

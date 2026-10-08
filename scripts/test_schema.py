@@ -24,6 +24,24 @@ class RelationalModelTest(unittest.TestCase):
 
     def tearDown(self): self.db.close()
 
+    def test_budget_migration_preserves_unknown_zero_and_explicit_flags(self):
+        old = sqlite3.connect(':memory:')
+        try:
+            before_v4 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_4')[0])
+            v4 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_4')[1])
+            for sql in before_v4: old.execute(sql)
+            old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Old',1,1)")
+            for id, cents in [('unknown', 0), ('configured', 12999)]:
+                old.execute("INSERT INTO projects(id,character_id,name,status,budget_cents,created_at,updated_at) VALUES(?,'c',?,'Preparing',?,1,1)", (id, id, cents))
+            for sql in v4: old.execute(sql)
+            self.assertEqual(old.execute('SELECT id,budget_cents,budget_configured FROM projects ORDER BY id').fetchall(), [('configured',12999,1), ('unknown',0,None)])
+            old.execute("UPDATE projects SET budget_configured=1 WHERE id='unknown'")
+            self.assertEqual(old.execute("SELECT budget_cents,budget_configured FROM projects WHERE id='unknown'").fetchone(), (0,1))
+            old.execute("UPDATE projects SET budget_configured=0 WHERE id='unknown'")
+            self.assertEqual(old.execute("SELECT budget_configured FROM projects WHERE id='unknown'").fetchone()[0],0)
+            with self.assertRaises(sqlite3.IntegrityError): old.execute('UPDATE projects SET budget_configured=2')
+        finally: old.close()
+
     def test_variant_must_belong_to_character(self):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("UPDATE projects SET character_id='other' WHERE id='p'")

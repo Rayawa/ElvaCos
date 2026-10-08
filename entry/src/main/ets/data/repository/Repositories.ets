@@ -115,6 +115,7 @@ export class CosProjectRepository {
           item.notes = str(rows, 'notes');
           item.targetDate = str(rows, 'target_date');
           item.budgetCents = num(rows, 'budget_cents');
+          item.budgetConfigured = rows.isColumnNull(rows.getColumnIndex('budget_configured')) ? undefined : num(rows, 'budget_configured') === 1;
           item.createdAt = num(rows, 'created_at');
           item.updatedAt = num(rows, 'updated_at');
           result.push(item);
@@ -130,7 +131,7 @@ export class CosProjectRepository {
       if (character) {
         await tx.execute('INSERT INTO characters (id,name,work_name,description,cover,favorite,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', [character.id, character.name, character.workName, character.description, character.cover, character.favorite ? 1 : 0, character.status, character.createdAt, character.updatedAt]);
       }
-      await tx.execute('INSERT INTO projects (id, character_id, variant_id, event_id, name, status, notes, target_date, budget_cents, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET character_id=excluded.character_id, variant_id=excluded.variant_id, event_id=excluded.event_id, name=excluded.name, status=excluded.status, notes=excluded.notes, target_date=excluded.target_date, budget_cents=excluded.budget_cents, created_at=excluded.created_at, updated_at=excluded.updated_at', [item.id, item.characterId, item.variantId || null, item.eventId || null, item.name, item.status, item.notes, item.targetDate, item.budgetCents, item.createdAt, item.updatedAt]);
+      await tx.execute('INSERT INTO projects (id, character_id, variant_id, event_id, name, status, notes, target_date, budget_cents, budget_configured, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET character_id=excluded.character_id, variant_id=excluded.variant_id, event_id=excluded.event_id, name=excluded.name, status=excluded.status, notes=excluded.notes, target_date=excluded.target_date, budget_cents=excluded.budget_cents, budget_configured=excluded.budget_configured, created_at=excluded.created_at, updated_at=excluded.updated_at', [item.id, item.characterId, item.variantId || null, item.eventId || null, item.name, item.status, item.notes, item.targetDate, item.budgetCents, item.budgetConfigured === undefined ? null : item.budgetConfigured ? 1 : 0, item.createdAt, item.updatedAt]);
       if (preparation) {
         if (preparation.categories.some((c) => c.projectId !== item.id) || preparation.tasks.some((t) => t.projectId !== item.id)) {
           throw new Error('准备模板不属于此计划');
@@ -379,6 +380,20 @@ export class RelationRepository {
       // The partial unique index makes repeated automatic generation idempotent.
       const item = new ChecklistItem();
       await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, asset.name]);
+    });
+  }
+  async generateChecklist(projectId: string, assets: Asset[], existing: ChecklistItem[]): Promise<void> {
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      for (const asset of assets) {
+        const item = new ChecklistItem();
+        await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, asset.name]);
+      }
+      for (const label of ['手机', '充电宝', '补妆', '门票', '身份证件', '发网']) {
+        if (!existing.some((item: ChecklistItem) => item.projectId === projectId && item.label === label)) {
+          const item = new ChecklistItem();
+          await tx.execute('INSERT INTO checklist_items(id,project_id,label,done,sort_order) VALUES (?,?,?,0,10)', [item.id, projectId, label]);
+        }
+      }
     });
   }
   async unlink(projectId: string, assetId: string): Promise<void> {

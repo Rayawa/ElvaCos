@@ -24,6 +24,7 @@ export class EditDraft {
   @Trace brand: string = '';
   @Trace size: string = '';
   @Trace money: string = '0';
+  @Trace budgetEdited: boolean = false;
   @Trace status: string = '';
   @Trace type: string = '';
   @Trace ticket: boolean = false;
@@ -61,6 +62,7 @@ export class EditDraft {
       }
     }
     if (kind === 'project') {
+      d.money = '';
       d.characterId = state.characters.some((c: Character) => c.id === parent) ? parent : state.characters[0]?.id || '';
       const event = state.events.find((e: CosEvent) => e.id === parent);
       if (event) { d.eventId = event.id; d.date = event.date; }
@@ -76,7 +78,7 @@ export class EditDraft {
         d.eventId = p.eventId;
         d.notes = p.notes;
         d.date = p.targetDate;
-        d.money = String(p.budgetCents / 100);
+        d.money = p.budgetConfigured === true ? String(p.budgetCents / 100) : '';
         d.status = p.status;
       }
     }
@@ -178,7 +180,9 @@ export class EditDraft {
       p.targetDate = this.date;
       p.status = this.status as ProjectStatus;
       p.notes = this.notes;
-      p.budgetCents = moneyToCents(this.money);
+      const budgetEntered = this.money.trim() !== '';
+      p.budgetCents = budgetEntered ? moneyToCents(this.money) : 0;
+      p.budgetConfigured = budgetEntered ? true : old && old.budgetConfigured === undefined && !this.budgetEdited ? undefined : false;
       const saved = await state.saveProject(p, character, old ? undefined : makePreparation(p.id, this.preparationKeys));
       if (saved) {
         this.id = p.id;

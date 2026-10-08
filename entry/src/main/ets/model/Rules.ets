@@ -1,3 +1,4 @@
+import { matchesPhotoFilter } from './PhotoStages';
 import {
   Asset,
   AssetStatus,
@@ -57,14 +58,10 @@ export function nextPlan(projects: CosProject[], events: CosEvent[], date: strin
 }
 
 export function photoStage(photos: PhotoAsset[], filter: number): PhotoAsset[] {
-  return photos.filter((photo: PhotoAsset) => filter === 0 ||
-    (filter === 1 && (photo.status === PhotoStatus.IMPORTED || photo.status === PhotoStatus.RAW)) ||
-    (filter === 2 && photo.status === PhotoStatus.SELECTED) ||
-    (filter === 3 && photo.status === PhotoStatus.WAITING) ||
-    (filter === 4 && (photo.status === PhotoStatus.RETOUCHED || photo.status === PhotoStatus.FINAL || photo.status === PhotoStatus.PUBLISHED)));
+  return photos.filter((photo: PhotoAsset) => matchesPhotoFilter(photo.status, filter));
 }
 
 export function portfolioStage(photos: PhotoAsset[], filter: number): PhotoAsset[] {
   return photos.filter((photo: PhotoAsset): boolean =>
-    (photo.status === PhotoStatus.FINAL && filter !== 2) || (photo.status === PhotoStatus.PUBLISHED && filter !== 1));
+    (photo.status === PhotoStatus.FINAL && filter !== 2) || photo.status === PhotoStatus.PUBLISHED);
 }

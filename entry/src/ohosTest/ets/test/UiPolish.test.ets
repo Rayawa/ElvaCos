@@ -43,14 +43,14 @@ export default function uiPolishTest(): void {
         .map((status: PhotoStatus): PhotoAsset => { const photo = new PhotoAsset(); photo.status = status; return photo; });
       const groups = photoDistribution(photos);
       expect(groups.reduce((sum: number, item): number => sum + item.value, 0)).assertEqual(photos.length);
-      expect(groups[0].value).assertEqual(2); expect(groups[3].value).assertEqual(2); expect(groups[4].value).assertEqual(1);
+      expect(groups[0].value).assertEqual(2); expect(groups[3].value).assertEqual(1); expect(groups[4].value).assertEqual(2);
       expect(photoDistribution([]).every((item): boolean => item.value === 0)).assertTrue();
     });
     it('portfolioFiltersOnlyFinalAndPublishedPhotos', 0, () => {
       const photos = [PhotoStatus.RAW, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED]
         .map((status: PhotoStatus): PhotoAsset => { const photo = new PhotoAsset(); photo.status = status; return photo; });
       expect(portfolioStage(photos, 0).length).assertEqual(2);
-      expect(portfolioStage(photos, 1)[0].status).assertEqual(PhotoStatus.FINAL);
+      expect(portfolioStage(photos, 1).length).assertEqual(2);
       expect(portfolioStage(photos, 2)[0].status).assertEqual(PhotoStatus.PUBLISHED);
       expect(portfolioStage([], 0).length).assertEqual(0);
     });

@@ -44,3 +44,9 @@ const MIGRATION_3: string[] = [
 export function baseSchema(): string[] { return SCHEMA; }
 export function migration2(): string[] { return MIGRATION_2; }
 export function migration3(): string[] { return MIGRATION_3; }
+
+const MIGRATION_4: string[] = [
+  `ALTER TABLE projects ADD COLUMN budget_configured INTEGER CHECK(budget_configured IN (0,1))`,
+  `UPDATE projects SET budget_configured=1 WHERE budget_cents>0`
+];
+export function migration4(): string[] { return MIGRATION_4; }

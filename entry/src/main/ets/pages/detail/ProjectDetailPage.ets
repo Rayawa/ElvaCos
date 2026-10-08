@@ -1,9 +1,10 @@
+import { budgetLabel } from '../../model/PlanReadiness';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_LABELS, PROJECT_STATUSES } from '../../common/constants';
 import { PressFeedback } from '../../common/pressFeedback';
 import { StaggerEntrance } from '../../common/motion';
-import { TeamMember, Expense, ReferenceImage, expenseTotal } from '../../model/Planning';
+import { TeamMember, Expense, ReferenceImage } from '../../model/Planning';
 import { ReferenceGallery } from '../../component/ReferenceGallery';
-import { PreparationCategory, PreparationTask, preparationKeys, preparationProgress } from '../../model/Preparation';
+import { PreparationCategory, PreparationTask, preparationKeys } from '../../model/Preparation';
 import { PreparationTemplatePicker } from '../../component/PreparationTemplatePicker';
 import { pageTransition } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
@@ -15,7 +16,7 @@ import { vibration } from '../../common/vibration';
 import { Asset, AssetStatus, ChecklistItem, CosProject, CosEvent } from '../../model/Entities';
 import { ProjectRoute } from '../../model/ProjectRoute';
 import { SectionHeading, StatusPill, EmptyState } from '../../component/Surfaces';
-import { checklistProgress, projectProgress, planDate } from '../../model/Rules';
+import { planDate } from '../../model/Rules';
 import { HapticService } from '../../common/HapticService';
 
 @ComponentV2
@@ -219,7 +220,7 @@ export struct ProjectDetail {
       Row() { Text('准备进度')
         .fontSize(15)
         .fontColor(Theme.muted)
-        .layoutWeight(1); Text(preparationProgress(this.project.id, this.state.preparationTasks)
+        .layoutWeight(1); Text(this.state.readiness(this.project.id).prep
         .total === 0 ? '待设置' : this.state.preparationPercent(this.project.id) + '%')
         .fontSize(24)
         .fontWeight(FontWeight.Medium)
@@ -229,14 +230,14 @@ export struct ProjectDetail {
         .width('100%')
         .color(Theme.brand)
         .backgroundColor(Theme.tint)
-      Text(preparationProgress(this.project.id, this.state.preparationTasks)
-        .total === 0 ? '尚未添加准备任务，可以从模板开始。' : preparationProgress(this.project.id, this.state.preparationTasks)
-        .ready + ' / ' + preparationProgress(this.project.id, this.state.preparationTasks)
+      Text(this.state.readiness(this.project.id).prep
+        .total === 0 ? '尚未添加准备任务，可以从模板开始。' : this.state.readiness(this.project.id).prep
+        .done + ' / ' + this.state.readiness(this.project.id).prep
         .total + ' 项准备完成')
         .fontSize(12)
         .fontColor(Theme.muted)
-      Text('装备可用 ' + projectProgress(this.project.id, this.state.links, this.state.assets)
-        .ready + ' / ' + this.state.projectAssets(this.project.id)
+      Text('装备可用 ' + this.state.readiness(this.project.id).equipment
+        .available + ' / ' + this.state.projectAssets(this.project.id)
         .length + ' 件 · 装包请在「打包」确认')
         .fontSize(12)
         .fontColor(Theme.muted)
@@ -452,9 +453,7 @@ export struct ProjectDetail {
         .compositingFilter(this.feedback.filter('button-26'))
         .attributeModifier(this.feedback.control('button-26'))
     }.width('100%')
-    Text('实际 ¥' + (expenseTotal(this.state.expenses, this.project.id) / 100)
-      .toFixed(2) + ' / 预计预算 ¥' + (this.project.budgetCents / 100)
-      .toFixed(2))
+    Text('实际 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' / ' + budgetLabel(this.project.budgetConfigured, this.project.budgetCents))
       .fontColor(Theme.accent)
       .fontSize(16)
     ForEach(this.state.expenses.filter((e: Expense) => e.projectId === this.project.id), (e: Expense) => {
@@ -495,13 +494,13 @@ export struct ProjectDetail {
   @Builder packing() {
     SectionHeading({
       title: '打包清单',
-      trailing: `${this.items().filter((c: ChecklistItem) => c.done).length} / ${this.items().length} 已装包`
+      trailing: `${this.state.readiness(this.project.id).pack.packed} / ${this.state.readiness(this.project.id).pack.total} 已装包`
     })
     if (this.route.outing) { Text('出门模式 · ' + (this.state.hand() === 'left' ? '左手操作' : this.state.hand() === 'right' ? '右手操作' : '智感握持'))
       .fontColor(Theme.accent)
       .fontSize(13) }
-    Progress({ value: checklistProgress(this.items()), total: 100, type: ProgressType.Linear })
-      .accessibilityText('打包清单完成 ' + checklistProgress(this.items()) + '%')
+    Progress({ value: this.state.readiness(this.project.id).pack.percent, total: 100, type: ProgressType.Linear })
+      .accessibilityText('打包清单完成 ' + this.state.readiness(this.project.id).pack.percent + '%')
       .color(Theme.brand)
       .backgroundColor(Theme.tint)
       .width('100%')

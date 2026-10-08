@@ -155,7 +155,7 @@ export struct FormEditor {
                 .visualEffect(this.feedback.effect('select-6'))
                 .compositingFilter(this.feedback.filter('select-6'))
                 .attributeModifier(this.feedback.control('select-6'))
-            Field({ label: '预计预算（元）', value: this.draft.money, change: (v: string) => { this.draft.money = v; } })
+            Field({ label: '预算（元，可留空；填 0 表示零预算）', value: this.draft.money, change: (v: string) => { this.draft.money = v; this.draft.budgetEdited = true; } })
             }
           }
           if (this.draft.kind === 'asset') {

@@ -58,8 +58,13 @@ export struct ExpenseSummary {
   }
 
   private budget(): number {
-    return this.state.projects.filter((project: CosProject): boolean => !this.projectId || project.id === this.projectId)
+    return this.state.projects.filter((project: CosProject): boolean => (!this.projectId || project.id === this.projectId) && project.budgetConfigured === true)
       .reduce((sum: number, project: CosProject): number => sum + project.budgetCents, 0);
+  }
+
+  private budgetSummary(): string {
+    const count = this.state.projects.filter((project: CosProject) => (!this.projectId || project.id === this.projectId) && project.budgetConfigured === true).length;
+    return count ? '已设置预算 ¥' + (this.budget() / 100).toFixed(2) + ' · 覆盖 ' + count + ' 份计划' : '当前范围无明确预算';
   }
 
   @Builder categoryChart() {
@@ -138,8 +143,8 @@ export struct ExpenseSummary {
           Column({ space: 8 }) {
             Text('实际花费 ¥' + (expenseTotal(this.records) / 100).toFixed(2)).fontSize(24).fontColor(Theme.accent)
               .accessibilityText('实际花费 ' + (expenseTotal(this.records) / 100).toFixed(2) + ' 元')
-            Text('预计预算 ¥' + (this.budget() / 100).toFixed(2)).fontSize(14).fontColor(Theme.muted)
-              .accessibilityText('预计预算 ' + (this.budget() / 100).toFixed(2) + ' 元')
+            Text(this.budgetSummary()).fontSize(14).fontColor(Theme.muted)
+              .accessibilityText(this.budgetSummary())
             Text('只统计已记录的花费，复用衣柜装备不会自动计费。').fontSize(12).fontColor(Theme.muted)
               .accessibilityText('只统计已记录的花费，复用衣柜装备不会自动计费')
           }.padding(18).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)

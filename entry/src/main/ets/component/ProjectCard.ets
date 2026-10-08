@@ -5,7 +5,6 @@ import { AppState } from '../model/ApplicationState';
 import { Theme } from '../common/Theme';
 import { CosProject, Character } from '../model/Entities';
 import { InteractiveCard, StatusPill } from './Surfaces';
-import { preparationProgress } from '../model/Preparation';
 
 @ComponentV2
 export struct ProjectCard {
@@ -47,14 +46,14 @@ export struct ProjectCard {
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(this.state.characterName(this.project.characterId)).fontSize(13).fontColor(Theme.muted)
-        Text(preparationProgress(this.project.id, this.state.preparationTasks)
-          .total === 0 ? '尚未添加准备任务' : preparationProgress(this.project.id, this.state.preparationTasks)
-          .ready + ' / ' + preparationProgress(this.project.id, this.state.preparationTasks)
+        Text(this.state.readiness(this.project.id).prep
+          .total === 0 ? '尚未添加准备任务' : this.state.readiness(this.project.id).prep
+          .done + ' / ' + this.state.readiness(this.project.id).prep
           .total + ' 项准备完成')
           .fontSize(12)
           .fontColor(Theme.muted)
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Column({ space: 4 }) { Text(preparationProgress(this.project.id, this.state.preparationTasks)
+      Column({ space: 4 }) { Text(this.state.readiness(this.project.id).prep
         .total === 0 ? '待设置' : this.state.preparationPercent(this.project.id) + '%')
         .fontSize(25)
         .fontWeight(FontWeight.Lighter)

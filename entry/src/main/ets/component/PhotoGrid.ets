@@ -40,7 +40,7 @@ export struct PhotoGrid {
     if (!this.portfolio) { return photoStage(this.photos, this.filter); }
     return portfolioStage(this.photos, this.filter);
   }
-  private filterLabels(): string[] { return this.portfolio ? ['全部作品', '成片', '已发布'] : ['全部', '待选', '已选', '待修', '成片']; }
+  private filterLabels(): string[] { return this.portfolio ? ['全部作品', '成片', '已发布'] : ['全部', '待选', '已选', '待修', '成片', '已修', '归档', '已发布']; }
   private choose(photo: PhotoAsset): void {
     if (!this.selecting) { this.open('photo', photo.id); return; }
     this.selectedIds = this.selectedIds.includes(photo.id) ? this.selectedIds.filter((id: string) => id !== photo.id) : this.selectedIds.concat(photo.id);

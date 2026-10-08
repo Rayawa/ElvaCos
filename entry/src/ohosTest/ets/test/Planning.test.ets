@@ -40,7 +40,7 @@ export default function planningTest(): void {
         await legacy.executeSql('PRAGMA user_version=2');
       } finally { await legacy.close(); }
       try {
-        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(3);
+        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(4);
         const tasks = await upgraded.getStore().querySql("SELECT done FROM preparation_tasks WHERE id='t'"); try { tasks.goToFirstRow(); expect(tasks.getLong(0)).assertEqual(1); } finally { tasks.close(); }
         const restored = (await new CosEventRepository(upgraded).list())[0]; expect(restored.dateMode).assertEqual('single'); expect(restored.reminderId).assertEqual(-1); expect(restored.date).assertEqual('2026-10-07');
       } finally { await upgraded.close(); await relationalStore.deleteRdbStore(context, oldName); }
@@ -95,6 +95,9 @@ export default function planningTest(): void {
     });
     it('v2BackupKeepsPreparationAndDefaultsNewScheduleFields', 0, async () => {
       const saved = await backup.exportMetadata(); const doc = JSON.parse(saved) as BackupDocument; doc.version = 2; doc.tables = doc.tables.slice(0, 12);
+      const projectTable = doc.tables.find((t: BackupTable) => t.name === 'projects');
+      if (!projectTable) { throw new Error('Missing projects table'); }
+      for (const row of projectTable.rows) { delete row['budget_configured']; }
       const eventTable = doc.tables.find((t: BackupTable) => t.name === 'events');
       if (!eventTable) { throw new Error('Missing event table'); }
       const rows: relationalStore.ValuesBucket[] = [];

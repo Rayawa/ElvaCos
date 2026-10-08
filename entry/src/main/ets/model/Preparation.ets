@@ -17,6 +17,8 @@ export class PreparationTask {
   done: boolean = false;
   dueDate: string = '';
   notes: string = '';
+  waitingOn: string = '';
+  waitingUntil: string = '';
   sortOrder: number = 0;
 }
 

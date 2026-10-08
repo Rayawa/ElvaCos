@@ -1,3 +1,6 @@
+import { today } from '../common/format';
+import { PlanReadiness, buildPlanReadiness } from './PlanReadiness';
+import { OperationResult, executeOperation, operationCommitted } from './OperationResult';
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../common/constants';
 import BuildProfile from 'BuildProfile';
 import { DemoDataRepository } from '../data/repository/DemoDataRepository';
@@ -7,7 +10,7 @@ import { EventReminderService } from '../common/EventReminderService';
 import { checkSchedule } from './Schedule';
 import { TeamMember, Expense, ReferenceImage } from './Planning';
 import { PlanningRepository } from '../data/repository/PlanningRepository';
-import { PreparationCategory, PreparationTask, PreparationBundle, makePreparation, preparationProgress } from './Preparation';
+import { PreparationCategory, PreparationTask, PreparationBundle, makePreparation } from './Preparation';
 import { PreparationRepository } from '../data/repository/PreparationRepository';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
@@ -38,7 +41,7 @@ import {
   ProjectStatus,
   PhotoStatus,
 } from './Entities';
-import { requiredName, safeUrl, validDate, checkProjectDate, projectProgress } from './Rules';
+import { requiredName, safeUrl, validDate, checkProjectDate } from './Rules';
 import { MediaRepository } from '../data/media/MediaRepository';
 import { SettingsService } from '../common/SettingsService';
 import { AccountService, AccountResult } from '../common/AccountService';
@@ -54,8 +57,30 @@ export interface SettingsSelection {
   hand?: string;
 }
 
+class DataSnapshot {
+  team: TeamMember[] = [];
+  expenses: Expense[] = [];
+  references: ReferenceImage[] = [];
+  characters: Character[] = [];
+  variants: CharacterVariant[] = [];
+  projects: CosProject[] = [];
+  assets: Asset[] = [];
+  preparationCategories: PreparationCategory[] = [];
+  preparationTasks: PreparationTask[] = [];
+  events: CosEvent[] = [];
+  checklist: ChecklistItem[] = [];
+  photos: PhotoAsset[] = [];
+  links: ProjectAsset[] = [];
+  diary: DiaryEntry[] = [];
+}
+const DATA_SCOPES: string[] = ['team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary'];
+
 @ObservedV2
 export class AppState {
+  @Trace operationScope: string = '';
+  @Trace lastOperation: OperationResult = { status: 'ok' };
+  @Trace staleScopes: string[] = [];
+  @Trace localDate: string = today();
   @Trace pendingEventId: string = '';
   @Trace ready: boolean = false;
   @Trace busy: boolean = false;
@@ -101,7 +126,9 @@ export class AppState {
   private context?: common.UIAbilityContext;
   private media?: MediaRepository;
   private startTask?: Promise<void>;
-  private operationTask?: Promise<boolean>;
+  private operationPartial: boolean = false;
+  private reloadTask?: Promise<boolean>;
+  private operationTask?: Promise<OperationResult>;
   private disposeTask?: Promise<void>;
   private preferencesTask?: Promise<void>;
 
@@ -166,6 +193,7 @@ export class AppState {
     try {
       await this.startTask;
       await this.operationTask;
+      await this.reloadTask;
       await this.settingsQueue;
       await this.preferencesTask;
     } catch (error) {
@@ -173,7 +201,7 @@ export class AppState {
     } finally {
       try { await this.db.close(); }
       catch (error) { this.reportError('数据库关闭未完成，下次启动将重新加载'); }
-      this.ready = false;
+      this.ready = false; this.staleScopes = []; this.lastOperation = { status: 'ok' };
       this.context = undefined;
       this.media = undefined;
       this.preferencesTask = undefined;
@@ -228,40 +256,99 @@ export class AppState {
       this.busy = false; this.accountBusy = false;
     }
   }
-  async refresh(): Promise<void> {
-    this.team = await this.planningRepo.team();
-    this.expenses = await this.planningRepo.expenses();
-    this.references = await this.planningRepo.references();
-    this.characters = await this.characterRepo.list(); this.variants = await this.variantRepo.list();
-    this.projects = await this.projectRepo.list(); this.assets = await this.assetRepo.list();
-    this.preparationCategories = await this.preparationRepo.categories(); this.preparationTasks = await this.preparationRepo.tasks();
-    this.events = await this.eventRepo.list(); this.checklist = await this.checklistRepo.list();
-    this.photos = await this.photoRepo.list(); this.links = await this.relations.links(); this.diary = await this.diaryRepo.list();
+  async refresh(scopes: string[] = DATA_SCOPES): Promise<void> {
+    const snapshot = new DataSnapshot();
+    if (scopes.includes('team')) { snapshot.team = await this.planningRepo.team(); }
+    if (scopes.includes('expenses')) { snapshot.expenses = await this.planningRepo.expenses(); }
+    if (scopes.includes('references')) { snapshot.references = await this.planningRepo.references(); }
+    if (scopes.includes('characters')) { snapshot.characters = await this.characterRepo.list(); }
+    if (scopes.includes('variants')) { snapshot.variants = await this.variantRepo.list(); }
+    if (scopes.includes('projects')) { snapshot.projects = await this.projectRepo.list(); }
+    if (scopes.includes('assets')) { snapshot.assets = await this.assetRepo.list(); }
+    if (scopes.includes('preparationCategories')) { snapshot.preparationCategories = await this.preparationRepo.categories(); }
+    if (scopes.includes('preparationTasks')) { snapshot.preparationTasks = await this.preparationRepo.tasks(); }
+    if (scopes.includes('events')) { snapshot.events = await this.eventRepo.list(); }
+    if (scopes.includes('checklist')) { snapshot.checklist = await this.checklistRepo.list(); }
+    if (scopes.includes('photos')) { snapshot.photos = await this.photoRepo.list(); }
+    if (scopes.includes('links')) { snapshot.links = await this.relations.links(); }
+    if (scopes.includes('diary')) { snapshot.diary = await this.diaryRepo.list(); }
+    // Publish a coherent snapshot only after all dependent reads succeed.
+    if (scopes.includes('team')) { this.team = snapshot.team; }
+    if (scopes.includes('expenses')) { this.expenses = snapshot.expenses; }
+    if (scopes.includes('references')) { this.references = snapshot.references; }
+    if (scopes.includes('characters')) { this.characters = snapshot.characters; }
+    if (scopes.includes('variants')) { this.variants = snapshot.variants; }
+    if (scopes.includes('projects')) { this.projects = snapshot.projects; }
+    if (scopes.includes('assets')) { this.assets = snapshot.assets; }
+    if (scopes.includes('preparationCategories')) { this.preparationCategories = snapshot.preparationCategories; }
+    if (scopes.includes('preparationTasks')) { this.preparationTasks = snapshot.preparationTasks; }
+    if (scopes.includes('events')) { this.events = snapshot.events; }
+    if (scopes.includes('checklist')) { this.checklist = snapshot.checklist; }
+    if (scopes.includes('photos')) { this.photos = snapshot.photos; }
+    if (scopes.includes('links')) { this.links = snapshot.links; }
+    if (scopes.includes('diary')) { this.diary = snapshot.diary; }
+    this.localDate = today();
+  }
+  @Computed
+  get readinessPlans(): PlanReadiness[] {
+    return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate));
+  }
+  readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
+  @Computed
+  get actionablePlans(): PlanReadiness[] { return this.readinessPlans.filter((item: PlanReadiness) => item.active); }
+  reloadRecords(): Promise<boolean> {
+    if (this.reloadTask) { return this.reloadTask; }
+    if (this.busy || this.disposeTask) { return Promise.resolve(false); }
+    this.reloadTask = this.reloadSnapshot().finally((): void => { this.reloadTask = undefined; });
+    return this.reloadTask;
+  }
+  private async reloadSnapshot(): Promise<boolean> {
+    this.busy = true;
+    try {
+      await this.refresh(this.staleScopes.length ? this.staleScopes : DATA_SCOPES);
+      this.staleScopes = []; this.error = ''; this.lastOperation = { status: 'ok' };
+      this.reportNotice('显示已更新'); return true;
+    } catch (error) { this.reportError('重新加载失败，已保存的记录保留，请重试加载。'); return false; }
+    finally { this.busy = false; }
   }
   reportError(message: string): void { this.error = message; this.feedbackVersion++; }
   reportNotice(message: string): void { this.notice = message; this.feedbackVersion++; }
-  perform(action: () => Promise<void>, refresh: boolean = true): Promise<boolean> {
-    if (this.busy || this.disposeTask) { return Promise.resolve(false); }
-    this.operationTask = this.runOperation(action, refresh).finally((): void => { this.operationTask = undefined; });
+  // Existing boolean callers interpret true as committed, never as a refresh guarantee.
+  perform(action: () => Promise<void>, refresh: boolean = true, scopes: string[] = DATA_SCOPES): Promise<boolean> {
+    return this.performResult(action, refresh, scopes).then(operationCommitted);
+  }
+  performResult(action: () => Promise<void>, refresh: boolean = true, scopes: string[] = DATA_SCOPES): Promise<OperationResult> {
+    if (this.busy || this.disposeTask) { return Promise.resolve<OperationResult>({ status: 'failed', detail: '已有数据操作进行中' }); }
+    if (this.staleScopes.length) {
+      const detail = '记录已保存，但显示尚未更新。请先重新加载，避免重复操作。';
+      this.reportError(detail); return Promise.resolve<OperationResult>({ status: 'failed', detail: detail });
+    }
+    this.operationTask = this.runOperation(action, refresh, scopes).finally((): void => { this.operationTask = undefined; });
     return this.operationTask;
   }
-
-  private async runOperation(action: () => Promise<void>, refresh: boolean): Promise<boolean> {
-    this.busy = true; this.error = ''; this.notice = '';
-    try { await action(); if (refresh) { await this.refresh(); } return true; }
-    catch (error) {
-      const code = (error as BusinessError).code;
-      this.reportError(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error)
-        .message || '操作失败，请重试'); return false;
-    }
-    finally { this.busy = false; }
+  private async runOperation(action: () => Promise<void>, refresh: boolean, scopes: string[]): Promise<OperationResult> {
+    this.busy = true; this.operationScope = scopes.join(','); this.error = ''; this.notice = ''; this.operationPartial = false;
+    try {
+      const result = await executeOperation(async (): Promise<void> => {
+        try { await action(); }
+        catch (error) {
+          const code = (error as BusinessError).code;
+          throw new Error(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error).message || '操作失败，请重试');
+        }
+      }, async (): Promise<void> => { if (refresh) { await this.refresh(scopes); } });
+      if (result.status === 'ok' && this.operationPartial) { result.status = 'partial'; result.detail = this.notice; }
+      this.lastOperation = result;
+      if (result.status === 'savedNotRefreshed') { this.staleScopes = scopes; this.reportError(result.detail || '记录已保存，请重新加载'); }
+      else if (result.status === 'failed') { this.reportError(result.detail || '操作失败，请重试'); }
+      return result;
+    } finally { this.busy = false; this.operationScope = ''; }
   }
   async saveCharacter(item: Character): Promise<boolean> {
     return this.perform(async () => {
       item.name = requiredName(item.name);
       item.updatedAt = Date.now();
       await this.characterRepo.save(item);
-    });
+    }, true, ['characters']);
   }
   async saveVariant(item: CharacterVariant): Promise<boolean> {
     return this.perform(async () => {
@@ -270,7 +357,7 @@ export class AppState {
         throw new Error('请先选择角色');
       }
       await this.variantRepo.save(item);
-    });
+    }, true, ['variants']);
   }
   async saveProject(item: CosProject, character?: Character, preparation?: PreparationBundle): Promise<boolean> {
     return this.perform(async () => {
@@ -282,16 +369,16 @@ export class AppState {
       const text = !old ? '开始了「' + item.name + '」' : old.status !== item.status ? item.name + ' → ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(item.status)] : '';
       await this.projectRepo.save(item, text, character, preparation);
       if (item.status === ProjectStatus.READY || item.status === ProjectStatus.COMPLETED) {
-        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+        void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
-    });
+    }, true, ['projects', 'characters', 'diary', 'preparationCategories', 'preparationTasks']);
   }
   async saveAsset(item: Asset, projectId: string = ''): Promise<boolean> {
     return this.perform(async () => {
       item.name = requiredName(item.name);
       item.purchaseUrl = safeUrl(item.purchaseUrl);
       await this.assetRepo.save(item, projectId);
-    });
+    }, true, ['assets', 'links', 'checklist']);
   }
   async openReminderSettings(): Promise<boolean> {
     return this.perform(async () => { if (this.context) { await this.reminder.settings(this.context); } }, false);
@@ -315,25 +402,29 @@ export class AppState {
         },
         async (id: number): Promise<void> => { await this.reminder.cancel(id); });
       const warning = await coordinator.save(item, old);
-      if (warning) { this.reportNotice(warning); }
-    });
+      if (warning) { this.operationPartial = true; this.reportNotice(warning); }
+    }, true, ['events']);
   }
-  async saveTeam(item: TeamMember): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveTeam(item); }); }
-  async saveExpense(item: Expense): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveExpense(item); }); }
+  async saveTeam(item: TeamMember): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveTeam(item); }, true, ['team']); }
+  async saveExpense(item: Expense): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveExpense(item); }, true, ['expenses']); }
   async saveReference(item: ReferenceImage): Promise<boolean> {
     return this.perform(async () => {
       await this.planningRepo.saveReference(item);
-    });
+    }, true, ['references']);
   }
   async importReferences(projectId: string = '', characterId: string = ''): Promise<boolean> {
     return this.perform(async () => {
       if (!this.media || (!projectId && !characterId) || (projectId && characterId)) { throw new Error('请选择参考图所属计划或角色'); }
       if (projectId && !this.projects.some((p: CosProject) => p.id === projectId)) { throw new Error('计划已不存在'); }
       if (characterId && !this.characters.some((c: Character) => c.id === characterId)) { throw new Error('角色已不存在'); }
-      const uris = await this.media.select(); let count = 0; let failed = 0;
+      const uris = await this.media.select(); let count = 0; let failed = 0; let skipped = 0;
+      if (uris.length === 0) { return; }
+      const seen: string[] = [];
       for (const uri of uris) {
+        if (seen.includes(uri)) { skipped++; continue; }
+        seen.push(uri);
         const old = this.references.find((r: ReferenceImage) => r.projectId === projectId && r.characterId === characterId && r.sourceUri === uri);
-        if (old && await this.media.exists(old)) { continue; }
+        if (old && await this.media.exists(old)) { skipped++; continue; }
         let imported: ReferenceImage | undefined;
         try {
           imported = await this.media.importReference(uri, projectId, characterId);
@@ -341,37 +432,39 @@ export class AppState {
           await this.planningRepo.saveReference(imported); count++;
         } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
       }
-      if (uris.length > 0) { this.reportNotice('已添加 ' + count + ' 张参考图' + (failed > 0 ? '，' + failed + ' 张失败，请检查格式或空间后重试' : '')); }
-    });
+      if (failed > 0 && count === 0) { throw new Error('参考图未添加，' + failed + ' 张失败，跳过重复 ' + skipped + ' 张。请检查格式或空间后重试。'); }
+      this.operationPartial = failed > 0;
+      this.reportNotice((count ? '已添加 ' + count + ' 张参考图，' : '') + '跳过重复 ' + skipped + ' 张，失败 ' + failed + ' 张' + (failed ? '。可重试失败项。' : ''));
+    }, true, ['references']);
   }
   async referenceCover(item: ReferenceImage): Promise<boolean> {
     return this.perform(async () => {
       const characterId = item.characterId || this.projects.find((p: CosProject) => p.id === item.projectId)?.characterId || '';
       if (!characterId || !item.thumbnailPath) { throw new Error('参考图缺失，请重新导入'); }
       await this.planningRepo.setReferenceCover(item, characterId);
-    });
+    }, true, ['characters']);
   }
   async savePreparationCategory(item: PreparationCategory): Promise<boolean> {
-    return this.perform(async () => { await this.preparationRepo.saveCategory(item); });
+    return this.perform(async () => { await this.preparationRepo.saveCategory(item); }, true, ['preparationCategories']);
   }
   async savePreparationTask(item: PreparationTask): Promise<boolean> {
-    return this.perform(async () => { await this.preparationRepo.saveTask(item); });
+    return this.perform(async () => { await this.preparationRepo.saveTask(item); }, true, ['preparationTasks']);
   }
   async togglePreparation(item: PreparationTask): Promise<boolean> {
     return this.perform(async () => {
       await this.preparationRepo.setDone(item.id, !item.done);
       if (!item.done) {
-        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+        void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
-    });
+    }, true, ['preparationTasks']);
   }
   async addPreparationTemplate(projectId: string, keys: string[]): Promise<boolean> {
     return this.perform(async () => {
       await this.preparationRepo.addTemplate(makePreparation(projectId, keys));
       this.reportNotice('已补入所选模板任务，原有进度保留');
-    });
+    }, true, ['preparationCategories', 'preparationTasks']);
   }
-  preparationPercent(projectId: string): number { return preparationProgress(projectId, this.preparationTasks).percent; }
+  preparationPercent(projectId: string): number { return this.readiness(projectId).prep.percent; }
   async addChecklist(projectId: string, label: string): Promise<boolean> {
     return this.perform(async () => {
       const item = new ChecklistItem();
@@ -379,33 +472,24 @@ export class AppState {
       item.label = requiredName(label);
       item.sortOrder = this.checklist.length;
       await this.checklistRepo.save(item);
-    });
+    }, true, ['checklist']);
   }
   async toggleChecklist(item: ChecklistItem): Promise<boolean> {
     return this.perform(async () => {
       const copy = JSON.parse(JSON.stringify(item)) as ChecklistItem; copy.done = !item.done;
-      await this.checklistRepo.save(copy); if (copy.done) { await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel); }
-    });
+      await this.checklistRepo.save(copy); if (copy.done) { void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {}); }
+    }, true, ['checklist']);
   }
   async linkAsset(projectId: string, asset: Asset): Promise<boolean> {
-    return this.perform(async () => { await this.relations.link(projectId, asset); });
+    return this.perform(async () => { await this.relations.link(projectId, asset); }, true, ['links', 'checklist']);
   }
   async unlinkAsset(projectId: string, assetId: string): Promise<boolean> {
-    return this.perform(async () => { await this.relations.unlink(projectId, assetId); });
+    return this.perform(async () => { await this.relations.unlink(projectId, assetId); }, true, ['links', 'checklist']);
   }
   async generateChecklist(projectId: string): Promise<boolean> {
     return this.perform(async () => {
-      for (const asset of this.projectAssets(projectId)) { await this.relations.link(projectId, asset); }
-      for (const label of ['手机', '充电宝', '补妆', '门票', '身份证件', '发网']) {
-        if (!this.checklist.some((c: ChecklistItem) => c.projectId === projectId && c.label === label)) {
-          const item = new ChecklistItem();
-          item.projectId = projectId;
-          item.label = label;
-          item.sortOrder = 10;
-          await this.checklistRepo.save(item);
-        }
-      }
-    });
+      await this.relations.generateChecklist(projectId, this.projectAssets(projectId), this.checklist);
+    }, true, ['checklist']);
   }
   async remove(kind: string, id: string): Promise<boolean> {
     return this.perform(async () => {
@@ -465,10 +549,14 @@ export class AppState {
   async importPhotos(projectId: string): Promise<boolean> {
     return this.perform(async () => {
       if (!this.media || !this.projects.some((p: CosProject) => p.id === projectId)) { throw new Error('请先选择照片所属计划'); }
-      const uris = await this.media.select(); let count = 0; let failed = 0;
+      const uris = await this.media.select(); let count = 0; let failed = 0; let skipped = 0;
+      if (uris.length === 0) { return; }
+      const seen: string[] = [];
       for (const uri of uris) {
+        if (seen.includes(uri)) { skipped++; continue; }
+        seen.push(uri);
         const existing = this.photos.find((p: PhotoAsset) => p.projectId === projectId && p.sourceUri === uri);
-        if (existing && await this.media.exists(existing)) { continue; }
+        if (existing && await this.media.exists(existing)) { skipped++; continue; }
         let imported: PhotoAsset | undefined;
         try {
           imported = await this.media.import(uri, projectId);
@@ -482,8 +570,10 @@ export class AppState {
           count++;
         } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
       }
-      this.reportNotice(`已导入 ${count} 张${failed > 0 ? `，${failed} 张失败，请检查格式或空间后重试` : ''}`);
-    });
+      if (failed > 0 && count === 0) { throw new Error('照片未导入，' + failed + ' 张失败，跳过重复 ' + skipped + ' 张。请检查格式或空间后重试。'); }
+      this.operationPartial = failed > 0;
+      this.reportNotice((count ? '已导入 ' + count + ' 张，' : '') + '跳过重复 ' + skipped + ' 张，失败 ' + failed + ' 张' + (failed ? '。可重试失败项。' : ''));
+    }, true, ['photos']);
   }
   async setPhotoStatus(photo: PhotoAsset, status: PhotoStatus): Promise<boolean> {
     return this.perform(async () => {
@@ -491,16 +581,16 @@ export class AppState {
       copy.status = status;
       await this.photoRepo.save(copy);
       if (status === PhotoStatus.SELECTED) {
-        await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
+        void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
-    });
+    }, true, ['photos']);
   }
   async setPhotoStatuses(ids: string[], status: PhotoStatus): Promise<boolean> {
     return this.perform(async () => {
       await this.photoRepo.setStatuses(ids, status);
       this.reportNotice('已更新 ' + ids.length + ' 张照片');
-      await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
-    });
+      void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
+    }, true, ['photos']);
   }
   async setCover(photo: PhotoAsset): Promise<boolean> {
     const project = this.projects.find((p: CosProject) => p.id === photo.projectId);
@@ -543,6 +633,7 @@ export class AppState {
   }
   suspend(): void { this.grip.stop(); this.sensedHand = 'auto'; }
   async resume(): Promise<void> {
+    this.localDate = today();
     if (this.settings.grip && this.context) {
       try {
         await this.grip.start(this.context, (hand: string) => {
@@ -606,6 +697,6 @@ export class AppState {
   }
   characterName(id: string): string { return this.characters.find((c: Character) => c.id === id)?.name || '未关联角色'; }
   projectName(id: string): string { return this.projects.find((p: CosProject) => p.id === id)?.name || '未关联计划'; }
-  progress(id: string): number { return projectProgress(id, this.links, this.assets).percent; }
+  progress(id: string): number { return this.readiness(id).equipment.percent; }
   hand(): string { return this.settings.hand === 'auto' ? this.sensedHand : this.settings.hand; }
 }

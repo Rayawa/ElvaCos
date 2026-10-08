@@ -130,7 +130,7 @@ import { EmptyState } from '../component/Surfaces';
   }
   private edit(kind: string, id: string = '', parent: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
-    this.state.error = '';
+    if (!this.state.staleScopes.length) { this.state.error = ''; }
     this.rootSheetKind = 'form';
     this.draft = EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent);
     this.formOpen = true;
@@ -545,10 +545,26 @@ import { EmptyState } from '../component/Surfaces';
     const message = this.state.error || this.state.notice;
     if (message) { showToastSafely(this.getUIContext().getPromptAction(), message, 2000, 'Application'); }
   }
-  @Builder loadingOverlay() {
-    if (this.state.busy) {
-      LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中')
+  @Builder recoveryBanner() {
+    if (this.state.staleScopes.length > 0) {
+      Row({ space: 12 }) {
+        Text('记录已保存，显示尚未更新。无需重复提交。').fontSize(14).fontColor(Theme.ink).layoutWeight(1)
+        Button(this.state.busy ? '加载中…' : '重新加载')
+          .enabled(!this.state.busy).fontColor(Theme.onAccent).backgroundColor(Theme.brand)
+          .onClick((): void => { this.state.reloadRecords(); })
+          .accessibilityText('重新加载已保存的记录')
+      }.id('saved-refresh-recovery').width('100%').padding(16).backgroundColor(Theme.surface)
+        .margin({ bottom: Theme.contentBottom }).align(Alignment.Bottom).accessibilityGroup(true)
     }
+  }
+
+  @Builder loadingOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (this.state.busy) {
+        LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中')
+      }
+      this.recoveryBanner()
+    }.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)
   }
 
   @Builder mainNavigation(index: number) {

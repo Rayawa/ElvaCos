@@ -1,5 +1,6 @@
+import { PHOTO_STAGE_LABELS, photoStageCounts } from './PhotoStages';
 import { Expense } from './Planning';
-import { PhotoAsset, PhotoStatus } from './Entities';
+import { PhotoAsset } from './Entities';
 
 export interface MonthlyExpensePoint { label: string; value: number; detail: string; }
 export interface PhotoDistributionItem { label: string; value: number; }
@@ -21,12 +22,6 @@ export function monthlyExpenses(records: Expense[], date: string, count: number 
 
 /** 各照片状态仅落入一个分组，含已归档，合计与照片总数一致。 */
 export function photoDistribution(photos: PhotoAsset[]): PhotoDistributionItem[] {
-  const labels = ['待选', '已选', '待修', '成片', '已发布', '已归档'];
-  const groups: PhotoStatus[][] = [
-    [PhotoStatus.IMPORTED, PhotoStatus.RAW], [PhotoStatus.SELECTED], [PhotoStatus.WAITING],
-    [PhotoStatus.RETOUCHED, PhotoStatus.FINAL], [PhotoStatus.PUBLISHED], [PhotoStatus.ARCHIVED],
-  ];
-  return labels.map((label: string, index: number): PhotoDistributionItem => ({
-    label: label, value: photos.filter((photo: PhotoAsset): boolean => groups[index].includes(photo.status)).length,
-  }));
+  const counts = photoStageCounts(photos);
+  return PHOTO_STAGE_LABELS.map((label: string, index: number): PhotoDistributionItem => ({ label: label, value: counts[index] }));
 }

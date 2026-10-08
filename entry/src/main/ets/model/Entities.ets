@@ -68,6 +68,7 @@ export class CosProject {
   notes: string = '';
   targetDate: string = '';
   budgetCents: number = 0;
+  budgetConfigured: boolean | undefined = false;
   createdAt: number = Date.now();
   updatedAt: number = Date.now();
 }

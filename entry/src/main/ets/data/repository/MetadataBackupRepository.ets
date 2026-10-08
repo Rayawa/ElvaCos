@@ -14,7 +14,7 @@ const TABLES: TableSpec[] = [
   new TableSpec('characters', ['id', 'name', 'work_name', 'description', 'cover', 'favorite', 'status', 'created_at', 'updated_at']),
   new TableSpec('variants', ['id', 'character_id', 'name', 'notes']),
   new TableSpec('events', LEGACY_EVENT_COLUMNS.concat(['date_mode', 'end_date', 'time_mode', 'start_time', 'end_time', 'event_type', 'reminder_id', 'reminder_minutes'])),
-  new TableSpec('projects', ['id', 'character_id', 'variant_id', 'event_id', 'name', 'status', 'notes', 'target_date', 'budget_cents', 'created_at', 'updated_at']),
+  new TableSpec('projects', ['id', 'character_id', 'variant_id', 'event_id', 'name', 'status', 'notes', 'target_date', 'budget_cents', 'budget_configured', 'created_at', 'updated_at']),
   new TableSpec('assets', ['id', 'name', 'type', 'status', 'location', 'brand', 'size', 'price_cents', 'purchase_url', 'notes', 'created_at']),
   new TableSpec('project_assets', ['project_id', 'asset_id']),
   new TableSpec('checklist_items', ['id', 'project_id', 'asset_id', 'label', 'done', 'sort_order']),
@@ -48,7 +48,7 @@ export class MetadataBackupRepository {
       } finally { result.close(); }
       tables.push({ name: spec.name, rows: rows });
     }
-    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 3, exportedAt: Date.now(), tables: tables };
+    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 4, exportedAt: Date.now(), tables: tables };
     const output = JSON.stringify(doc);
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
@@ -56,7 +56,7 @@ export class MetadataBackupRepository {
   async restoreMetadata(input: string): Promise<void> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : TABLES.length)) {
+    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
     const allowedCovers: string[] = [];
@@ -88,7 +88,8 @@ export class MetadataBackupRepository {
       }
     }
     for (let i = 0; i < doc.tables.length; i++) {
-      const spec = doc.version < 3 && TABLES[i].name === 'events' ? new TableSpec('events', LEGACY_EVENT_COLUMNS) : TABLES[i];
+      let spec = doc.version < 3 && TABLES[i].name === 'events' ? new TableSpec('events', LEGACY_EVENT_COLUMNS) : TABLES[i];
+      if (doc.version < 4 && spec.name === 'projects') { spec = new TableSpec('projects', spec.columns.filter((col: string) => col !== 'budget_configured')); }
       const table = doc.tables[i];
       if (!table || table.name !== spec.name || !Array.isArray(table.rows) || table.rows.length > 50000) { throw new Error('备份表结构无效'); }
       for (const row of table.rows) {
@@ -97,6 +98,10 @@ export class MetadataBackupRepository {
           const value = row[col];
           if (value !== null && typeof value !== 'string' && typeof value !== 'number') { throw new Error('备份包含无效字段'); }
           const numbers = ['favorite', 'created_at', 'updated_at', 'ticket_purchased', 'budget_cents', 'price_cents', 'done', 'sort_order', 'amount_cents', 'reminder_id', 'reminder_minutes'];
+          if (col === 'budget_configured') {
+            if (value !== null && value !== 0 && value !== 1) { throw new Error('备份包含无效预算标记'); }
+            continue;
+          }
           if (numbers.includes(col) && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < (col === 'reminder_id' || col === 'reminder_minutes' ? -1 : 0))) {
             throw new Error('备份包含无效数字');
           }
@@ -111,6 +116,7 @@ export class MetadataBackupRepository {
           }
           if (typeof value === 'string' && value.length > 20000) { throw new Error('备份字段过长'); }
         }
+        if (spec.name === 'projects' && doc.version < 4) { row['budget_configured'] = Number(row['budget_cents']) > 0 ? 1 : null; }
         if (spec.name === 'events') {
           const event = new CosEvent();
           event.date = String(row['date']);

@@ -1,3 +1,4 @@
+import { PlanReadiness } from '../../model/PlanReadiness';
 import { MIN_SPLIT_HEIGHT } from '../../common/constants';
 import { daysUntil, today } from '../../common/format';
 import { PressFeedback } from '../../common/pressFeedback';
@@ -14,7 +15,7 @@ import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../c
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
 import { vibration } from '../../common/vibration';
-import { CosProject, ProjectStatus, CosEvent, ChecklistItem, PhotoAsset, PhotoStatus } from '../../model/Entities';
+import { CosProject, ProjectStatus, CosEvent, ChecklistItem, PhotoAsset } from '../../model/Entities';
 import { SectionHeading, InteractiveCard, EmptyState, StatusPill } from '../../component/Surfaces';
 import { nextPlan, planDate } from '../../model/Rules';
 import { ProjectCard } from '../../component/ProjectCard';
@@ -47,13 +48,15 @@ export struct HomePage {
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterAnimationTimers); this.animStep = 3; }
   private current(): CosProject | undefined { return nextPlan(this.state.projects, this.state.events, today()); }
-  private packingTasks(): ChecklistItem[] { const currentId = this.current()?.id; return this.state.checklist.filter((item: ChecklistItem) => !item.done && this.state.projects.some((project: CosProject) => project.id === item.projectId && project.status !== ProjectStatus.COMPLETED && project.status !== ProjectStatus.ARCHIVED))
-    .sort((a: ChecklistItem, b: ChecklistItem) => Number(b.projectId === currentId) - Number(a.projectId === currentId) || a.sortOrder - b.sortOrder); }
+  private packingTasks(): ChecklistItem[] {
+    const current = this.current()?.id;
+    return this.state.actionablePlans.reduce((items: ChecklistItem[], plan: PlanReadiness) => items.concat(plan.pack.pending), [])
+      .sort((a: ChecklistItem, b: ChecklistItem) => Number(b.projectId === current) - Number(a.projectId === current) || a.sortOrder - b.sortOrder);
+  }
   private preparationTasks(): PreparationTask[] {
-    const current = this.current()?.id || '';
-    return this.state.preparationTasks.filter((task: PreparationTask) => !task.done && this.state.projects.some((p: CosProject) => p.id === task.projectId && p.status !== ProjectStatus.COMPLETED && p.status !== ProjectStatus.ARCHIVED))
-      .sort((a: PreparationTask, b: PreparationTask) => Number(b.projectId === current) - Number(a.projectId === current) || (a.dueDate || '9999')
-        .localeCompare(b.dueDate || '9999') || a.sortOrder - b.sortOrder);
+    const current = this.current()?.id;
+    return this.state.actionablePlans.reduce((items: PreparationTask[], plan: PlanReadiness) => items.concat(plan.prep.pending), [])
+      .sort((a: PreparationTask, b: PreparationTask) => Number(b.projectId === current) - Number(a.projectId === current) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || a.sortOrder - b.sortOrder);
   }
   private next(): CosEvent | undefined { return this.state.events.filter((e: CosEvent) => e.status === 'Planned' && e.dateMode !== 'pending' && eventEnd(e) >= today())
     .sort((a: CosEvent, b: CosEvent) => a.date.localeCompare(b.date))[0]; }
@@ -175,7 +178,7 @@ export struct HomePage {
       }
       if (this.preparationTasks()
         .length > 0 || this.packingTasks()
-        .length > 0 || this.state.photos.some((p: PhotoAsset) => p.status === PhotoStatus.IMPORTED || p.status === PhotoStatus.RAW)) {
+        .length > 0 || this.state.readinessPlans.some((plan: PlanReadiness) => plan.photos.byStage[0] > 0)) {
         SectionHeading({ title: '下一步' })
         ForEach(this.preparationTasks().slice(0, 2), (task: PreparationTask) => {
           TaskLinkCard({
@@ -192,12 +195,11 @@ export struct HomePage {
             action: (): void => { this.open('packing', item.projectId); },
           })
         }, (item: ChecklistItem) => item.id)
-        ForEach(this.state.projects.filter((project: CosProject) => this.state.photos.some((photo: PhotoAsset) => photo.projectId === project.id && (photo.status === PhotoStatus.IMPORTED || photo.status === PhotoStatus.RAW)))
+        ForEach(this.state.projects.filter((project: CosProject) => this.state.readiness(project.id).photos.byStage[0] > 0)
           .slice(0, 2), (project: CosProject) => {
           TaskLinkCard({
             title: '选片 · ' + project.name,
-            detail: this.state.photos.filter((photo: PhotoAsset) => photo.projectId === project.id && (photo.status === PhotoStatus.IMPORTED || photo.status === PhotoStatus.RAW))
-              .length + ' 张照片待选',
+            detail: this.state.readiness(project.id).photos.byStage[0] + ' 张照片待选',
             label: '打开 ' + project.name + ' 的选片', hint: '双击继续选片', effects: this.state.settings.effects,
             action: (): void => { this.open('projectPhotos', project.id); },
           })
