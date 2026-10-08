@@ -8,6 +8,7 @@ import { Database } from '../../../main/ets/data/database/Database';
 import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, PhotoAssetRepository, RelationRepository, ChecklistItemRepository } from '../../../main/ets/data/repository/Repositories';
 import { Character, CharacterVariant, CosProject, Asset, PhotoAsset, PhotoStatus, newId } from '../../../main/ets/model/Entities';
 import { BackupService } from '../../../main/ets/common/BackupService';
+import { MetadataBackupRepository } from '../../../main/ets/data/repository/MetadataBackupRepository';
 import { MediaRepository } from '../../../main/ets/data/media/MediaRepository';
 import getDiskStorageInstance from '../../../main/ets/common/DiskStorage';
 import { migrateElvaPreferences, migrateUxPreferences } from '../../../main/ets/common/SettingsMigration';
@@ -53,12 +54,16 @@ export default function abilityTest(): void {
       const backup = new BackupService(db, context);
       const exported = await backup.exportMetadata();
       character.name = 'Changed'; await characters.save(character);
+      const preview = await new MetadataBackupRepository(db).previewMetadata(exported);
+      expect(preview.version).assertEqual(6);
+      expect(preview.counts.find((count) => count.table === 'projects')?.incoming).assertEqual(1);
+      expect((await characters.list())[0].name).assertEqual('Changed');
       await backup.restoreMetadata(exported);
       expect((await characters.list())[0].name).assertEqual('Verification Character');
       let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":6', '"version":99')); } catch (error) { rejected = true; }
       expect(rejected).assertTrue(); expect((await projects.list()).length).assertEqual(1);
     });
-    it('invalidBackupForeignKeyRollsBackReplacement', 0, async () => {
+    it('invalidBackupForeignKeyIsRejectedBeforeReplacement', 0, async () => {
       const backup = new BackupService(db, context);
       const exported = await backup.exportMetadata();
       let rejected = false;

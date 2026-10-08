@@ -4,6 +4,10 @@ import { util } from '@kit.ArkTS';
 import { Database } from '../data/database/Database';
 import { MetadataBackupRepository } from '../data/repository/MetadataBackupRepository';
 
+import { MetadataBackupPreview } from '../model/MetadataBackupPreview';
+
+export interface BackupRestoreSelection { input: string; preview: MetadataBackupPreview; }
+
 // System document-picker boundary; metadata validation and SQL belong to the repository.
 export class BackupService {
   private metadata: MetadataBackupRepository;
@@ -15,12 +19,15 @@ export class BackupService {
     const uris = await new picker.DocumentViewPicker(this.context).save({ newFileNames: ['ElvaCos-metadata-' + Date.now() + '.json'], fileSuffixChoices: ['JSON|.json'] });
     if (uris.length === 0) { return false; }
     const file = await fs.open(uris[0], fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
-    try { await fs.write(file.fd, output); } finally { await fs.close(file); }
+    try {
+      const bytes = util.TextEncoder.create('utf-8').encodeInto(output);
+      if (await fs.write(file.fd, bytes.buffer as ArrayBuffer) !== bytes.byteLength) { throw new Error('备份文件未完整写入，请重新导出'); }
+    } finally { await fs.close(file); }
     return true;
   }
-  async restore(): Promise<boolean> {
+  async prepareRestore(): Promise<BackupRestoreSelection | undefined> {
     const uris = await new picker.DocumentViewPicker(this.context).select({ maxSelectNumber: 1, fileSuffixFilters: ['.json'] });
-    if (uris.length === 0) { return false; }
+    if (uris.length === 0) { return undefined; }
     const file = await fs.open(uris[0], fs.OpenMode.READ_ONLY);
     let input: string;
     try {
@@ -36,8 +43,7 @@ export class BackupService {
       }
       input = new util.TextDecoder('utf-8').decodeToString(new Uint8Array(bytes));
     } finally { await fs.close(file); }
-    await this.restoreMetadata(input);
-    return true;
+    return { input: input, preview: await this.metadata.previewMetadata(input) };
   }
   async restoreMetadata(input: string): Promise<void> { await this.metadata.restoreMetadata(input); }
 }

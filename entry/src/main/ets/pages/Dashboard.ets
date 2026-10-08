@@ -1,3 +1,4 @@
+import { BackupRestoreSheet } from '../component/BackupRestoreSheet';
 import { EventRoute, EventReturnPath } from '../model/EventRoute';
 import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
 import { LedgerRoute } from '../model/LedgerRoute';
@@ -79,6 +80,7 @@ import { EmptyState } from '../component/Surfaces';
   @Local rootSheetKind: string = 'form';
   @Local importOpen: boolean = false;
   @Local formOpen: boolean = false;
+  @Local restoreOpen: boolean = false;
   @Local formSession: FormSession = new FormSession(new EditDraft(), formDraftStore);
   private checkingFormClose: boolean = false;
   @Local viewportWidth: number = 360;
@@ -275,20 +277,17 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private async destructive(kind: string): Promise<void> {
-    const accepted = await confirm(
-      this.getUIContext(),
-      kind === 'restore' ? '替换当前元数据？' : '清空本地数据？',
-      kind === 'restore'
-        ? '建议先导出当前记录。恢复会替换全部角色、计划和衣柜记录；本机未保存的照片需重新导入。'
-        : '全部本地记录和照片副本将删除，系统相册原图保留。建议先完成备份。',
-      kind === 'restore' ? '选择备份' : '清空'
-    );
-    if (accepted) {
-      const changed = kind === 'restore' ? await this.state.restoreData() : await this.state.clearData();
-      if (changed) { this.detailStack.clear(); }
+    if (kind === 'restore') {
+      if (await this.state.prepareRestoreData()) { this.rootSheetKind = 'restore'; this.restoreOpen = true; }
+      return;
     }
+    const accepted = await confirm(this.getUIContext(), '清空本地数据？', '全部本地记录和照片副本将删除，系统相册原图保留。建议先完成备份。', '清空');
+    if (accepted && await this.state.clearData()) { this.detailStack.clear(); }
   }
-
+  private closeRestore(): void {
+    if (this.state.busy) { return; }
+    this.restoreOpen = false; this.state.cancelRestoreData();
+  }
   private async allowFormClose(): Promise<boolean> {
     if (this.state.busy || this.formSession.submitting || this.checkingFormClose) { return false; }
     this.checkingFormClose = true;
@@ -303,16 +302,20 @@ import { EmptyState } from '../component/Surfaces';
     } finally { this.checkingFormClose = false; }
   }
   private rootSheetOptions(): SheetOptions {
-    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; }, this.sheetEntrance, this.getUIContext());
+    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; this.restoreOpen = false; if (this.rootSheetKind === 'restore') { this.state.cancelRestoreData(); } }, this.sheetEntrance, this.getUIContext());
     if (this.rootSheetKind === 'form') {
       options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
       options.onWillDismiss = (action: DismissSheetAction): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { action.dismiss(); } }); };
     }
+    if (this.rootSheetKind === 'restore') { options.onWillDismiss = (action: DismissSheetAction): void => { if (!this.state.busy) { action.dismiss(); } }; }
     return options;
   }
 
   @Builder rootSheet() {
-    if (this.rootSheetKind === 'form') { this.form() } else { this.importSheet() }
+    if (this.rootSheetKind === 'form') { this.form() }
+    else if (this.rootSheetKind === 'restore') {
+      BackupRestoreSheet({ state: this.state, close: (): void => { this.closeRestore(); }, done: (): void => { this.restoreOpen = false; this.detailStack.clear(); this.stacks.forEach((stack: NavPathStack): void => { stack.clear(); }); } })
+    } else { this.importSheet() }
   }
   @Builder form() {
     FormEditor({
@@ -870,7 +873,7 @@ import { EmptyState } from '../component/Surfaces';
       .width('100%').height(LayoutPolicy.matchParent)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-      .bindSheet(this.importOpen || this.formOpen, this.rootSheet(), this.rootSheetOptions())
+      .bindSheet(this.importOpen || this.formOpen || this.restoreOpen, this.rootSheet(), this.rootSheetOptions())
     }
   }
 }

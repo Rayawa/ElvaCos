@@ -1,3 +1,4 @@
+import { formatTimestamp } from '../../common/format';
 import { DEVELOPER_ENTRANCE_TAPS, DEVELOPER_ENTRANCE_WINDOW_MS, MIN_SPLIT_HEIGHT, SETTINGS_ENTRANCE_KEY } from '../../common/constants';
 import { PreferenceSettings } from '../../component/PreferenceSettings';
 import { SettingsSelection } from '../../model/ApplicationState';
@@ -214,6 +215,8 @@ export struct SettingsPage {
   private dataSection(): void {
     Column({ space: Theme.sectionContentGap }) {
       this.groupTitle('数据与备份')
+      Text('角色、计划和元数据保存在本机；照片保存本机副本，JSON 不含照片文件。').fontSize(14).fontColor(Theme.muted)
+      Text(this.state.lastMetadataExport ? '最近成功导出元数据：' + formatTimestamp(this.state.lastMetadataExport) + '（不含照片）' : '尚无成功导出的元数据记录').fontSize(14).fontColor(Theme.muted)
       Column() {
         SettingsActionRow({
           label: '导出元数据 JSON',

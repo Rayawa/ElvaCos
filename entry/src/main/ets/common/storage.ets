@@ -201,6 +201,14 @@ export async function getUsername(): Promise<string> {
     return deviceName;
 }
 
+export async function getLastMetadataExport(): Promise<number> {
+    const value = Number(await (await ensureReady()).get('last_metadata_export', 0));
+    return Number.isSafeInteger(value) && value > 0 ? value : 0;
+}
+export async function setLastMetadataExport(value: number): Promise<void> {
+    await (await ensureReady()).set('last_metadata_export', value);
+}
+
 // Form drafts are local preferences, separate from saved business records.
 export async function getFormDraftData(): Promise<string> {
     return String(await (await ensureReady()).get('form_drafts_v1', ''));

@@ -10,17 +10,23 @@ const crypto = require('node:crypto');
 const studio = (process.env.DEVECO_HOME || path.join(process.env.HOME, 'Applications/DevEco-Studio.app')).replace(/\/Contents$/, '') + '/Contents';
 const ts = require(path.join(studio, 'tools/ohpm/node_modules/typescript'));
 const originalLoad = Module._load;
+let backupControl = {};
+let backupFileControl = {};
+let metadataExportTime = 0;
+let failExportTime = false;
 Module._load = function (id, parent, isMain) {
-  if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID() } };
+  if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID(), TextEncoder: { create: () => ({ encodeInto: value => new Uint8Array(Buffer.from(value, 'utf8')) }) }, TextDecoder: class { decodeToString(bytes) { return Buffer.from(bytes).toString('utf8'); } } } };
+  if (id === '@kit.CoreFileKit' && parent?.filename.endsWith('/common/BackupService.ets')) return { fileIo: { OpenMode: { READ_ONLY: 1, WRITE_ONLY: 2, TRUNC: 4 }, open: async () => ({ fd: 1 }), close: async fd => backupFileControl.close?.(fd), write: async (fd, buffer) => backupFileControl.write(fd, buffer), read: async (fd, buffer, options) => backupFileControl.read(fd, buffer, options), stat: async () => ({ size: backupFileControl.bytes?.length || 0 }) }, picker: { DocumentViewPicker: class { async save() { return backupFileControl.save?.() || []; } async select() { return backupFileControl.select?.() || []; } } } };
   if (id === '@kit.ArkData') return { relationalStore: { RdbPredicates: class {
     constructor(table) { this.table = table; this.terms = []; }
     equalTo(key, value) { this.terms.push([key, value]); return this; }
   } } };
   if (id === 'BuildProfile') return { DEBUG: false };
   if (parent?.filename.endsWith('/model/ApplicationState.ets')) {
-    if (id === '../common/storage') return {};
+    if (id === '../common/storage') return { setLastMetadataExport: async value => { if (failExportTime) throw new Error('preferences unavailable'); metadataExportTime = value; }, getLastMetadataExport: async () => metadataExportTime };
     if (id === '../common/formDrafts') return { formDraftStore: { clear: async () => {} } };
     const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'ShareService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
+    if (nativeService === 'BackupService') return { BackupService: class { async prepareRestore() { return backupControl.prepare?.(); } async restoreMetadata(input) { return backupControl.restore(input); } async export() { return backupControl.export?.() || false; } } };
     if (nativeService) return { [nativeService]: class { static async confirm() {} } };
   }
   if (['@kit.AbilityKit', '@kit.BackgroundTasksKit', '@kit.NotificationKit'].includes(id)) return {};
@@ -662,11 +668,113 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       await assert.rejects(backup.restoreMetadata(JSON.stringify(doc)), /预算标记/);
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
     });
-    await test('backup foreign key failure rolls replacement back', async () => {
+    await test('backup invalid foreign key is rejected before offering replacement', async () => {
       const doc = JSON.parse(exported); doc.tables.find(t => t.name === 'projects').rows[0].character_id = 'missing';
-      await assert.rejects(backup.restoreMetadata(JSON.stringify(doc)), /FOREIGN KEY/);
+      await assert.rejects(backup.previewMetadata(JSON.stringify(doc)), /关联无效/);
+      await assert.rejects(backup.restoreMetadata(JSON.stringify(doc)), /关联无效/);
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
       assert.equal((await db.sql('SELECT name FROM characters')).rows[0][0], 'Legacy');
+    });
+    await test('backup preview counts current and incoming objects without any transaction or mutation', async () => {
+      const before = await backup.exportMetadata(); const originalTransaction = db.transaction;
+      db.transaction = async () => { throw new Error('preview must not begin a transaction'); };
+      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0, 15);
+      for (const row of doc.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
+      const preview = await backup.previewMetadata(JSON.stringify(doc));
+      assert.equal(preview.version, 4); assert.equal(preview.exportedAt, doc.exportedAt);
+      assert.equal(preview.counts.length, 16); assert.equal(preview.counts.find(row => row.table === 'projects').incoming, 4);
+      assert.equal(preview.counts.find(row => row.table === 'entries').incoming, 0);
+      assert.equal(preview.incomingCount, preview.counts.reduce((sum, row) => sum + row.incoming, 0));
+      assert.deepEqual(JSON.parse(await backup.exportMetadata()).tables, JSON.parse(before).tables);
+      db.transaction = originalTransaction;
+    });
+    await test('backup preview rejects duplicate IDs, duplicate relationships, invalid states and mismatched owners', async () => {
+      const original = JSON.parse(exported);
+      const mutations = [
+        doc => doc.tables.find(t => t.name === 'characters').rows.push({ ...doc.tables.find(t => t.name === 'characters').rows[0] }),
+        doc => { doc.tables.find(t => t.name === 'projects').rows[0].status = 'Unknown'; },
+        doc => { doc.tables.find(t => t.name === 'preparation_tasks').rows[0].project_id = 'zero'; },
+        doc => { doc.tables.find(t => t.name === 'preparation_tasks').rows[0].done = 2; },
+        doc => { doc.tables.find(t => t.name === 'preparation_tasks').rows[0].id = ''; },
+        doc => { doc.exportedAt = -1; },
+        doc => doc.tables.find(t => t.name === 'preparation_categories').rows.push({ ...doc.tables.find(t => t.name === 'preparation_categories').rows[0], id: 'duplicate-name' }),
+      ];
+      for (const mutation of mutations) {
+        const doc = structuredClone(original); mutation(doc); await assert.rejects(backup.previewMetadata(JSON.stringify(doc)));
+      }
+      assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
+    });
+    await test('backup preview states media gaps and rejects duplicate photo sources and conflicting reference ownership', async () => {
+      const doc = JSON.parse(exported);
+      const photo = { id: 'preview-photo', project_id: 'positive', source_uri: 'test://media', local_path: '/foreign/file', thumbnail_path: '/foreign/thumb', status: 'Final', caption: '', created_at: 1 };
+      doc.tables.find(t => t.name === 'photos').rows.push(photo);
+      doc.tables.find(t => t.name === 'photo_versions').rows.push({ id: 'preview-version', photo_id: photo.id, name: '版本', recipe: '{}', rendered_path: '/foreign/rendered', created_at: 1 });
+      const reference = { id: 'preview-reference', project_id: null, character_id: 'c', source_uri: 'test://reference', local_path: '/foreign/ref', thumbnail_path: '/foreign/ref-thumb', caption: '', created_at: 1 };
+      doc.tables.find(t => t.name === 'reference_images').rows.push(reference);
+      const preview = await backup.previewMetadata(JSON.stringify(doc));
+      assert.equal(preview.mediaWithoutLocalPath, 2); assert.equal(preview.counts.find(row => row.table === 'photos').incoming, 1);
+      assert.equal((await db.sql('SELECT count(*) FROM photos')).rows[0][0], 0);
+      doc.tables.find(t => t.name === 'photos').rows.push({ ...photo, id: 'other-photo' });
+      await assert.rejects(backup.previewMetadata(JSON.stringify(doc)), /重复的关联/);
+      doc.tables.find(t => t.name === 'photos').rows.pop(); reference.project_id = 'positive';
+      await assert.rejects(backup.previewMetadata(JSON.stringify(doc)), /必须且只能属于/);
+    });
+    await test('backup valid replacement rolls all tables back when the actual SQL write fails', async () => {
+      await db.sql("UPDATE characters SET name='Before failed replacement'");
+      db.failSql = 'INSERT INTO projects'; await assert.rejects(backup.restoreMetadata(exported), /injected write failure/); db.failSql = '';
+      assert.equal((await db.sql('SELECT name FROM characters')).rows[0][0], 'Before failed replacement');
+      assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4); await backup.restoreMetadata(exported);
+    });
+    await test('backup file export checks UTF-8 byte counts and closes files on complete and partial writes', async () => {
+      const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
+      const service = new ActualBackupService(db, {}); let closes = 0, output;
+      backupFileControl = { save: () => ['test://export'], close: () => { closes++; }, write: (fd, bytes) => { output = Buffer.from(bytes); return bytes.byteLength; } };
+      assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 6);
+      assert.equal(output.includes(Buffer.from('毛娘', 'utf8')), true);
+      backupFileControl.write = (fd, bytes) => bytes.byteLength - 1;
+      await assert.rejects(service.export(), /未完整写入/); assert.equal(closes, 2);
+      backupFileControl.save = () => []; assert.equal(await service.export(), false); assert.equal(closes, 2);
+    });
+    await test('backup file selection reads chunks, closes files and only returns a validated preview', async () => {
+      const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
+      const service = new ActualBackupService(db, {}); let closes = 0;
+      backupFileControl = { bytes: Buffer.from(exported), select: () => ['test://import'], close: () => { closes++; }, read: (fd, buffer, options) => { const part = backupFileControl.bytes.subarray(options.offset, options.offset + Math.min(buffer.byteLength, 127)); new Uint8Array(buffer).set(part); return part.length; } };
+      const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 6); assert.equal(closes, 1);
+      assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
+      backupFileControl.read = () => 0; await assert.rejects(service.prepareRestore(), /读取不完整/); assert.equal(closes, 2);
+      backupFileControl.bytes = Buffer.from('bad json'); backupFileControl.read = (fd, buffer) => { new Uint8Array(buffer).set(backupFileControl.bytes); return backupFileControl.bytes.length; };
+      await assert.rejects(service.prepareRestore()); assert.equal(closes, 3);
+      backupFileControl.select = () => []; assert.equal(await service.prepareRestore(), undefined); backupFileControl = {};
+    });
+    await test('backup state selection and cancellation only stage validated input, export cancellation never records success', async () => {
+      const state = new AppState(); state.context = {}; state.db = db; let replacements = 0;
+      backupControl = { prepare: async () => ({ input: exported, preview: await backup.previewMetadata(exported) }), restore: async input => { replacements++; await backup.restoreMetadata(input); }, export: async () => false };
+      assert.equal(await state.restoreData(), false); assert.equal(replacements, 0);
+      assert.equal(await state.prepareRestoreData(), true); assert.ok(state.restorePreview); assert.equal(replacements, 0);
+      assert.equal(await state.exportData(), false); assert.equal(state.lastMetadataExport, 0); assert.equal(state.notice, '');
+      state.cancelRestoreData(); assert.equal(state.restorePreview, undefined); assert.equal(await state.restoreData(), false);
+      backupControl.prepare = async () => undefined; assert.equal(await state.prepareRestoreData(), false); assert.equal(state.notice, '');
+      backupControl.export = async () => true; failExportTime = true;
+      assert.equal(await state.exportData(), true); assert.equal(state.lastOperation.status, 'partial'); assert.match(state.notice, /已导出/); assert.ok(state.lastMetadataExport);
+      failExportTime = false; assert.equal(await state.exportData(), true); assert.equal(metadataExportTime, state.lastMetadataExport);
+    });
+    await test('backup committed replacement clears its input before refresh; reload never replays replacement', async () => {
+      const state = new AppState(); state.context = {}; state.db = db; let writes = 0, refreshes = 0;
+      backupControl = { prepare: async () => ({ input: exported, preview: await backup.previewMetadata(exported) }), restore: async input => { writes++; await backup.restoreMetadata(input); } };
+      state.refresh = async () => { refreshes++; if (refreshes === 1) throw new Error('read unavailable'); };
+      assert.equal(await state.prepareRestoreData(), true);
+      assert.equal(await state.restoreData(), true); assert.equal(writes, 1); assert.equal(state.restorePreview, undefined);
+      assert.equal(state.lastOperation.status, 'savedNotRefreshed'); assert.match(state.notice, /已替换恢复/);
+      assert.equal(await state.restoreData(), false); assert.equal(writes, 1);
+      assert.equal(await state.reloadRecords(), true); assert.equal(writes, 1); assert.equal(refreshes, 2);
+    });
+    await test('backup replacement failure preserves staged input and original records for explicit retry', async () => {
+      const state = new AppState(); state.context = {}; state.db = db; state.refresh = async () => {};
+      backupControl = { prepare: async () => ({ input: exported, preview: await backup.previewMetadata(exported) }), restore: async input => backup.restoreMetadata(input) };
+      await state.prepareRestoreData(); db.failSql = 'INSERT INTO projects';
+      assert.equal(await state.restoreData(), false); assert.ok(state.restorePreview); assert.equal(state.lastOperation.status, 'failed'); db.failSql = '';
+      assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
+      assert.equal(await state.restoreData(), true); assert.equal(state.restorePreview, undefined); backupControl = {};
     });
     const { EntryRepository } = require(root + '/data/repository/EntryRepository.ets');
     const { entryFromText, validateEntry, CollectedEntry } = require(root + '/model/CollectedEntry.ets');

@@ -1,3 +1,5 @@
+import { BackupTable, validateBackupRelations } from './BackupValidation';
+import { MetadataBackupPreview, BackupObjectCount } from '../../model/MetadataBackupPreview';
 import { CollectedEntry, validateEntry } from '../../model/CollectedEntry';
 import { entryScopeTable } from './EntryRepository';
 import { CosEvent } from '../../model/Entities';
@@ -30,7 +32,6 @@ const TABLES: TableSpec[] = [
   new TableSpec('reference_images', ['id', 'project_id', 'character_id', 'source_uri', 'local_path', 'thumbnail_path', 'caption', 'created_at']),
   new TableSpec('entries', ['id','kind','scope_kind','scope_id','title','url','text','local_path','thumbnail_path','pinned','created_at'])
 ];
-interface BackupTable { name: string; rows: relationalStore.ValuesBucket[]; }
 interface BackupDocument { format: string; version: number; exportedAt: number; tables: BackupTable[]; }
 
 // Versioned portable metadata and RDB transactions stay in the data layer.
@@ -56,12 +57,13 @@ export class MetadataBackupRepository {
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
   }
-  async restoreMetadata(input: string): Promise<void> {
+  private async prepareDocument(input: string): Promise<BackupDocument> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
+    if (!doc || doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
+    if (!Number.isSafeInteger(doc.exportedAt) || doc.exportedAt < 0 || !Number.isFinite(new Date(doc.exportedAt).getTime())) { throw new Error('备份导出时间无效'); }
     const existingEntries = new Map<string, relationalStore.ValuesBucket>();
     const entryRows = await this.db.getStore().querySql('SELECT id,local_path,thumbnail_path FROM entries');
     try { while (entryRows.goToNextRow()) { existingEntries.set(entryRows.getString(0), { local_path: entryRows.getString(1), thumbnail_path: entryRows.getString(2) }); } } finally { entryRows.close(); }
@@ -100,6 +102,7 @@ export class MetadataBackupRepository {
       const table = doc.tables[i];
       if (!table || table.name !== spec.name || !Array.isArray(table.rows) || table.rows.length > 50000) { throw new Error('备份表结构无效'); }
       for (const row of table.rows) {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) { throw new Error('备份包含无效记录'); }
         if (Object.keys(row).length !== spec.columns.length) { throw new Error('备份列不完整'); }
         for (const col of spec.columns) {
           const value = row[col];
@@ -165,6 +168,28 @@ export class MetadataBackupRepository {
         if (spec.name === 'characters') { row['cover'] = allowedCovers.includes(String(row['cover'])) ? row['cover'] : ''; }
       }
     }
+    validateBackupRelations(doc.tables);
+    return doc;
+  }
+  async previewMetadata(input: string): Promise<MetadataBackupPreview> {
+    const doc = await this.prepareDocument(input);
+    const preview = new MetadataBackupPreview(); preview.version = doc.version; preview.exportedAt = doc.exportedAt;
+    const labels: string[] = ['角色', '角色版本', '活动', '计划', '装备', '计划装备关联', '打包项', '照片', '照片版本', '计划日志', '准备分类', '准备任务', '团队成员', '花费', '参考图', '收录'];
+    for (let i = 0; i < TABLES.length; i++) {
+      const count = new BackupObjectCount(); count.table = TABLES[i].name; count.label = labels[i];
+      count.incoming = doc.tables.find((table: BackupTable) => table.name === count.table)?.rows.length || 0;
+      const result = await this.db.getStore().querySql('SELECT COUNT(*) FROM ' + count.table);
+      try { if (result.goToNextRow()) { count.current = result.getLong(0); } } finally { result.close(); }
+      preview.counts.push(count);
+    }
+    for (const table of doc.tables) {
+      if (!['photos', 'reference_images', 'entries'].includes(table.name)) { continue; }
+      preview.mediaWithoutLocalPath += table.rows.filter((row: relationalStore.ValuesBucket) => !row['local_path'] && (table.name !== 'entries' || row['kind'] === 'image')).length;
+    }
+    return preview;
+  }
+  async restoreMetadata(input: string): Promise<void> {
+    const doc = await this.prepareDocument(input);
     await this.db.transaction(async (tx: WriteTransaction) => {
       for (let i = TABLES.length - 1; i >= 0; i--) { await tx.execute('DELETE FROM ' + TABLES[i].name); }
       for (let i = 0; i < doc.tables.length; i++) {

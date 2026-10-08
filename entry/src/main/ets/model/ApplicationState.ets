@@ -1,3 +1,4 @@
+import { MetadataBackupPreview } from './MetadataBackupPreview';
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
 import { LedgerRoute } from './LedgerRoute';
 import { PreparationUndo, usablePreparationUndo } from './HomeSummary';
@@ -7,7 +8,7 @@ import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
 import { buildTaskQueue, TaskQueueItem, taskNeedsAction } from './TaskQueue';
 import { DayModulePreferences, dayEntries, localDay, DAY_MODULES, orderedDayModules } from './DayMode';
-import { getDayModules, setDayModules, getDayDismissals, setDayDismissals } from '../common/storage';
+import { getDayModules, setDayModules, getDayDismissals, setDayDismissals, getLastMetadataExport, setLastMetadataExport } from '../common/storage';
 import { PlanReadiness, buildPlanReadiness } from './PlanReadiness';
 import { OperationResult, executeOperation, operationCommitted } from './OperationResult';
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../common/constants';
@@ -95,6 +96,9 @@ export class AppState {
   @Trace dayModules: DayModulePreferences = {};
   @Trace dayDismissals: Record<string, string> = {};
   @Trace pendingEventId: string = '';
+  @Trace lastMetadataExport: number = 0;
+  @Trace restorePreview?: MetadataBackupPreview;
+  private restoreInput: string = '';
   @Trace ready: boolean = false;
   @Trace busy: boolean = false;
   @Trace settingsBusy: boolean = false;
@@ -153,7 +157,7 @@ export class AppState {
     if (!this.preferencesTask) {
       this.preferencesTask = this.preference.load(context).then(async (settings: AppSettings): Promise<void> => {
         this.settings = settings;
-        this.dayModules = await getDayModules(); this.dayDismissals = await getDayDismissals(); this.tickClock();
+        this.dayModules = await getDayModules(); this.dayDismissals = await getDayDismissals(); this.lastMetadataExport = await getLastMetadataExport(); this.tickClock();
       }).catch((error: Error): void => {
         this.preferencesTask = undefined;
         throw error;
@@ -772,11 +776,30 @@ export class AppState {
     }, false);
   }
   async exportData(): Promise<boolean> {
-    return this.perform(async () => {
-      if (this.context && await new BackupService(this.db, this.context)
-        .export()) { this.reportNotice('元数据已导出。原照片请使用系统备份另行保护。'); }
+    let exported = false;
+    const success = await this.perform(async () => {
+      if (!this.context) { throw new Error('应用尚未就绪'); }
+      exported = await new BackupService(this.db, this.context).export();
+      if (exported) {
+        const timestamp = Date.now(); this.lastMetadataExport = timestamp;
+        try { await setLastMetadataExport(timestamp); }
+        catch (error) { this.operationPartial = true; this.reportNotice('元数据已导出；导出时间未能保存。原照片请另行备份。'); return; }
+        this.reportNotice('元数据已导出。原照片请使用系统备份另行保护。');
+      }
     }, false);
+    return success && exported;
   }
+  async prepareRestoreData(): Promise<boolean> {
+    let selected = false;
+    const success = await this.perform(async () => {
+      if (!this.context) { throw new Error('应用尚未就绪'); }
+      this.cancelRestoreData();
+      const selection = await new BackupService(this.db, this.context).prepareRestore();
+      if (selection) { this.restoreInput = selection.input; this.restorePreview = selection.preview; selected = true; }
+    }, false);
+    return success && selected;
+  }
+  cancelRestoreData(): void { this.restoreInput = ''; this.restorePreview = undefined; }
   async loadDemoData(): Promise<boolean> {
     return this.perform(async (): Promise<void> => {
       if (!this.ready || !this.context || !this.media) { throw new Error('应用尚未就绪'); }
@@ -785,15 +808,18 @@ export class AppState {
     });
   }
   async restoreData(): Promise<boolean> {
+    const input = this.restoreInput; const preview = this.restorePreview;
+    if (!input || !preview) { this.reportError('请先选择并预览备份文件'); return false; }
     let restored = false;
     const success = await this.perform(async () => {
-      if (this.context) { restored = await new BackupService(this.db, this.context).restore(); }
-      if (restored) {
-        this.preparationUndos = [];
-        const draftsCleared = await this.clearFormDrafts('元数据已恢复');
-        const canceled = await this.cancelEventReminders();
-        this.reportNotice('元数据已恢复。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。') + (draftsCleared ? '' : '本地草稿清理未完成，请勿恢复旧草稿。'));
-      }
+      if (!this.context) { throw new Error('应用尚未就绪'); }
+      await new BackupService(this.db, this.context).restoreMetadata(input); restored = true;
+      // Invalidate the staged input as soon as the transaction commits; refresh
+      // retries must never repeat replacement.
+      this.cancelRestoreData(); this.preparationUndos = [];
+      const draftsCleared = await this.clearFormDrafts('元数据已恢复');
+      const canceled = await this.cancelEventReminders();
+      this.reportNotice('已替换恢复 ' + preview.incomingCount + ' 条记录。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。') + (draftsCleared ? '' : '本地草稿清理未完成，请勿恢复旧草稿。'));
     });
     return success && restored;
   }
