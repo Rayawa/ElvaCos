@@ -160,6 +160,23 @@ class RelationalModelTest(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT count(*) FROM preparation_tasks').fetchone()[0], 0)
         self.assertEqual(self.db.execute('SELECT count(*) FROM checklist_items').fetchone()[0], 1)
 
+    def test_v7_to_v8_preserves_plans_and_validates_optional_shooting_time(self):
+        old = sqlite3.connect(':memory:')
+        try:
+            old.execute('PRAGMA foreign_keys=ON')
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_8')[0]): old.execute(sql)
+            old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','旧角色',1,1)")
+            old.execute("INSERT INTO projects(id,character_id,name,status,target_date,budget_cents,budget_configured,created_at,updated_at) VALUES('p','c','旧计划','Ready','2026-10-09',1250,1,2,3)")
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_8')[1]): old.execute(sql)
+            self.assertEqual(old.execute('SELECT name,status,target_date,budget_cents,budget_configured,created_at,updated_at,shooting_time FROM projects').fetchone(), ('旧计划','Ready','2026-10-09',1250,1,2,3,''))
+            for value in ['', '00:00', '09:30', '23:59']:
+                old.execute('UPDATE projects SET shooting_time=?', (value,))
+                self.assertEqual(old.execute('SELECT shooting_time FROM projects').fetchone()[0], value)
+            for value in ['24:00','12:60','9:30','09:3','09:30:00','aa:bb',None]:
+                with self.assertRaises(sqlite3.IntegrityError): old.execute('UPDATE projects SET shooting_time=?', (value,))
+            self.assertEqual(old.execute('SELECT shooting_time FROM projects').fetchone()[0], '23:59')
+        finally: old.close()
+
     def test_v6_to_v7_adds_shots_without_changing_existing_history(self):
         old = sqlite3.connect(':memory:')
         try:
@@ -171,7 +188,7 @@ class RelationalModelTest(unittest.TestCase):
             old.execute("INSERT INTO preparation_tasks(id,project_id,category_id,label,done,waiting_on,waiting_until) VALUES('task','p','category','在途',1,'快递','2026-10-10')")
             old.execute("INSERT INTO checklist_items VALUES('pack','p',NULL,'打包',1,0)")
             old.execute("INSERT INTO photos VALUES('photo','p','test://photo','/original','/thumbnail','Final','说明',1)")
-            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_7')[1]): old.execute(sql)
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_7')[1].split('const MIGRATION_8')[0]): old.execute(sql)
             self.assertEqual(old.execute('SELECT done,waiting_on,waiting_until FROM preparation_tasks').fetchone(), (1,'快递','2026-10-10'))
             self.assertEqual(old.execute('SELECT done FROM checklist_items').fetchone()[0], 1)
             self.assertEqual(old.execute('SELECT local_path,status,caption FROM photos').fetchone(), ('/original','Final','说明'))

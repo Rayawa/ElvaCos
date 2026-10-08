@@ -5,7 +5,7 @@ import { PreparationCategory, PreparationTask, makePreparation, preparationKeys 
 import { AppState } from './ApplicationState';
 import { Asset, Character, CharacterVariant, CosEvent, CosProject, AssetType, AssetStatus, ProjectStatus, ChecklistItem, PhotoAsset, newId } from './Entities';
 import { moneyToCents, validDate, requiredName, safeUrl } from './Rules';
-import { checkSchedule, ScheduleError } from './Schedule';
+import { checkSchedule, ScheduleError, validTime } from './Schedule';
 
 export class FormIssue {
   field: string; message: string;
@@ -25,6 +25,7 @@ interface FormDraftSnapshot {
   variantId: string;
   eventId: string;
   date: string;
+  shootingTime?: string;
   city: string;
   venue: string;
   url: string;
@@ -69,6 +70,7 @@ export class EditDraft {
   @Trace variantId: string = '';
   @Trace eventId: string = '';
   @Trace date: string = '';
+  @Trace shootingTime: string = '';
   @Trace city: string = '';
   @Trace venue: string = '';
   @Trace url: string = '';
@@ -135,7 +137,7 @@ export class EditDraft {
         d.variantId = p.variantId;
         d.eventId = p.eventId;
         d.notes = p.notes;
-        d.date = p.targetDate;
+        d.date = p.targetDate; d.shootingTime = p.shootingTime || '';
         d.money = p.budgetConfigured === true ? String(p.budgetCents / 100) : '';
         d.status = p.status;
       }
@@ -226,6 +228,7 @@ export class EditDraft {
       variantId: this.variantId,
       eventId: this.eventId,
       date: this.date,
+      shootingTime: this.shootingTime,
       city: this.city,
       venue: this.venue,
       url: this.url,
@@ -277,6 +280,7 @@ export class EditDraft {
     if (typeof source.variantId !== 'string') { throw new Error('草稿字段无法读取'); } value.variantId = source.variantId;
     if (typeof source.eventId !== 'string') { throw new Error('草稿字段无法读取'); } value.eventId = source.eventId;
     if (typeof source.date !== 'string') { throw new Error('草稿字段无法读取'); } value.date = source.date;
+    if (source.shootingTime !== undefined && typeof source.shootingTime !== 'string') { throw new Error('草稿字段无法读取'); } value.shootingTime = source.shootingTime || '';
     if (typeof source.city !== 'string') { throw new Error('草稿字段无法读取'); } value.city = source.city;
     if (typeof source.venue !== 'string') { throw new Error('草稿字段无法读取'); } value.venue = source.venue;
     if (typeof source.url !== 'string') { throw new Error('草稿字段无法读取'); } value.url = source.url;
@@ -338,6 +342,7 @@ export class EditDraft {
     if (this.kind === 'project' && this.date || this.kind === 'preparation' && this.date || this.kind === 'expense') {
       if (!validDate(this.date)) { errors.push(new FormIssue('date', '请选择有效日期')); }
     }
+    if (this.kind === 'project' && this.shootingTime && !validTime(this.shootingTime)) { errors.push(new FormIssue('shootingTime', '请选择有效拍摄时间')); }
     if (this.kind === 'preparation') {
       if (!state.preparationCategories.some((item: PreparationCategory) => item.id === this.categoryId && item.projectId === this.parentId)) { errors.push(new FormIssue('categoryId', '请选择此计划的准备分类')); }
       if (this.waitingUntil && !validDate(this.waitingUntil)) { errors.push(new FormIssue('waitingUntil', '请选择有效等待日期')); }
@@ -393,7 +398,7 @@ export class EditDraft {
       p.characterId = this.characterId;
       p.variantId = this.variantId;
       p.eventId = this.eventId;
-      p.targetDate = this.date;
+      p.targetDate = this.date; p.shootingTime = this.shootingTime;
       p.status = this.status as ProjectStatus;
       p.notes = this.notes;
       const budgetEntered = this.money.trim() !== '';

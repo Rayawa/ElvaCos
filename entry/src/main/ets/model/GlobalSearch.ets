@@ -75,7 +75,7 @@ export function globalSearch(data: SearchData, query: string): SearchSummary {
     const character = characters.get(project.characterId);
     const variant = (variants.get(project.characterId) || []).find((value: CharacterVariant) => value.id === project.variantId);
     const event = events.get(project.eventId);
-    const detail = [character?.name || '角色已不存在', variant?.name || '', event?.name || '', planDate(project, data.events) || '日期待定'].filter((value: string) => !!value).join(' · ');
+    const detail = [character?.name || '角色已不存在', variant?.name || '', event?.name || '', planDate(project, data.events) || '日期待定', project.shootingTime || ''].filter((value: string) => !!value).join(' · ');
     if (matches(project.name + ' ' + detail + ' ' + project.notes + ' ' + (character?.workName || ''))) { summary.sections[0].push(new SearchHit('project', project.id, project.name, detail)); }
   }
   for (const character of data.characters) {

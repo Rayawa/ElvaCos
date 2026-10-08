@@ -1,8 +1,8 @@
 import { DATE_MODES, TIME_MODES } from '../common/constants';
 import { CosEvent } from './Entities';
-import { validDate, requiredName } from './Rules';
+import { validDate, requiredName, validTime } from './Rules';
 
-export function validTime(value: string): boolean { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
+export { validTime } from './Rules';
 export class ScheduleError extends Error {
   field: string;
   constructor(field: string, message: string) { super(message); this.field = field; }

@@ -5,7 +5,7 @@ import { entryScopeTable } from './EntryRepository';
 import { CosEvent } from '../../model/Entities';
 import { checkSchedule } from '../../model/Schedule';
 import { relationalStore } from '@kit.ArkData';
-import { validDate, requiredName, safeUrl } from '../../model/Rules';
+import { validDate, requiredName, safeUrl, validTime } from '../../model/Rules';
 import { Database, WriteTransaction } from '../database/Database';
 
 class TableSpec {
@@ -18,7 +18,7 @@ const TABLES: TableSpec[] = [
   new TableSpec('characters', ['id', 'name', 'work_name', 'description', 'cover', 'favorite', 'status', 'created_at', 'updated_at']),
   new TableSpec('variants', ['id', 'character_id', 'name', 'notes']),
   new TableSpec('events', LEGACY_EVENT_COLUMNS.concat(['date_mode', 'end_date', 'time_mode', 'start_time', 'end_time', 'event_type', 'reminder_id', 'reminder_minutes'])),
-  new TableSpec('projects', ['id', 'character_id', 'variant_id', 'event_id', 'name', 'status', 'notes', 'target_date', 'budget_cents', 'budget_configured', 'created_at', 'updated_at']),
+  new TableSpec('projects', ['id', 'character_id', 'variant_id', 'event_id', 'name', 'status', 'notes', 'target_date', 'shooting_time', 'budget_cents', 'budget_configured', 'created_at', 'updated_at']),
   new TableSpec('assets', ['id', 'name', 'type', 'status', 'location', 'brand', 'size', 'price_cents', 'purchase_url', 'notes', 'created_at']),
   new TableSpec('project_assets', ['project_id', 'asset_id']),
   new TableSpec('checklist_items', ['id', 'project_id', 'asset_id', 'label', 'done', 'sort_order']),
@@ -53,7 +53,7 @@ export class MetadataBackupRepository {
       } finally { result.close(); }
       tables.push({ name: spec.name, rows: rows });
     }
-    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 7, exportedAt: Date.now(), tables: tables };
+    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 8, exportedAt: Date.now(), tables: tables };
     const output = JSON.stringify(doc);
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
@@ -61,7 +61,7 @@ export class MetadataBackupRepository {
   private async prepareDocument(input: string): Promise<BackupDocument> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (!doc || doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6, 7].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : doc.version < 7 ? 16 : TABLES.length)) {
+    if (!doc || doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : doc.version < 7 ? 16 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
     if (!Number.isSafeInteger(doc.exportedAt) || doc.exportedAt < 0 || !Number.isFinite(new Date(doc.exportedAt).getTime())) { throw new Error('备份导出时间无效'); }
@@ -98,6 +98,7 @@ export class MetadataBackupRepository {
     }
     for (let i = 0; i < doc.tables.length; i++) {
       let spec = doc.version < 3 && TABLES[i].name === 'events' ? new TableSpec('events', LEGACY_EVENT_COLUMNS) : TABLES[i];
+      if (doc.version < 8 && spec.name === 'projects') { spec = new TableSpec(spec.name, spec.columns.filter((col: string) => col !== 'shooting_time')); }
       if (doc.version < 4 && spec.name === 'projects') { spec = new TableSpec('projects', spec.columns.filter((col: string) => col !== 'budget_configured')); }
       if (doc.version < 6 && spec.name === 'preparation_tasks') { spec = new TableSpec(spec.name, spec.columns.filter((col: string) => col !== 'waiting_on' && col !== 'waiting_until')); }
       const table = doc.tables[i];
@@ -125,6 +126,7 @@ export class MetadataBackupRepository {
           if (typeof value === 'string' && (col === 'date' || col === 'target_date' || col === 'due_date' || col === 'end_date' || col === 'waiting_until') && (value !== '' || (col === 'date' && !(spec.name === 'events' && row['date_mode'] === 'pending'))) && !validDate(value)) {
             throw new Error('备份包含无效日期');
           }
+          if (col === 'shooting_time' && value !== '' && !validTime(String(value))) { throw new Error('备份包含无效拍摄时间'); }
           if (typeof value === 'string' && value.length > 20000) { throw new Error('备份字段过长'); }
         }
         if (spec.name === 'entries') {
@@ -140,6 +142,7 @@ export class MetadataBackupRepository {
           const existing = existingEntries.get(String(row['id']));
           row['local_path'] = existing ? existing['local_path'] : ''; row['thumbnail_path'] = existing ? existing['thumbnail_path'] : '';
         }
+        if (spec.name === 'projects' && doc.version < 8) { row['shooting_time'] = ''; }
         if (spec.name === 'projects' && doc.version < 4) { row['budget_configured'] = Number(row['budget_cents']) > 0 ? 1 : null; }
         if (spec.name === 'events') {
           const event = new CosEvent();

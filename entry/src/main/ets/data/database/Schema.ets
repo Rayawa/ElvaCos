@@ -77,3 +77,8 @@ const MIGRATION_7: string[] = [
   `CREATE TRIGGER shot_reference_owner_changed AFTER UPDATE OF project_id,character_id ON reference_images BEGIN UPDATE project_shots SET reference_id='' WHERE reference_id=NEW.id AND NOT EXISTS(SELECT 1 FROM projects p WHERE p.id=project_shots.project_id AND (NEW.project_id=p.id OR NEW.character_id=p.character_id)); END`
 ];
 export function migration7(): string[] { return MIGRATION_7; }
+
+const MIGRATION_8: string[] = [
+  `ALTER TABLE projects ADD COLUMN shooting_time TEXT NOT NULL DEFAULT '' CHECK(shooting_time='' OR (length(shooting_time)=5 AND shooting_time GLOB '[0-2][0-9]:[0-5][0-9]' AND substr(shooting_time,1,2)<'24'))`
+];
+export function migration8(): string[] { return MIGRATION_8; }

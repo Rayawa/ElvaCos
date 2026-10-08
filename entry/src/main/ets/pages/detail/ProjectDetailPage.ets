@@ -1,3 +1,4 @@
+import { planShootingLabel } from '../../model/DayMode';
 import { WorkCard } from '../../component/WorkCard';
 import { formatTimestamp } from '../../common/format';
 import { DiaryEntry } from '../../model/Entities';
@@ -187,12 +188,13 @@ export struct ProjectDetail {
       StatusPill({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.project.status)] })
     }.width('100%').alignItems(VerticalAlign.Center)
     if (planDate(this.project, this.state.events)) { Text((this.state.readiness(this.project.id).dateFromEvent ? '日期来自活动 · ' : '计划日期 · ') + planDate(this.project, this.state.events)).fontSize(13).fontColor(Theme.muted) }
+    if (this.project.shootingTime) { Text('拍摄 / 约拍 · ' + planShootingLabel(this.project, this.state.events)).id('project-shooting-time').fontSize(15).fontColor(Theme.ink) }
     if (this.project.eventId) {
       Button('活动 · ' + (this.state.events.find((e: CosEvent) => e.id === this.project.eventId)?.name || '未关联'))
         .backgroundColor(Theme.tint)
         .fontColor(Theme.accent)
         .fontSize(13)
-        .constraintSize({ minHeight: 36 })
+        .constraintSize({ minHeight: 48 })
         .onClick((): void => { vibration.dotVibration(); this.open('event', this.project.eventId); })
         .accessibilityText('打开关联活动').visualEffect(this.feedback.effect('button-5')).compositingFilter(this.feedback.filter('button-5')).attributeModifier(this.feedback.control('button-5'))
     }

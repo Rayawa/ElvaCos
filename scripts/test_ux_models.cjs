@@ -226,6 +226,55 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const { ProjectRoute }=require(root+'/model/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/model/CharacterRoute.ets');
     for(const owner of [new ProjectRoute('plan'),new CharacterRoute('role'),event]) { owner.entries.setKind('link'); assert.equal(owner.entries.kind,'link'); assert.equal(owner.entries.scopeId,owner.id); assert.equal(owner.entries.content,''); }
   });
+  await test('shooting labels and timeline share plan dates, show unknown dates honestly, order cross-day boundaries and disappear without recorded times', () => {
+    const { eventTimeline, planShootingLabel, availableDayModules }=day;
+    const expo=Object.assign(new CosEvent(),{id:'shoot-event',dateMode:'multiple',date:'2026-10-08',endDate:'2026-10-10',timeMode:'range',startTime:'10:00',endTime:'18:00'});
+    const plans=[Object.assign(new CosProject(),{id:'first',name:'第一套',eventId:expo.id,shootingTime:'11:00'}),Object.assign(new CosProject(),{id:'later',name:'第二套',eventId:expo.id,targetDate:'2026-10-09',shootingTime:'09:30'}),Object.assign(new CosProject(),{id:'foreign',eventId:'other',shootingTime:'08:00'})];
+    const before=JSON.stringify(plans); assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-08 · 11:00'); assert.equal(planShootingLabel(plans[1],[expo]),'2026-10-09 · 09:30');
+    assert.deepEqual(eventTimeline(expo,plans).map(item=>[item.id,item.date,item.time]),[['event-start','2026-10-08','10:00'],['project:first','2026-10-08','11:00'],['project:later','2026-10-09','09:30'],['event-end','2026-10-10','18:00']]); assert.equal(JSON.stringify(plans),before);
+    expo.date='2026-10-09'; assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-09 · 11:00');
+    expo.dateMode='pending'; expo.date=''; expo.endDate=''; expo.timeMode='none'; expo.startTime=''; expo.endTime='';
+    assert.equal(planShootingLabel(plans[0],[expo]),'日期待定 · 11:00'); assert.equal(eventTimeline(expo,plans).at(-1).date,'');
+    assert.equal(availableDayModules(expo,plans,[],[],Date.now()).includes('timeline'),true); plans[0].shootingTime=''; plans[1].shootingTime='';
+    assert.equal(eventTimeline(expo,plans).length,0); assert.equal(availableDayModules(expo,plans,[],[],Date.now()).includes('timeline'),false); assert.equal(planShootingLabel(plans[0],[expo]),'拍摄时间未设置');
+  });
+  await test('shooting time draft survives native-style non-enumerable fields and old snapshots normalize without false source changes', async () => {
+    const { state, db }=await wardrobeFixture();
+    try {
+      state.characters=[Object.assign(new entities.Character(),{id:'role',name:'角色'})];
+      const draft=EditDraft.make(state,'project','p1'); draft.name='拍摄计划'; draft.shootingTime='23:59';
+      let time=draft.shootingTime; Object.defineProperty(draft,'shootingTime',{enumerable:false,configurable:true,get:()=>time,set:value=>{time=value;}});
+      assert.equal(EditDraft.fromJSON(draft.serialize()).shootingTime,'23:59'); draft.shootingTime='24:00'; assert.equal(draft.issues(state).find(issue=>issue.field==='shootingTime').message,'请选择有效拍摄时间'); draft.shootingTime=''; assert.equal(draft.issues(state).some(issue=>issue.field==='shootingTime'),false);
+      const snapshot=JSON.parse(draft.serialize()); delete snapshot.shootingTime; assert.equal(EditDraft.fromJSON(JSON.stringify(snapshot)).shootingTime,''); snapshot.shootingTime=9; assert.throws(()=>EditDraft.fromJSON(JSON.stringify(snapshot)),/草稿字段/);
+      const baseline=EditDraft.make(state,'project','p1'); const old=JSON.parse(baseline.serialize()); delete old.shootingTime;
+      const store=new FormDraftStore({read:async()=>JSON.stringify({version:1,records:[{key:formDraftKey(baseline),payload:JSON.stringify(old),baseline:JSON.stringify(old),savedAt:Date.now()}]}),write:async()=>{}});
+      const session=new FormSession(baseline,store); await session.initialize(state); session.restore(); assert.equal(session.sourceChanged,false); assert.equal(session.dirty,false);
+    } finally { db.close(); }
+  });
+  await test('actual plan timing persistence can be cleared, rejects invalid time and retains edits after write failure; committed refresh failure is never resubmitted', async () => {
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/data/repository/Repositories.ets'); const repo=new CosProjectRepository(db);
+    try {
+      state.projectRepo=repo; state.characters=[Object.assign(new entities.Character(),{id:'role',name:'角色'})];
+      const refresh=async()=>{state.projects=await repo.list();}; state.refresh=refresh; await refresh();
+      const initial=(await repo.list()).find(plan=>plan.id==='p1'); const before=JSON.stringify(state.readiness('p1'));
+      initial.shootingTime='09:30'; await repo.save(initial); await refresh(); assert.equal(state.projects.find(plan=>plan.id==='p1').shootingTime,'09:30'); assert.equal(JSON.stringify(state.readiness('p1')),before);
+      initial.shootingTime='24:00'; await assert.rejects(repo.save(initial),/拍摄时间/); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'09:30');
+      const draft=EditDraft.make(state,'project','p1'); draft.shootingTime='17:00'; db.failSql='INSERT INTO projects'; assert.equal(await draft.save(state),false); db.failSql=''; assert.equal(draft.shootingTime,'17:00'); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'09:30');
+      state.refresh=async()=>{throw new Error('read failed');}; assert.equal(await draft.save(state),true); assert.equal(state.lastOperation.status,'savedNotRefreshed'); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'17:00');
+      state.refresh=refresh; assert.equal(await state.reloadRecords(),true); assert.equal(state.projects.find(plan=>plan.id==='p1').shootingTime,'17:00'); assert.equal((await repo.list()).length,3);
+      const clear=EditDraft.make(state,'project','p1'); clear.shootingTime=''; assert.equal(await clear.save(state),true); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'');
+    } finally { db.close(); }
+  });
+  await test('v8 plan timing backup round trips, v7 defaults empty, and invalid or interrupted replacement preserves the original record', async () => {
+    const { db }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/data/repository/Repositories.ets'); const { MetadataBackupRepository }=require(root+'/data/repository/MetadataBackupRepository.ets'); const repo=new CosProjectRepository(db),backup=new MetadataBackupRepository(db);
+    try {
+      const plan=(await repo.list()).find(plan=>plan.id==='p1'); plan.shootingTime='00:00'; await repo.save(plan); const saved=await backup.exportMetadata(); assert.equal(JSON.parse(saved).version,8);
+      const old=JSON.parse(saved); old.version=7; for(const row of old.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } await backup.restoreMetadata(JSON.stringify(old)); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'');
+      await backup.restoreMetadata(saved); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'00:00');
+      for(const value of ['24:00','12:60','9:30','date',null,123]) { const bad=JSON.parse(saved); bad.tables.find(table=>table.name==='projects').rows.find(row=>row.id==='p1').shooting_time=value; await assert.rejects(backup.previewMetadata(JSON.stringify(bad)),/备份/); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'00:00'); }
+      db.failSql='INSERT INTO projects'; await assert.rejects(backup.restoreMetadata(saved),/injected/); db.failSql=''; assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'00:00'); assert.equal((await repo.list()).length,3);
+    } finally { db.close(); }
+  });
   await test('day entry opens at local eve 20:00 and ends after the entire last day', () => {
     assert.equal(day.dayWindow(dayEvent, time('2026-10-07T19:59:59')), false);
     assert.equal(day.dayWindow(dayEvent, time('2026-10-07T20:00:00')), true);
@@ -888,14 +937,14 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const oldSession = new FormSession(EditDraft.make(state,'character'),store); await oldSession.initialize(state); oldSession.restore(); assert.equal(oldSession.sourceChanged,false);
     } finally { db.close(); }
   });
-  await test('v7 shot backup preview and restore preserve links and completion; v6 clears only the absent shot type; invalid ownership and failed replacement retain records', async () => {
+  await test('current shot backup preview and restore preserve links and completion; v6 clears only the absent shot type; invalid ownership and failed replacement retain records', async () => {
     const { ProjectShot } = require(root + '/model/Shot.ets'), { db,repo,backup } = await shotsFixture();
     try {
       await repo.save(Object.assign(new ProjectShot(),{id:'backed',projectId:'p1',title:'合影',referenceId:'role-ref'}),true); await repo.setDone('backed','p1',true,false);
-      const exported = await backup.exportMetadata(); assert.equal(JSON.parse(exported).version,7); const preview = await backup.previewMetadata(exported); assert.equal(preview.counts.find(row=>row.table==='project_shots').incoming,1); assert.equal((await repo.list())[0].done,true);
+      const exported = await backup.exportMetadata(); assert.equal(JSON.parse(exported).version,8); const preview = await backup.previewMetadata(exported); assert.equal(preview.counts.find(row=>row.table==='project_shots').incoming,1); assert.equal((await repo.list())[0].done,true);
       const bad = JSON.parse(exported); bad.tables.find(table=>table.name==='project_shots').rows[0].reference_id='foreign-ref'; await assert.rejects(backup.previewMetadata(JSON.stringify(bad)),/不属于/); assert.equal((await repo.list()).length,1);
       db.failSql='INSERT INTO project_shots'; await assert.rejects(backup.restoreMetadata(exported),/injected/); db.failSql=''; assert.equal((await repo.list())[0].done,true);
-      const legacy = JSON.parse(exported); legacy.version=6; legacy.tables=legacy.tables.slice(0,16); const oldPreview = await backup.previewMetadata(JSON.stringify(legacy)); assert.equal(oldPreview.counts.find(row=>row.table==='project_shots').incoming,0);
+      const legacy = JSON.parse(exported); legacy.version=6; legacy.tables=legacy.tables.slice(0,16); for (const row of legacy.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } const oldPreview = await backup.previewMetadata(JSON.stringify(legacy)); assert.equal(oldPreview.counts.find(row=>row.table==='project_shots').incoming,0);
       await backup.restoreMetadata(JSON.stringify(legacy)); assert.equal((await repo.list()).length,0); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0],3);
       await backup.restoreMetadata(exported); assert.equal((await repo.list())[0].referenceId,'role-ref'); assert.equal((await repo.list())[0].done,true);
     } finally { db.close(); }
@@ -1282,12 +1331,12 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const backup = new MetadataBackupRepository(db);
     const exported = await backup.exportMetadata();
     await test('current backup round trip preserves explicit zero, unset and unknown budgets', async () => {
-      assert.equal(JSON.parse(exported).version, 7); await backup.restoreMetadata(exported);
+      assert.equal(JSON.parse(exported).version, 8); await backup.restoreMetadata(exported);
       assert.deepEqual((await db.sql('SELECT id,budget_cents,budget_configured FROM projects ORDER BY id')).rows, [['positive',1234,1], ['unknown',0,null], ['unset',0,0], ['zero',0,1]]);
     });
     await test('v1, v2 and v3 backups infer positive budgets but preserve historical zero as unknown', async () => {
       for (const version of [1,2,3]) {
-        const doc = JSON.parse(exported); doc.version = version; doc.tables = doc.tables.slice(0, version === 1 ? 10 : version === 2 ? 12 : 15);
+        const doc = JSON.parse(exported); doc.version = version; for (const row of doc.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } doc.tables = doc.tables.slice(0, version === 1 ? 10 : version === 2 ? 12 : 15);
         for (const row of doc.tables.find(t => t.name === 'preparation_tasks')?.rows || []) { delete row.waiting_on; delete row.waiting_until; }
         for (const row of doc.tables.find(t => t.name === 'projects').rows) delete row.budget_configured;
         await backup.restoreMetadata(JSON.stringify(doc));
@@ -1295,14 +1344,14 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       }
     });
     await test('v4 backup retains budget flags and defaults the new entries table to empty', async () => {
-      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0,15); for (const row of doc.tables.find(t => t.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; } await backup.restoreMetadata(JSON.stringify(doc));
+      const doc = JSON.parse(exported); doc.version = 4; for (const row of doc.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } doc.tables = doc.tables.slice(0,15); for (const row of doc.tables.find(t => t.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; } await backup.restoreMetadata(JSON.stringify(doc));
       assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',0], ['zero',1]]);
       assert.equal((await db.sql('SELECT count(*) FROM entries')).rows[0][0], 0);
     });
     await test('current waiting fields round trip; v5 defaults them without changing task history', async () => {
       await backup.restoreMetadata(exported); const current = (await preparations.tasks()).find(task => task.id === 'persist-wait');
       assert.equal(current.waitingOn, '毛娘'); assert.equal(current.waitingUntil, '2026-10-11');
-      const old = JSON.parse(exported); old.version = 5; old.tables = old.tables.slice(0, 16);
+      const old = JSON.parse(exported); old.version = 5; for (const row of old.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } old.tables = old.tables.slice(0, 16);
       for (const row of old.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
       await backup.restoreMetadata(JSON.stringify(old)); const restored = (await preparations.tasks()).find(task => task.id === 'persist-wait');
       assert.equal(restored.waitingOn, ''); assert.equal(restored.waitingUntil, ''); assert.equal(restored.done, true); assert.equal(restored.dueDate, '2026-10-01');
@@ -1325,7 +1374,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     await test('backup preview counts current and incoming objects without any transaction or mutation', async () => {
       const before = await backup.exportMetadata(); const originalTransaction = db.transaction;
       db.transaction = async () => { throw new Error('preview must not begin a transaction'); };
-      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0, 15);
+      const doc = JSON.parse(exported); doc.version = 4; for (const row of doc.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } doc.tables = doc.tables.slice(0, 15);
       for (const row of doc.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
       const preview = await backup.previewMetadata(JSON.stringify(doc));
       assert.equal(preview.version, 4); assert.equal(preview.exportedAt, doc.exportedAt);
@@ -1376,7 +1425,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0, output;
       backupFileControl = { save: () => ['test://export'], close: () => { closes++; }, write: (fd, bytes) => { output = Buffer.from(bytes); return bytes.byteLength; } };
-      assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 7);
+      assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 8);
       assert.equal(output.includes(Buffer.from('毛娘', 'utf8')), true);
       backupFileControl.write = (fd, bytes) => bytes.byteLength - 1;
       await assert.rejects(service.export(), /未完整写入/); assert.equal(closes, 2);
@@ -1386,7 +1435,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const { BackupService: ActualBackupService } = require(root + '/common/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0;
       backupFileControl = { bytes: Buffer.from(exported), select: () => ['test://import'], close: () => { closes++; }, read: (fd, buffer, options) => { const part = backupFileControl.bytes.subarray(options.offset, options.offset + Math.min(buffer.byteLength, 127)); new Uint8Array(buffer).set(part); return part.length; } };
-      const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 7); assert.equal(closes, 1);
+      const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 8); assert.equal(closes, 1);
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
       backupFileControl.read = () => 0; await assert.rejects(service.prepareRestore(), /读取不完整/); assert.equal(closes, 2);
       backupFileControl.bytes = Buffer.from('bad json'); backupFileControl.read = (fd, buffer) => { new Uint8Array(buffer).set(backupFileControl.bytes); return backupFileControl.bytes.length; };

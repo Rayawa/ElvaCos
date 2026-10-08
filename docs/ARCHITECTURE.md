@@ -32,13 +32,13 @@ DiaryEntry 记录项目生命周期。照片保留项目、角色上下文，P1 
 
 ## 数据库
 
-RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v7，增量加入准备分类/任务、团队、花费、参考图、可空预算标记、收录条目、在途任务字段与拍摄清单；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
+RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v8，增量加入准备分类/任务、团队、花费、参考图、可空预算标记、收录条目、在途任务字段、拍摄清单与可选计划拍摄时刻；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
 
 照片导入默认仅导入用户选中的图片，一份沙箱原文件 + 一份低分辨率缩略图；保留 source_uri 作来源标识，不依赖临时 URI 权限。图片列表只展示缩略图，详情才读取原图；不修改系统相册原文件。PhotoVersion 保存编辑参数和派生路径，与 PhotoAsset 独立。首版编辑器不扩展到重型修图。
 
 收录使用 `entries` 存放链接/票/图/笔记/想法；归属对象删除时自动回到未归位，转换为任务/花费/参考图以事务同时提交新对象与移除源条目。图片复用沙箱媒体管理与缺失修复，媒体清理保留照片、参考图与收录的文件。
 
-备份：当前元数据格式 v7，兼容 v1–v6；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
+备份：当前元数据格式 v8，兼容 v1–v7；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
 
 ## 目录与责任
 

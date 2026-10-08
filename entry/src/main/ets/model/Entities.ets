@@ -67,6 +67,7 @@ export class CosProject {
   status: ProjectStatus = ProjectStatus.PREPARING;
   notes: string = '';
   targetDate: string = '';
+  shootingTime: string = '';
   budgetCents: number = 0;
   budgetConfigured: boolean | undefined = false;
   createdAt: number = Date.now();

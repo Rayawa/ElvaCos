@@ -1,3 +1,4 @@
+import { checkProjectDate } from '../../model/Rules';
 import { checkSchedule } from '../../model/Schedule';
 import { assetRemovalKey } from '../../model/Wardrobe';
 import { PreparationBundle } from '../../model/Preparation';
@@ -115,6 +116,7 @@ export class CosProjectRepository {
           item.status = str(rows, 'status') as ProjectStatus;
           item.notes = str(rows, 'notes');
           item.targetDate = str(rows, 'target_date');
+          item.shootingTime = str(rows, 'shooting_time');
           item.budgetCents = num(rows, 'budget_cents');
           item.budgetConfigured = rows.isColumnNull(rows.getColumnIndex('budget_configured')) ? undefined : num(rows, 'budget_configured') === 1;
           item.createdAt = num(rows, 'created_at');
@@ -128,11 +130,12 @@ export class CosProjectRepository {
     return result;
   }
   async save(item: CosProject, logText: string = '', character?: Character, preparation?: PreparationBundle): Promise<void> {
+    checkProjectDate(item);
     await this.db.transaction(async (tx: WriteTransaction) => {
       if (character) {
         await tx.execute('INSERT INTO characters (id,name,work_name,description,cover,favorite,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)', [character.id, character.name, character.workName, character.description, character.cover, character.favorite ? 1 : 0, character.status, character.createdAt, character.updatedAt]);
       }
-      await tx.execute('INSERT INTO projects (id, character_id, variant_id, event_id, name, status, notes, target_date, budget_cents, budget_configured, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET character_id=excluded.character_id, variant_id=excluded.variant_id, event_id=excluded.event_id, name=excluded.name, status=excluded.status, notes=excluded.notes, target_date=excluded.target_date, budget_cents=excluded.budget_cents, budget_configured=excluded.budget_configured, created_at=excluded.created_at, updated_at=excluded.updated_at', [item.id, item.characterId, item.variantId || null, item.eventId || null, item.name, item.status, item.notes, item.targetDate, item.budgetCents, item.budgetConfigured === undefined ? null : item.budgetConfigured ? 1 : 0, item.createdAt, item.updatedAt]);
+      await tx.execute('INSERT INTO projects (id, character_id, variant_id, event_id, name, status, notes, target_date, shooting_time, budget_cents, budget_configured, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET character_id=excluded.character_id, variant_id=excluded.variant_id, event_id=excluded.event_id, name=excluded.name, status=excluded.status, notes=excluded.notes, target_date=excluded.target_date, shooting_time=excluded.shooting_time, budget_cents=excluded.budget_cents, budget_configured=excluded.budget_configured, created_at=excluded.created_at, updated_at=excluded.updated_at', [item.id, item.characterId, item.variantId || null, item.eventId || null, item.name, item.status, item.notes, item.targetDate, item.shootingTime || '', item.budgetCents, item.budgetConfigured === undefined ? null : item.budgetConfigured ? 1 : 0, item.createdAt, item.updatedAt]);
       if (preparation) {
         if (preparation.categories.some((c) => c.projectId !== item.id) || preparation.tasks.some((t) => t.projectId !== item.id)) {
           throw new Error('准备模板不属于此计划');

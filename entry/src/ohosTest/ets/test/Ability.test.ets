@@ -29,16 +29,16 @@ export default function abilityTest(): void {
     const checklist = new ChecklistItemRepository(db);
     const character = new Character(); character.name = 'Verification Character';
     const variant = new CharacterVariant(); variant.characterId = character.id; variant.name = 'Original';
-    const project = new CosProject(); project.name = 'Verification Project'; project.characterId = character.id; project.variantId = variant.id;
+    const project = new CosProject(); project.name = 'Verification Project'; project.shootingTime = '09:30'; project.characterId = character.id; project.variantId = variant.id;
     const asset = new Asset(); asset.name = 'Verification Wig';
     let context: common.Context;
     beforeAll(async () => { if (!TestContext.value) { throw new Error('TestAbility context unavailable'); } context = TestContext.value; await db.open(context); });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('migrationAndCrudWorkOnNativeRdb', 0, async () => {
-      expect(db.getStore().version).assertEqual(7);
+      expect(db.getStore().version).assertEqual(8);
       await characters.save(character); await variants.save(variant); await projects.save(project); await assets.save(asset);
       expect((await characters.list())[0].name).assertEqual(character.name);
-      expect((await projects.list())[0].variantId).assertEqual(variant.id);
+      expect((await projects.list())[0].variantId).assertEqual(variant.id); expect((await projects.list())[0].shootingTime).assertEqual('09:30');
     });
     it('assetAssociationAndChecklistGenerationAreIdempotent', 0, async () => {
       await relations.link(project.id, asset); await relations.link(project.id, asset);
@@ -55,12 +55,12 @@ export default function abilityTest(): void {
       const exported = await backup.exportMetadata();
       character.name = 'Changed'; await characters.save(character);
       const preview = await new MetadataBackupRepository(db).previewMetadata(exported);
-      expect(preview.version).assertEqual(7);
+      expect(preview.version).assertEqual(8);
       expect(preview.counts.find((count) => count.table === 'projects')?.incoming).assertEqual(1);
       expect((await characters.list())[0].name).assertEqual('Changed');
       await backup.restoreMetadata(exported);
       expect((await characters.list())[0].name).assertEqual('Verification Character');
-      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":7', '"version":99')); } catch (error) { rejected = true; }
+      let rejected = false; try { await backup.restoreMetadata(exported.replace('"version":8', '"version":99')); } catch (error) { rejected = true; }
       expect(rejected).assertTrue(); expect((await projects.list()).length).assertEqual(1);
     });
     it('invalidBackupForeignKeyIsRejectedBeforeReplacement', 0, async () => {
@@ -68,7 +68,7 @@ export default function abilityTest(): void {
       const exported = await backup.exportMetadata();
       let rejected = false;
       try { await backup.restoreMetadata(exported.replace('"variant_id":"' + variant.id + '"', '"variant_id":"missing"')); } catch (error) { rejected = true; }
-      expect(rejected).assertTrue(); expect((await projects.list())[0].variantId).assertEqual(variant.id); expect((await relations.links()).length).assertEqual(1);
+      expect(rejected).assertTrue(); expect((await projects.list())[0].variantId).assertEqual(variant.id); expect((await projects.list())[0].shootingTime).assertEqual('09:30'); expect((await relations.links()).length).assertEqual(1);
     });
     it('mediaImportMakesIndependentOriginalAndThumbnail', 0, async () => {
       const sourcePath = context.cacheDir + '/verification.jpg';

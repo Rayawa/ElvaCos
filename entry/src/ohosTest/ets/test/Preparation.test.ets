@@ -39,7 +39,7 @@ export default function preparationTest(): void {
     });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('nativeV1MigrationPreservesPackingAndMediaWithoutInventingPreparation', 0, async () => {
-      expect(db.getStore().version).assertEqual(7);
+      expect(db.getStore().version).assertEqual(8);
       expect((await checklist.list())[0].done).assertTrue();
       expect((await repo.tasks()).length).assertEqual(0);
       const rows = await db.getStore().querySql("SELECT local_path FROM photos WHERE id='legacy-photo'");
@@ -94,6 +94,12 @@ export default function preparationTest(): void {
     it('legacyBackupImportsWithoutChangingPackingMeaning', 0, async () => {
       const saved = await backup.exportMetadata();
       const legacy = JSON.parse(saved) as BackupDocument; legacy.version = 1; legacy.tables = legacy.tables.slice(0, 10);
+      const projectTable = legacy.tables.find((table: BackupTable) => table.name === 'projects');
+      if (projectTable) { projectTable.rows = projectTable.rows.map((current: relationalStore.ValuesBucket): relationalStore.ValuesBucket => {
+        const row: relationalStore.ValuesBucket = {};
+        for (const key of Object.keys(current)) { if (key !== 'budget_configured' && key !== 'shooting_time') { row[key] = current[key]; } }
+        return row;
+      }); }
       const eventTable = legacy.tables.find((t: BackupTable) => t.name === 'events');
       if (eventTable) {
         const legacyRows: relationalStore.ValuesBucket[] = [];

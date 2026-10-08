@@ -39,7 +39,9 @@ export function projectProgress(id: string, links: ProjectAsset[], assets: Asset
 export function checklistProgress(items: ChecklistItem[]): number {
   return items.length === 0 ? 0 : Math.round(items.filter((item: ChecklistItem) => item.done).length * 100 / items.length);
 }
+export function validTime(value: string): boolean { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
 export function checkProjectDate(project: CosProject): void {
+  if (project.shootingTime && !validTime(project.shootingTime)) { throw new Error('拍摄时间格式为 HH:mm'); }
   if (project.targetDate !== '' && !validDate(project.targetDate)) { throw new Error('目标日期格式为 YYYY-MM-DD'); }
 }
 

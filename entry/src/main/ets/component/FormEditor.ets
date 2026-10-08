@@ -74,7 +74,7 @@ export struct FormEditor {
   private focus(field: string): void { this.focusedField = field; this.reveal(field); }
   private locateFirstError(): void {
     const field = this.issues[0]?.field || 'object';
-    if (['variantId', 'eventId', 'money'].includes(field) && this.draft.kind === 'project') { this.draft.advanced = true; }
+    if (['variantId', 'eventId', 'shootingTime', 'money'].includes(field) && this.draft.kind === 'project') { this.draft.advanced = true; }
     if (this.focusTimer >= 0) { clearTimeout(this.focusTimer); }
     this.focusTimer = setTimeout((): void => { this.focusTimer = -1; this.reveal(field, true); }, 60);
   }
@@ -200,8 +200,8 @@ export struct FormEditor {
                   change: (keys: string[], mode: number): void => { this.draft.preparationKeys = keys; this.draft.preparationMode = mode; }
                 }) }
             }
-            Button(this.draft.advanced ? '收起更多设置' : '更多设置 · 版本、活动、预算')
-              .accessibilityText(this.draft.advanced ? '收起更多设置' : '展开角色版本、活动与预算设置')
+            Button(this.draft.advanced ? '收起更多设置' : '更多设置 · 版本、活动、拍摄、预算')
+              .id('form-project-more').accessibilityText(this.draft.advanced ? '收起更多设置' : '展开角色版本、活动、拍摄时间与预算设置')
               .backgroundColor(Theme.tint)
               .fontColor(Theme.accent)
               .onClick(() => { vibration.dotVibration(); this.draft.advanced = !this.draft.advanced; })
@@ -238,6 +238,8 @@ export struct FormEditor {
                 .visualEffect(this.feedback.effect('select-6'))
                 .compositingFilter(this.feedback.filter('select-6'))
                 .attributeModifier(this.feedback.control('select-6'))
+            DateField({ componentId: 'form-input:shootingTime', error: this.issue('shootingTime'), area: (area: Area): void => { this.fieldArea('shootingTime', area); }, label: '拍摄 / 约拍开始时间（可选）', value: this.draft.shootingTime, time: true, optional: true, change: (value: string): void => { this.draft.shootingTime = value; } })
+            Text('日期使用目标日期，否则使用活动开始日期；跨日拍摄请指定目标日期。日期未定时仅记录时刻。').fontSize(14).fontColor(Theme.muted)
             Field({ componentId: 'form-input:money', error: this.issue('money'), area: (area: Area): void => { this.fieldArea('money', area); }, focused: (): void => { this.focus('money'); }, label: '预算（元，可留空；填 0 表示零预算）', value: this.draft.money, change: (v: string) => { this.draft.money = v; this.draft.budgetEdited = true; } })
             }
           }

@@ -1,3 +1,4 @@
+import { planDate, validTime } from './Rules';
 import { PlanReadiness } from './PlanReadiness';
 import { CosEvent, CosProject } from './Entities';
 import { CollectedEntry } from './CollectedEntry';
@@ -73,7 +74,7 @@ export function availableDayModules(event: CosEvent, projects: CosProject[], ent
   if (entries.some((entry: CollectedEntry) => entry.scopeKind === 'event' && entry.scopeId === event.id && ['ticket', 'map', 'link'].includes(entry.kind))) { modules.push('credentials'); }
   if (team.some((member: TeamMember) => ids.includes(member.projectId))) { modules.push('people'); }
   if (hasShots) { modules.push('shots'); }
-  if (event.startTime) { modules.push('timeline'); }
+  if (event.startTime || projects.some((project: CosProject) => ids.includes(project.id) && validTime(project.shootingTime || ''))) { modules.push('timeline'); }
   if (event.dateMode !== 'pending' && event.date <= localDay(now) && eventEnd(event) >= localDay(now) && new Date(now).getHours() >= 18) { modules.push('wrapup'); }
   return modules;
 }
@@ -84,4 +85,26 @@ export function reminderState(event: CosEvent, now: number): string {
   if (event.reminderMinutes < 0) { return '未选择提醒'; }
   if (reminderTime(event) <= now) { return '提醒时间已过'; }
   return event.reminderId >= 0 ? '系统提醒已建立' : '已选择提醒，系统提醒未建立；请检查通知权限并重试';
+}
+
+export function planShootingLabel(project: CosProject, events: CosEvent[]): string {
+  return project.shootingTime ? (planDate(project, events) || '日期待定') + ' · ' + project.shootingTime : '拍摄时间未设置';
+}
+export class DayTimelineItem {
+  id: string; date: string; time: string; label: string; projectId: string;
+  constructor(id: string, date: string, time: string, label: string, projectId: string = '') {
+    this.id = id; this.date = date; this.time = time; this.label = label; this.projectId = projectId;
+  }
+}
+/** Real recorded times only; string keys retain local calendar semantics. */
+export function eventTimeline(event: CosEvent, projects: CosProject[]): DayTimelineItem[] {
+  const result: DayTimelineItem[] = [];
+  if (validTime(event.startTime) && event.dateMode !== 'pending') { result.push(new DayTimelineItem('event-start', event.date, event.startTime, '活动开始')); }
+  if (event.timeMode === 'range' && validTime(event.endTime) && event.dateMode !== 'pending') { result.push(new DayTimelineItem('event-end', eventEnd(event), event.endTime, '活动结束')); }
+  for (const project of projects) {
+    if (project.eventId === event.id && validTime(project.shootingTime || '')) {
+      result.push(new DayTimelineItem('project:' + project.id, planDate(project, [event]), project.shootingTime, project.name + ' · 拍摄 / 约拍', project.id));
+    }
+  }
+  return result.sort((a: DayTimelineItem, b: DayTimelineItem) => (a.date || '9999').localeCompare(b.date || '9999') || a.time.localeCompare(b.time) || a.id.localeCompare(b.id));
 }

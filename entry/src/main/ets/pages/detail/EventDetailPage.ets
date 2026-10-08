@@ -10,7 +10,7 @@ import { CosEvent, CosProject, ChecklistItem } from '../../model/Entities';
 import { TeamMember } from '../../model/Planning';
 import { CollectedEntry, entryTitle } from '../../model/CollectedEntry';
 import { eventDateLabel, eventTimeLabel } from '../../model/Schedule';
-import { DayModule, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState } from '../../model/DayMode';
+import { DayModule, DayTimelineItem, eventTimeline, planShootingLabel, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState } from '../../model/DayMode';
 import { StaggerEntrance } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
 import { confirm } from '../../common/Confirm';
@@ -279,12 +279,18 @@ export struct EventDetail {
         }, (project: CosProject) => project.id)
       } else if (module.id === 'plans') {
         ForEach(this.projects(), (project: CosProject) => {
-          Button(project.name + ' · ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)]).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
+          Button(project.name + ' · ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)] + '\n' + planShootingLabel(project, this.state.events)).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
         }, (project: CosProject) => project.id)
       } else if (module.id === 'shots') {
         if (this.shotError) { Text(this.shotError).fontSize(17).fontColor(Theme.danger) }
         ForEach(this.projects().filter((project: CosProject) => this.state.readiness(project.id).shots.total > 0), (project: CosProject) => { this.shots(project) }, (project: CosProject) => project.id)
-      } else if (module.id === 'timeline') { FactRow({ label: '活动时段', value: eventDateLabel(this.event) + ' · ' + eventTimeLabel(this.event) }) }
+      } else if (module.id === 'timeline') {
+        ForEach(eventTimeline(this.event, this.state.projects), (item: DayTimelineItem) => {
+          if (item.projectId) { Button((item.date || '日期待定') + ' · ' + item.time + ' · ' + item.label).id('day-timeline:' + item.id).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
+            .onClick((): void => { this.open('project', item.projectId); }).accessibilityText('查看计划，' + (item.date || '日期待定') + '，' + item.time + '，' + item.label) }
+          else { Text(item.date + ' · ' + item.time + ' · ' + item.label).id('day-timeline:' + item.id).fontSize(18).fontColor(Theme.ink) }
+        }, (item: DayTimelineItem) => item.id)
+      }
       else if (module.id === 'wrapup') { Text('今天结束了？选好所属计划后导入照片。').fontSize(18).fontColor(Theme.ink)
         Button('导入照片').constraintSize({ minHeight: 64 }).onClick((): void => { this.recordKind = 2; this.recording = true; }) }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)

@@ -237,6 +237,10 @@ export default function uiShellTest(): void {
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-new-plan.png');
       await (await driver.findComponent(ON.id('form-input:characterName').inWindow(bundle))).inputText('未提交验证角色');
       await driver.delayMs(500); await back();
+      const formScroll = await driver.findComponent(ON.id('form-scroll').inWindow(bundle)); await formScroll.scrollSearch(ON.id('form-project-more').inWindow(bundle)); await tap('form-project-more');
+      await formScroll.scrollSearch(ON.id('form-input:shootingTime').inWindow(bundle)); await present('拍摄 / 约拍开始时间（可选）'); await tap('form-input:shootingTime');
+      expect((await driver.findComponents(ON.type('TimePicker').inWindow(bundle))).length > 0).assertTrue(); await back();
+      await formScroll.scrollSearch(ON.id('form-input:characterName').inWindow(bundle));
       await tap('sheet-close'); await present('继续编辑'); await tap('继续编辑');
       expect(await (await driver.findComponent(ON.id('form-input:characterName').inWindow(bundle))).getText()).assertEqual('未提交验证角色');
       await tap('sheet-close'); await present('放弃修改'); await tap('放弃修改'); await present('新建计划');
