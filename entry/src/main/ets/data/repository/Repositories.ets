@@ -296,6 +296,10 @@ export class ChecklistItemRepository {
   async save(item: ChecklistItem): Promise<void> {
     await this.db.getStore().executeSql('INSERT INTO checklist_items (id, project_id, asset_id, label, done, sort_order) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id, asset_id=excluded.asset_id, label=excluded.label, done=excluded.done, sort_order=excluded.sort_order', [item.id, item.projectId, item.assetId || null, item.label, item.done ? 1 : 0, item.sortOrder]);
   }
+  async setDone(id: string, projectId: string, done: boolean, expected: boolean): Promise<void> {
+    const changed = await this.db.getStore().update({ done: done ? 1 : 0 }, new relationalStore.RdbPredicates('checklist_items').equalTo('id', id).equalTo('project_id', projectId).equalTo('done', expected ? 1 : 0));
+    if (changed !== 1) { throw new Error('打包事项已变更或不存在，请重新加载后继续'); }
+  }
   async remove(id: string): Promise<void> { await this.db.getStore().executeSql('DELETE FROM checklist_items WHERE id=?', [id]); }
 }
 

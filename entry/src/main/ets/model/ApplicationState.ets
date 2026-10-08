@@ -660,8 +660,9 @@ export class AppState implements SearchData, RemovalData {
   }
   async toggleChecklist(item: ChecklistItem): Promise<boolean> {
     return this.perform(async () => {
-      const copy = JSON.parse(JSON.stringify(item)) as ChecklistItem; copy.done = !item.done;
-      await this.checklistRepo.save(copy); if (copy.done) { void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {}); }
+      const done = !item.done;
+      await this.checklistRepo.setDone(item.id, item.projectId, done, item.done);
+      if (done) { void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {}); }
     }, true, ['checklist']);
   }
   async linkAsset(projectId: string, asset: Asset): Promise<boolean> {

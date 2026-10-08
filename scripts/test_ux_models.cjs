@@ -927,6 +927,32 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.projects = ['p1', 'p2', 'p3'].map(id => Object.assign(new CosProject(), { id, characterId: 'role', status: id === 'p2' ? ProjectStatus.COMPLETED : ProjectStatus.PREPARING }));
     state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
   }
+  await test('packing toggles only current owner and expected completion, preserve edited fields and never recreate deleted items', async () => {
+    const { ChecklistItemRepository } = require(root + '/data/repository/Repositories.ets');
+    const { db, state, refresh } = await wardrobeFixture(), repo = new ChecklistItemRepository(db); state.checklistRepo = repo;
+    try {
+      const item = Object.assign(new ChecklistItem(), { id: 'guarded-pack', projectId: 'p1', assetId: 'shared', label: '旧名称', done: false, sortOrder: 1 });
+      await repo.save(item); await refresh();
+      await db.sql("UPDATE checklist_items SET label='当前名称',sort_order=42,asset_id=NULL WHERE id='guarded-pack'");
+      assert.equal(await state.toggleChecklist(item), true);
+      assert.deepEqual((await db.sql("SELECT label,sort_order,asset_id,done FROM checklist_items WHERE id='guarded-pack'")).rows[0], ['当前名称', 42, null, 1]);
+      assert.equal(item.done, false); assert.equal(state.checklist[0].done, true);
+      assert.equal(await state.toggleChecklist(item), false); assert.match(state.error, /已变更或不存在/);
+      const current = state.checklist[0];
+      assert.equal(await state.toggleChecklist(Object.assign(new ChecklistItem(), current, { projectId: 'p2' })), false);
+      assert.equal((await repo.list())[0].projectId, 'p1'); assert.equal((await repo.list())[0].done, true);
+      db.failSql = 'UPDATE checklist_items'; assert.equal(await state.toggleChecklist(current), false); db.failSql = '';
+      assert.equal((await repo.list())[0].done, true); assert.equal(state.checklist[0].done, true);
+      state.refresh = async () => { throw new Error('read unavailable'); };
+      assert.equal(await state.toggleChecklist(current), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed');
+      assert.equal((await repo.list())[0].done, false); assert.equal(state.checklist[0].done, true);
+      assert.equal(await state.toggleChecklist(current), false); assert.equal((await repo.list())[0].done, false);
+      state.refresh = refresh; assert.equal(await state.reloadRecords(), true); assert.equal(state.checklist[0].done, false);
+      const removed = state.checklist[0]; await repo.remove(removed.id);
+      assert.equal(await state.toggleChecklist(removed), false); assert.equal((await repo.list()).length, 0);
+      assert.equal(await state.reloadRecords(), true); assert.equal(state.checklist.length, 0);
+    } finally { db.close(); }
+  });
   await test('entry writes retain source on failure and image repair cancellation never saves edits or repeats a committed repair', async () => {
     const f = await wardrobeFixture(), { db, entries, state, refresh } = f;
     const { CollectedEntry } = require(root + '/model/CollectedEntry.ets');

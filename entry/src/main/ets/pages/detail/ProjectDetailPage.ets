@@ -162,7 +162,7 @@ export struct ProjectDetail {
       .constraintSize({ minWidth: 88, minHeight: this.route.outing ? 64 : 48 })
       .backgroundColor(item.done ? Theme.tint : Theme.brand)
       .fontColor(item.done ? Theme.accent : Theme.onAccent)
-      .enabled(!this.state.busy)
+      .enabled(!this.state.busy && !this.state.staleScopes.length)
       .onClick((): void => { vibration.dotVibration(); this.state.toggleChecklist(item); })
         .accessibilityText(item.label + (item.done ? '，已装包，点击取消' : '，点击确认装包'))
         .visualEffect(this.feedback.effect('packing-confirm:' + item.id))

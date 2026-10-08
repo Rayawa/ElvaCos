@@ -250,6 +250,13 @@ export default function uiShellTest(): void {
         expect((await enter.getBounds()).bottom < after.top).assertTrue();
         expect((await close.getBounds()).bottom < after.top).assertTrue();
         await enter.click(); await driver.delayMs(500); await present('今天模式'); await present('现场');
+        const dayDate = await driver.findComponent(ON.id('day-date-time').inWindow(bundle));
+        expect(await dayDate.getText()).assertEqual(event.date + ' · 未标记时间');
+        await present('day-location'); const dateBefore = await dayDate.getBounds();
+        await tap('event-view-tabs-1'); await driver.delayMs(350);
+        const dateAfter = await (await driver.findComponent(ON.id('day-date-time').inWindow(bundle))).getBounds();
+        expect(dateAfter.top).assertEqual(dateBefore.top); expect(dateAfter.bottom).assertEqual(dateBefore.bottom);
+        await present('day-location');
         expect((await driver.findComponents(ON.id('day-entry-bar').inWindow(bundle))).length).assertEqual(0);
         await back();
         if (!(await driver.waitForComponent(ON.id('day-entry-bar').inWindow(bundle), 3000))) { throw new Error('Today entry did not return to the root'); }

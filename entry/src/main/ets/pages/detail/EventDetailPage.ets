@@ -30,6 +30,7 @@ export struct EventDetail {
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   @Event open: (kind: string, id: string) => void = () => {};
   @Local shotError: string = '';
+  @Local packingError: string = '';
   @Event openShot: (projectId: string, shotId: string) => void = () => {};
   @Event openAsset: (id: string, projectId: string) => void = () => {};
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
@@ -229,11 +230,12 @@ export struct EventDetail {
     Column({ space: 10 }) {
       Row({ space: 10 }) {
         Button('返回').constraintSize({ minHeight: 64, minWidth: 64 }).onClick((): void => { this.back(); }).accessibilityText('返回来源页面')
-        Text(dayTitle(this.event, this.state.clockTime)).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink).layoutWeight(1)
+        Text(dayTitle(this.event, this.state.clockTime)).id('day-title').fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink).layoutWeight(1)
         Select([{ value: '记一笔' }, { value: '收录一条' }, { value: '传照片' }]).value('记').height(64).constraintSize({ minWidth: 64 })
           .onSelect((index: number): void => { this.recordKind = index; this.recordError = ''; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
       }.width('100%')
-      Text((this.event.venue || this.event.city || '地点待定') + ' · ' + eventTimeLabel(this.event) + (dayNumber(this.event, this.state.clockTime) ? ' · ' + dayNumber(this.event, this.state.clockTime) : '')).fontSize(15).fontColor(Theme.muted).width('100%')
+      Text(eventDateLabel(this.event) + ' · ' + eventTimeLabel(this.event) + (dayNumber(this.event, this.state.clockTime) ? ' · ' + dayNumber(this.event, this.state.clockTime) : '')).id('day-date-time').fontSize(15).fontColor(Theme.muted).width('100%')
+      Text(this.event.venue || this.event.city || '地点待定').id('day-location').fontSize(15).fontColor(Theme.muted).width('100%')
     }.padding({ top: 16, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 12 }).width('100%').backgroundColor(Theme.bg)
   }
   @Builder packing(project: CosProject) {
@@ -245,12 +247,16 @@ export struct EventDetail {
       }
       ForEach(this.state.checklist.filter((item: ChecklistItem) => item.projectId === project.id).sort((a: ChecklistItem, b: ChecklistItem) => a.sortOrder - b.sortOrder), (item: ChecklistItem) => {
         Button((item.done ? '✓ 已装包 · ' : '○ 未装包 · ') + item.label).width('100%').constraintSize({ minHeight: 64 }).fontSize(18)
-          .fontColor(item.done ? Theme.muted : Theme.ink).backgroundColor(Theme.surface).enabled(!this.state.busy)
-          .onClick((): void => { this.state.toggleChecklist(item); }).accessibilityText(item.label + (item.done ? '，已装包，点击改为未装包' : '，未装包，点击确认装包'))
+          .fontColor(item.done ? Theme.muted : Theme.ink).backgroundColor(Theme.surface).enabled(!this.state.busy && !this.state.staleScopes.length)
+          .onClick((): void => { void this.togglePacking(item); }).accessibilityText(item.label + (item.done ? '，已装包，点击改为未装包' : '，未装包，点击确认装包'))
         if (item.assetId) { Button((this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置') + ' · ' + (this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在')).fontColor(Theme.muted).fontSize(14).constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openAsset(item.assetId, project.id); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
       }, (item: ChecklistItem) => item.id)
       Button('打开出门清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('outing', project.id); })
     }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+  private async togglePacking(item: ChecklistItem): Promise<void> {
+    this.packingError = '';
+    if (!await this.state.toggleChecklist(item)) { this.packingError = this.state.projectName(item.projectId) + ' · ' + item.label + '：' + (this.state.error || '装包确认未保存，请重试'); }
   }
   private async toggleShot(shot: ProjectShot): Promise<void> {
     this.shotError = ''; const result = await this.state.toggleShot(shot.id, shot.projectId, shot.done);
@@ -271,7 +277,10 @@ export struct EventDetail {
   @Builder dayModule(module: DayModule) {
     Column({ space: 14 }) {
       SectionHeading({ title: module.label })
-      if (module.id === 'packing') { ForEach(this.projects(), (project: CosProject) => { this.packing(project) }, (project: CosProject) => project.id) }
+      if (module.id === 'packing') {
+        if (this.packingError) { Text(this.packingError).id('day-packing-error').fontSize(17).fontColor(Theme.danger) }
+        ForEach(this.projects(), (project: CosProject) => { this.packing(project) }, (project: CosProject) => project.id)
+      }
       else if (module.id === 'credentials') {
         ForEach(this.credentials(), (entry: CollectedEntry) => {
           Button() {
