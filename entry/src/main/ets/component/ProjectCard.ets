@@ -45,7 +45,7 @@ export struct ProjectCard {
           .fontColor(Theme.ink)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(this.state.characterName(this.project.characterId)).fontSize(13).fontColor(Theme.muted)
+        Text(this.state.characterName(this.project.characterId) + (this.project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在') : '')).fontSize(13).fontColor(Theme.muted)
         Text(this.state.readiness(this.project.id).prep
           .total === 0 ? '尚未添加准备任务' : this.state.readiness(this.project.id).prep
           .done + ' / ' + this.state.readiness(this.project.id).prep
@@ -53,20 +53,15 @@ export struct ProjectCard {
           .fontSize(12)
           .fontColor(Theme.muted)
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Column({ space: 4 }) { Text(this.state.readiness(this.project.id).prep
-        .total === 0 ? '待设置' : this.state.preparationPercent(this.project.id) + '%')
-        .fontSize(25)
-        .fontWeight(FontWeight.Lighter)
-        .fontColor(Theme.accent); Text('准备进度')
-        .fontSize(10)
-        .fontColor(Theme.muted) }
     }.width('100%')
-    Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear })
-      .color(Theme.brand)
-      .backgroundColor(Theme.tint)
-      .width('100%')
-      .margin({ top: 16 })
-      .accessibilityText('准备进度 ' + this.state.preparationPercent(this.project.id) + '%')
+    Text((this.state.readiness(this.project.id).date || '日期待定') + (this.state.readiness(this.project.id).dateFromEvent ? ' · 来自活动' : '')).fontSize(14).fontColor(Theme.muted)
+    if (this.state.readiness(this.project.id).blockers.length || this.state.readiness(this.project.id).prep.next) {
+      Text(this.state.readiness(this.project.id).blockers[0] || '下一项 · ' + (this.state.readiness(this.project.id).prep.next?.label || '')).fontSize(14).fontColor(Theme.accent)
+    }
+    if (this.state.readiness(this.project.id).prep.total > 8) {
+      Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear }).color(Theme.brand).backgroundColor(Theme.tint).width('100%').margin({ top: 12 })
+        .accessibilityText('准备任务完成 ' + this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项')
+    }
   }
   build() { InteractiveCard({
       label: this.project.name,

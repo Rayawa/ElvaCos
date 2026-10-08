@@ -14,13 +14,13 @@ Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。�
 
 保留五个一级入口：首页、Cos、活动、衣柜、我的。首页按照目标日期或关联漫展日期选择最近的未结束计划，有未来日期优先，逾期计划次之，未定日期最后；打包和选片入口携带对应任务视图。Cos 默认计划，切换角色资料/计划并筛选状态；衣柜切换装备/照片；我的聚合作品和时间轴，标题菜单进入独立设置页，不创建尚未实现的 People/Location/Pose 空页面。
 
-主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、项目、资产、漫展、照片详情和设置压入主路由，详情显示时主页底栏完全隐藏。详情之间的关联跳转继续入主栈，返回逐层恢复。
+主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、计划、装备、照片详情和设置压入主路由，覆盖详情显示时主页底栏隐藏；活动详情由日程 Tab 的独立栈承载，今天入口占用底部布局高度。详情之间的关联跳转继续入主栈，返回逐层恢复。
 
 二级切换仍使用 titleBar.stackBuilder 内居中的 HdsTitleBarSegment / TabSegmentButtonV2。一级动作通过 HDS 标题菜单提供；按 2026-10-06 用户要求，详情使用 HdsTabs 浮动操作栏替代原生 toolbar，动作点击通过 onContentWillChange 拦截内容切换，继续显示当前详情。新增角色、版本、项目、装备、漫展、清单项和编辑均使用 bindSheet，关联装备与照片导入项目选择也使用 Sheet；删除继续使用确认 Dialog。
 
 设置覆盖主页，第一组直接复用 Dashboard SettingsPanel，其余组统一 HdsListItemCard 的图标、文本、控件列与帮助入口。材质等级成为视效唯一选择：流畅关闭视效，轻柔/精美开启对应等级；外观提供浅色/跟随系统/深色，主题配色独立提供五组；单手操作三档为左手/智感握持/右手，只有中间档开启感知权限与检测。旧独立开关通过 Preferences v2 显式转换，业务数据库不变。
 
-以上为当前实现。下一轮体验重构（一级入口按目的重组、收录原语、今天模式、在途三态、角色履历与作品卡，以及 `entries` / 预算标记 / 在途 / 拍摄清单四项增量迁移）已整理为可执行规格，见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md)；**尚未实施**，本文的现状描述在实施前保持有效。
+以上为当前实现。下一轮体验重构（一级入口按目的重组、收录原语、今天模式、在途三态、角色履历与作品卡，以及 `entries` / 预算标记 / 在途 / 拍摄清单四项增量迁移）已整理为可执行规格，见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md)；**实施中**，阶段证据见 [实施记录](UX_IMPLEMENTATION.md)。A–C 已完成基础确认；D 正在实施，计划详情已切为概览 / 准备 / 打包 / 照片，活动与计划的详情动作已移至标题菜单；其余详情暂保留浮动动作栏。首页已采用三区块结构，完整待办共享 TaskQueue 聚合，最终五 Tab 切换留到 H。
 
 ## 实体关系
 
@@ -32,13 +32,13 @@ DiaryEntry 记录项目生命周期。照片保留项目、角色上下文，P1 
 
 ## 数据库
 
-RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v5，增量加入准备分类/任务、团队、花费、参考图、可空预算标记与收录条目；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
+RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v6，增量加入准备分类/任务、团队、花费、参考图、可空预算标记、收录条目与在途任务字段；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
 
 照片导入默认仅导入用户选中的图片，一份沙箱原文件 + 一份低分辨率缩略图；保留 source_uri 作来源标识，不依赖临时 URI 权限。图片列表只展示缩略图，详情才读取原图；不修改系统相册原文件。PhotoVersion 保存编辑参数和派生路径，与 PhotoAsset 独立。首版编辑器不扩展到重型修图。
 
 收录使用 `entries` 存放链接/票/图/笔记/想法；归属对象删除时自动回到未归位，转换为任务/花费/参考图以事务同时提交新对象与移除源条目。图片复用沙箱媒体管理与缺失修复，媒体清理保留照片、参考图与收录的文件。
 
-备份：当前元数据格式 v5，兼容 v1–v4；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
+备份：当前元数据格式 v6，兼容 v1–v5；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
 
 ## 目录与责任
 

@@ -7,5 +7,14 @@ export class ProjectRoute {
   @Trace sheetKind: number = 0;
   @Trace preparing: boolean = false;
   @Trace linking: boolean = false;
+  @Trace expandedCategories: string[] = [];
+  @Trace photoFilter: number = 0;
+  @Trace contextSheet: string = '';
+  @Trace showCompleted: boolean = false;
+  packingOrder: string[] = [];
+  focusTaskId: string = '';
+  focusPackingId: string = '';
+  focusHandled: boolean = false;
+  offsets: number[] = [0, 0, 0, 0];
   constructor(id: string, section: number = 0) { this.id = id; this.section = section; }
 }

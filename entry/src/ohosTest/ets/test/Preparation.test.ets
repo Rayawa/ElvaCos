@@ -39,7 +39,7 @@ export default function preparationTest(): void {
     });
     afterAll(async () => { await db.close(); await relationalStore.deleteRdbStore(context, name); });
     it('nativeV1MigrationPreservesPackingAndMediaWithoutInventingPreparation', 0, async () => {
-      expect(db.getStore().version).assertEqual(5);
+      expect(db.getStore().version).assertEqual(6);
       expect((await checklist.list())[0].done).assertTrue();
       expect((await repo.tasks()).length).assertEqual(0);
       const rows = await db.getStore().querySql("SELECT local_path FROM photos WHERE id='legacy-photo'");

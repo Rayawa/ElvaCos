@@ -1,6 +1,7 @@
 import { CollectedEntry, entryFromText } from './CollectedEntry';
 import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
+import { buildTaskQueue, TaskQueueItem, taskNeedsAction } from './TaskQueue';
 import { DayModulePreferences, dayEntries, localDay, DAY_MODULES, orderedDayModules } from './DayMode';
 import { getDayModules, setDayModules, getDayDismissals, setDayDismissals } from '../common/storage';
 import { PlanReadiness, buildPlanReadiness } from './PlanReadiness';
@@ -309,6 +310,12 @@ export class AppState {
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
   @Computed
   get actionablePlans(): PlanReadiness[] { return this.readinessPlans.filter((item: PlanReadiness) => item.active); }
+  @Computed
+  get taskQueue(): TaskQueueItem[] { return buildTaskQueue(this.readinessPlans, this.projects, this.localDate); }
+  @Computed
+  get actionItems(): TaskQueueItem[] { return this.taskQueue.filter(taskNeedsAction); }
+  @Computed
+  get waitingItems(): TaskQueueItem[] { return this.taskQueue.filter((item: TaskQueueItem) => item.kind === 'waiting'); }
   @Computed
   get todayEvents(): CosEvent[] { return dayEntries(this.events, this.dayDismissals, this.clockTime); }
   tickClock(): void { this.clockTime = Date.now(); this.localDate = localDay(this.clockTime); }

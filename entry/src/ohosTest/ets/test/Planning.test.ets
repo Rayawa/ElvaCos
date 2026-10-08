@@ -40,7 +40,7 @@ export default function planningTest(): void {
         await legacy.executeSql('PRAGMA user_version=2');
       } finally { await legacy.close(); }
       try {
-        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(5);
+        await upgraded.open(context); expect(upgraded.getStore().version).assertEqual(6);
         const tasks = await upgraded.getStore().querySql("SELECT done FROM preparation_tasks WHERE id='t'"); try { tasks.goToFirstRow(); expect(tasks.getLong(0)).assertEqual(1); } finally { tasks.close(); }
         const restored = (await new CosEventRepository(upgraded).list())[0]; expect(restored.dateMode).assertEqual('single'); expect(restored.reminderId).assertEqual(-1); expect(restored.date).assertEqual('2026-10-07');
       } finally { await upgraded.close(); await relationalStore.deleteRdbStore(context, oldName); }

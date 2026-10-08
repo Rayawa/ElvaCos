@@ -1,3 +1,4 @@
+import { LedgerRoute } from '../../model/LedgerRoute';
 import { PressFeedback } from '../../common/pressFeedback';
 import { AppState } from '../../model/ApplicationState';
 import { READING_MAX_WIDTH } from '../../common/constants';
@@ -26,20 +27,19 @@ export struct ExpenseSummary {
   @Require @Param state: AppState;
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
   @Event remove: (kind: string, id: string) => void = () => {};
-  @Local projectId: string = '';
-  @Local category: string = '';
+  @Param route: LedgerRoute = new LedgerRoute();
 
   aboutToAppear(): void { if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
   aboutToDisappear(): void { if (!this.entrance.managed) { this.entrance.reset(); } }
 
   @Computed
   private get records(): Expense[] {
-    return this.state.expenses.filter((expense: Expense): boolean => !this.projectId || expense.projectId === this.projectId);
+    return this.state.expenses.filter((expense: Expense): boolean => !this.route.projectId || expense.projectId === this.route.projectId);
   }
 
   @Computed
   private get visibleRecords(): Expense[] {
-    return this.records.filter((expense: Expense): boolean => !this.category || expense.category === this.category);
+    return this.records.filter((expense: Expense): boolean => !this.route.category || expense.category === this.route.category);
   }
   @Computed
   private get trend(): LineChartPoint[] { return monthlyExpenses(this.records, today()); }
@@ -58,12 +58,12 @@ export struct ExpenseSummary {
   }
 
   private budget(): number {
-    return this.state.projects.filter((project: CosProject): boolean => (!this.projectId || project.id === this.projectId) && project.budgetConfigured === true)
+    return this.state.projects.filter((project: CosProject): boolean => (!this.route.projectId || project.id === this.route.projectId) && project.budgetConfigured === true)
       .reduce((sum: number, project: CosProject): number => sum + project.budgetCents, 0);
   }
 
   private budgetSummary(): string {
-    const count = this.state.projects.filter((project: CosProject) => (!this.projectId || project.id === this.projectId) && project.budgetConfigured === true).length;
+    const count = this.state.projects.filter((project: CosProject) => (!this.route.projectId || project.id === this.route.projectId) && project.budgetConfigured === true).length;
     return count ? '已设置预算 ¥' + (this.budget() / 100).toFixed(2) + ' · 覆盖 ' + count + ' 份计划' : '当前范围无明确预算';
   }
 
@@ -80,10 +80,10 @@ export struct ExpenseSummary {
           .width('100%').color(Theme.brand).backgroundColor(Theme.tint).accessibilityLevel('no')
       }.id('expense-category:' + category.name).width('100%').alignItems(HorizontalAlign.Start).padding(14)
         .backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
-        .border({ width: this.category === category.name ? 1 : 0, color: Theme.accent })
-        .onClick((): void => { vibration.dotVibration(); this.category = this.category === category.name ? '' : category.name; })
+        .border({ width: this.route.category === category.name ? 1 : 0, color: Theme.accent })
+        .onClick((): void => { vibration.dotVibration(); this.route.category = this.route.category === category.name ? '' : category.name; })
         .accessibilityGroup(true).accessibilityRole(AccessibilityRoleType.BUTTON)
-        .accessibilitySelected(this.category === category.name)
+        .accessibilitySelected(this.route.category === category.name)
         .accessibilityText(category.name + '，花费 ' + (category.amount / 100).toFixed(2) + ' 元，占比 ' + category.percent.toFixed(1) + '%')
         .accessibilityDescription('双击筛选此分类，再次双击显示全部分类')
         .visualEffect(this.feedback.effect('expense-category:' + category.name, true))
@@ -94,9 +94,9 @@ export struct ExpenseSummary {
 
   @Builder expenseRecords() {
     SectionHeading({ title: '花费明细', trailing: this.visibleRecords.length + ' 笔' })
-    if (this.category) {
+    if (this.route.category) {
       Button('显示全部分类').fontColor(Theme.accent).backgroundColor(Theme.tint)
-        .onClick((): void => { vibration.dotVibration(); this.category = ''; })
+        .onClick((): void => { vibration.dotVibration(); this.route.category = ''; })
         .accessibilityText('取消花费分类筛选').visualEffect(this.feedback.effect('clear-category')).compositingFilter(this.feedback.filter('clear-category')).attributeModifier(this.feedback.control('clear-category'))
     }
     ForEach(this.visibleRecords, (expense: Expense) => {
@@ -120,7 +120,7 @@ export struct ExpenseSummary {
     if (this.records.length === 0) {
       EmptyState({
         title: '记下这次的实际花费', message: '服装、妆造、摄影、门票和交通可以分别记录。',
-        button: '＋ 添加花费', action: (): void => this.edit('expense', '', this.projectId),
+        button: '＋ 添加花费', action: (): void => this.edit('expense', '', this.route.projectId),
       })
     } else if (this.visibleRecords.length === 0) {
       Text('此分类暂无花费记录，可显示全部分类。').fontColor(Theme.muted).accessibilityText('此分类暂无花费记录，可显示全部分类')
@@ -133,11 +133,11 @@ export struct ExpenseSummary {
         Blank().height(Theme.detailTop).accessibilityLevel('no')
         Column({ space: Theme.sectionSpacing }) {
           Select(new Array<SelectOption>({ value: '全部计划' }).concat(this.state.projects.map((project: CosProject): SelectOption => ({ value: project.name }))))
-            .id('expense-project').value(this.projectId ? this.state.projectName(this.projectId) : '全部计划')
+            .id('expense-project').value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
             .onSelect((index: number): void => {
               vibration.dotVibration();
-              this.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
-              this.category = '';
+              this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
+              this.route.category = '';
             })
             .accessibilityText('花费所属计划').visualEffect(this.feedback.effect('expense-project')).compositingFilter(this.feedback.filter('expense-project')).attributeModifier(this.feedback.control('expense-project'))
           Column({ space: 8 }) {

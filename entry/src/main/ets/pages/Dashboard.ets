@@ -1,4 +1,7 @@
 import { EventRoute, EventReturnPath } from '../model/EventRoute';
+import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
+import { LedgerRoute } from '../model/LedgerRoute';
+import { TasksPage } from './more/TasksPage';
 import { dayTitle } from '../model/DayMode';
 import { InboxPage } from './more/InboxPage';
 import { InboxRoute } from '../model/CollectedEntry';
@@ -124,11 +127,20 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
+    if (kind === 'characters') { this.cosProjects = false; this.tab = 1; this.tabsController.changeIndex(1); return; }
+    if (kind === 'tasks') { this.detailStack.pushPathByName('tasks', new TaskRoute(id === 'all' ? '' : id)); return; }
+    if (kind === 'expenseStats') { this.detailStack.pushPathByName('expenseStats', new LedgerRoute(id === 'all' ? '' : id)); return; }
+    if (kind === 'inbox' && id.startsWith('project|')) {
+      const projectId = id.slice(8); const current = this.detailStack.size() > 0 ? this.detailStack.getParamByIndex(this.detailStack.size() - 1) as ProjectRoute : undefined;
+      if (current && current.id === projectId && this.detailStack.getAllPathName()[this.detailStack.size() - 1] === 'project') { current.contextSheet = 'entries'; }
+      else { const route = new ProjectRoute(projectId); route.contextSheet = 'entries'; this.detailStack.pushPathByName('project', route); }
+      return;
+    }
     if (kind === 'inbox' && id.startsWith('event|')) { this.openEvent(id.slice(6), false, 2); return; }
     if (kind === 'inbox') {
       const parts = id.split('|'); this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
-    } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos' || kind === 'outing') {
-      const section = kind === 'packing' || kind === 'outing' ? 1 : kind === 'projectPhotos' ? 2 : 0;
+    } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos' || kind === 'outing' || kind === 'projectPreparation') {
+      const section = kind === 'packing' || kind === 'outing' ? 2 : kind === 'projectPhotos' ? 3 : kind === 'projectPreparation' ? 1 : 0;
       const route = new ProjectRoute(id, section); route.outing = kind === 'outing';
       this.detailStack.pushPathByName('project', route);
     } else {
@@ -150,6 +162,13 @@ import { EmptyState } from '../component/Surfaces';
     if (names.length) { this.detailStack.clear(false); }
     this.tab = 2; this.tabsController.changeIndex(2);
     this.stacks[2].pushPathByName('event', route);
+  }
+  private openTaskItem(item: TaskQueueItem): void {
+    if (item.source === 'asset') { this.open('asset', item.focusId); return; }
+    const route = new ProjectRoute(item.projectId, item.section); route.photoFilter = item.photoFilter;
+    if (item.source === 'preparation') { route.focusTaskId = item.focusId; }
+    if (item.source === 'packing') { route.focusPackingId = item.focusId; }
+    this.detailStack.pushPathByName('project', route);
   }
   private closeEvent(route: EventRoute): void {
     if (this.stacks[2].size() === 0 || this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) !== route) { return; }
@@ -216,7 +235,7 @@ import { EmptyState } from '../component/Surfaces';
     const accepted = await confirm(this.getUIContext(), '确认删除？', messages.get(kind) || '记录将删除。', '删除');
     if (accepted && await this.state.remove(kind, id)) {
       if (kind === 'project' || kind === 'character') {
-        this.detailStack.clear();
+        this.pruneInvalidDetails(kind, id);
       } else if (kind === 'event') {
         const route = this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute;
         if (route && route.id === id) { this.closeEvent(route); }
@@ -225,6 +244,26 @@ import { EmptyState } from '../component/Surfaces';
       }
     }
   }
+  private validDetailPath(name: string, param: Object, deletedKind: string = '', deletedId: string = ''): boolean {
+    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : param as string) === deletedId) { return false; }
+    if (name === 'project') { return this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id); }
+    if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as string)); }
+    if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as string) && !(deletedKind === 'project' && photo.projectId === deletedId)); }
+    if (name === 'reference') { return this.state.references.some((reference: ReferenceImage) => reference.id === (param as string) && !(deletedKind === 'project' && reference.projectId === deletedId) && !(deletedKind === 'character' && reference.characterId === deletedId)); }
+    if (name === 'tasks' && (param as TaskRoute).projectId && (deletedKind === 'project' && (param as TaskRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as TaskRoute).projectId))) { (param as TaskRoute).projectId = ''; }
+    if (name === 'expenseStats' && (param as LedgerRoute).projectId && (deletedKind === 'project' && (param as LedgerRoute).projectId === deletedId || !this.state.projects.some((project: CosProject) => project.id === (param as LedgerRoute).projectId))) { (param as LedgerRoute).projectId = ''; }
+    return true;
+  }
+  private pruneInvalidDetails(deletedKind: string, deletedId: string): void {
+    const indexes: number[] = [];
+    this.detailStack.getAllPathName().forEach((name: string, index: number): void => { if (!this.validDetailPath(name, this.detailStack.getParamByIndex(index) as Object, deletedKind, deletedId)) { indexes.push(index); } });
+    if (indexes.length) { this.detailStack.removeByIndexes(indexes); }
+    for (let index = 0; index < this.stacks[2].size(); index++) {
+      const route = this.stacks[2].getParamByIndex(index) as EventRoute;
+      route.returnPaths = route.returnPaths.filter((path: EventReturnPath) => this.validDetailPath(path.name, path.param, deletedKind, deletedId));
+    }
+  }
+
   private async destructive(kind: string): Promise<void> {
     const accepted = await confirm(
       this.getUIContext(),
@@ -248,7 +287,7 @@ import { EmptyState } from '../component/Surfaces';
       entrance: this.sheetEntrance,
       state: this.state, draft: this.draft,
       done: (): void => { this.formOpen = false; },
-      saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('project', id); } },
+      saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('projectPreparation', id); } },
     })
   }
 
@@ -265,13 +304,17 @@ import { EmptyState } from '../component/Surfaces';
         })
       }
       else if (kind === 'project') {
-        if ((param as ProjectRoute).section === 2) {
+        if (!this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id)) {
+          EmptyState({ title: '计划已不存在', message: '可以返回继续查看其他事项。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop })
+        } else if ((param as ProjectRoute).section === 3) {
           PhotoGrid({
             entrance: entrance,
             state: this.state,
             topInset: Theme.detailTopWithSegment,
             bottomInset: Theme.contentBottom,
             sidePadding: Theme.pagePadding,
+            initialFilter: (param as ProjectRoute).photoFilter,
+            filterChanged: (filter: number): void => { (param as ProjectRoute).photoFilter = filter; },
             photos: this.state.photos.filter((p: PhotoAsset) => p.projectId === (param as ProjectRoute).id),
             open: (k: string, id: string) => this.open(k, id)
           })
@@ -282,7 +325,7 @@ import { EmptyState } from '../component/Surfaces';
             state: this.state,
             route: param as ProjectRoute,
             topInset: Theme.detailTopWithSegment,
-            project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) || new CosProject(),
+            project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) as CosProject,
             open: (k: string, id: string) => this.open(k, id),
             edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
             remove: (k: string, id: string) => this.remove(k, id)
@@ -300,6 +343,7 @@ import { EmptyState } from '../component/Surfaces';
         ExpenseSummary({
           entrance: entrance,
           state: this.state,
+          route: param as LedgerRoute,
           edit: (k: string, id: string, parent: string): void => this.edit(k, id, parent),
           remove: (k: string, id: string): void => { this.remove(k, id); }
         })
@@ -327,7 +371,11 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   @Builder destinationBody(kind: string, param: Object, entrance: StaggerEntrance) {
-    if (kind === 'privacy') {
+    if (kind === 'project') {
+      this.detailContent(kind, param, entrance)
+    } else if (kind === 'tasks') {
+      TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
+    } else if (kind === 'privacy') {
       LocalHtmlPage({ entrance: entrance })
     } else if (kind === 'settings') {
       SettingsPage({
@@ -365,16 +413,16 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' ? '' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
+          kind === 'project' ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
           kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : undefined,
-          [], false,
+          kind === 'project' ? this.projectMenus(param as ProjectRoute) : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
+        shown: (): void => { if (kind === 'project' && (param as ProjectRoute).outing) { this.state.resume(); } },
         hidden: (): void => {
-          if (kind === 'project') { (param as ProjectRoute).outing = false; }
           this.state.suspend();
         },
         content: this.destinationBody.bind(this, kind, param),
@@ -485,7 +533,7 @@ import { EmptyState } from '../component/Surfaces';
     Column() {
       HdsTitleBarSegment({
         componentId: 'project-task-segment',
-        items: this.buildSegmentItems(['准备', '打包', '照片']),
+        items: this.buildSegmentItems(['概览', '准备', '打包', '照片']),
         selectedIndexes: [route.section],
         experimentalWidth: Theme.titleSegmentWidth,
         onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); },
@@ -494,40 +542,37 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
+  private projectMenus(route: ProjectRoute): HdsNavigationMenuItemOptions[] {
+    const tools: ToolbarItem[] = [];
+    if (route.section === 1) {
+      tools.push({ value: '添加准备任务', icon: Icons.add, action: (): void => { route.sheetKind = 0; route.preparing = true; } });
+      tools.push({ value: '从衣柜复用', icon: Icons.library, action: (): void => { route.sheetKind = 1; route.linking = true; } });
+    } else if (route.section === 2) {
+      if (!route.outing) {
+        tools.push({ value: '添加物品', icon: Icons.add, action: (): void => { this.edit('checklist', '', route.id); } });
+        tools.push({ value: '补入常用物品', icon: Icons.check, action: (): void => { this.state.generateChecklist(route.id); } });
+      }
+      tools.push({ value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: (): void => { route.outing = !route.outing; if (route.outing) { this.state.resume(); } else { this.state.suspend(); } } });
+    } else if (route.section === 3) { tools.push({ value: '导入照片', icon: Icons.importPhoto, action: (): void => { this.state.importPhotos(route.id); } }); }
+    if (!route.outing) {
+      tools.push({ value: '编辑计划', icon: Icons.edit, action: (): void => { this.edit('project', route.id); } });
+      tools.push({ value: '分享', icon: Icons.share, action: (): void => { this.state.shareProject(route.id); } });
+      tools.push({ value: '删除计划', icon: Icons.remove, action: (): void => { this.remove('project', route.id); } });
+    }
+    return tools.map((item: ToolbarItem): HdsNavigationMenuItemOptions => { return { content: { label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy, action: item.action } }; });
+  }
+
   private detailTools(kind: string, param: Object): ToolbarItem[] {
     const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
     if (kind === 'settings') { return []; }
     if (kind === 'developer') { return []; }
-    if (kind === 'expenseStats') { return [{ value: '记一笔', icon: Icons.add, action: () => this.edit('expense') }]; }
+    if (kind === 'expenseStats') { return [{ value: '记一笔', icon: Icons.add, action: () => this.edit('expense', '', (param as LedgerRoute).projectId) }]; }
     if (kind === 'reference') {
       return [
         { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },
         { value: '编辑说明', icon: Icons.edit, action: () => this.edit('reference', id) },
         { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
       ];
-    }
-    if (kind === 'project') {
-      const route = param as ProjectRoute;
-      if (route.section === 2) { return [{ value: '导入照片', icon: Icons.importPhoto, action: () => this.state.importPhotos(id) }]; }
-      if (route.section === 1) {
-        return [{ value: '添加物品', icon: Icons.add, action: () => this.edit('checklist', '', id) },
-        { value: '常用物品', icon: Icons.check, action: () => this.state.generateChecklist(id) },
-        {
-          value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: () => {
-            route.outing = !route.outing;
-            if (route.outing) {
-              this.state.resume();
-            } else {
-              this.state.suspend();
-            }
-          }
-        }];
-      }
-      return [{ value: '准备任务', icon: Icons.add, action: () => { route.sheetKind = 0; route.preparing = true; } },
-      { value: '从衣柜', icon: Icons.library, action: () => { route.sheetKind = 1; route.linking = true; } },
-      { value: '编辑', icon: Icons.edit, action: () => this.edit('project', id) },
-      { value: '分享', icon: Icons.share, action: () => this.state.shareProject(id) },
-      { value: '删除计划', icon: Icons.remove, action: () => this.remove('project', id) }];
     }
     if (kind === 'character') {
       return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }];
@@ -643,6 +688,7 @@ import { EmptyState } from '../component/Surfaces';
             bottomInset: Theme.homeContentBottom,
             active: this.tab === index,
             open: (k: string, id: string) => this.open(k, id),
+            openTask: (item: TaskQueueItem): void => { this.openTaskItem(item); },
             add: (k: string, parent: string) => this.edit(k, '', parent)
           })
         }

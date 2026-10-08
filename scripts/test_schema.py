@@ -42,6 +42,20 @@ class RelationalModelTest(unittest.TestCase):
             with self.assertRaises(sqlite3.IntegrityError): old.execute('UPDATE projects SET budget_configured=2')
         finally: old.close()
 
+    def test_waiting_migration_keeps_task_history_and_defaults_to_not_waiting(self):
+        old = sqlite3.connect(':memory:')
+        try:
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_6')[0]): old.execute(sql)
+            old.execute("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Old',1,1)")
+            old.execute("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('p','c','Old','Preparing',1,1)")
+            old.execute("INSERT INTO preparation_categories VALUES('g','p','造型',0)")
+            old.execute("INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order) VALUES('t','p','g','试穿',1,'2026-10-01','keep notes',2)")
+            for sql in re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_6')[1]): old.execute(sql)
+            self.assertEqual(old.execute('SELECT done,due_date,notes,sort_order,waiting_on,waiting_until FROM preparation_tasks').fetchone(), (1,'2026-10-01','keep notes',2,'',''))
+            old.execute("UPDATE preparation_tasks SET waiting_on='快递',waiting_until='2026-10-10'")
+            self.assertEqual(old.execute('SELECT waiting_on,waiting_until FROM preparation_tasks').fetchone(), ('快递','2026-10-10'))
+        finally: old.close()
+
     def test_entries_are_rehomed_when_the_owner_is_deleted(self):
         for scope, table, id in [('event','events','e'), ('project','projects','p'), ('asset','assets','a')]:
             entry = 'entry-' + scope

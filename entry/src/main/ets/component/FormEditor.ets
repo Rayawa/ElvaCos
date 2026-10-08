@@ -295,7 +295,7 @@ export struct FormEditor {
           }
           if (this.draft.kind === 'expense') {
             Text('所属计划 *').fontSize(13).fontColor(Theme.muted)
-            Select(this.state.projects.map((p: CosProject): SelectOption => { return { value: p.name }; })).value(this.state.projectName(this.draft.parentId))
+            Select(this.state.projects.map((p: CosProject): SelectOption => { return { value: p.name }; })).value(this.draft.parentId ? this.state.projectName(this.draft.parentId) : '请选择计划')
               .onSelect((index: number): void => { vibration.dotVibration(); this.draft.parentId = this.state.projects[index].id; })
                 .enabled(!this.draft.id)
                 .accessibilityText('花费计划')
@@ -332,6 +332,9 @@ export struct FormEditor {
               optional: true,
               change: (v: string): void => { this.draft.date = v; }
             })
+            Field({ label: '等待对象（可选）', value: this.draft.waitingOn, placeholder: '例如：快递、妆娘排期、摄影师返图', change: (value: string): void => { this.draft.waitingOn = value; } })
+            DateField({ label: '等待至（可选）', value: this.draft.waitingUntil, optional: true, change: (value: string): void => { this.draft.waitingUntil = value; } })
+            Text('填写任一等待字段后，未完成任务会归入「在途」，不计入逾期。清空两项可回到待办。').fontSize(13).fontColor(Theme.muted)
           }
           if (this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { Field({
               label: this.draft.kind === 'reference' ? '图片说明' : '备注',

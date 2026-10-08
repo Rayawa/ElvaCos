@@ -1,281 +1,84 @@
-import { dayTitle } from '../../model/DayMode';
-import { PlanReadiness } from '../../model/PlanReadiness';
-import { MIN_SPLIT_HEIGHT } from '../../common/constants';
-import { daysUntil, today } from '../../common/format';
-import { PressFeedback } from '../../common/pressFeedback';
-import { MainEntranceSession } from '../../common/motion';
-import { TaskLinkCard } from '../../component/TaskLinkCard';
-import { scrollByAxis } from '../../common/scroll';
-import { DashboardSplitLayout } from '../../component/DashboardSplitLayout';
-import { PreparationTask } from '../../model/Preparation';
-import { eventEnd } from '../../model/Schedule';
-import { expenseTotal } from '../../model/Planning';
-import { ManagedImage } from '../../component/ManagedImage';
-import { getDeviceName } from '../../common/storage';
-import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
-import { vibration } from '../../common/vibration';
-import { CosProject, ProjectStatus, CosEvent, ChecklistItem, PhotoAsset } from '../../model/Entities';
-import { SectionHeading, InteractiveCard, EmptyState, StatusPill } from '../../component/Surfaces';
-import { nextPlan, planDate } from '../../model/Rules';
+import { MainEntranceSession } from '../../common/motion';
+import { CosProject, CosEvent } from '../../model/Entities';
+import { TaskQueueItem } from '../../model/TaskQueue';
+import { eventEnd } from '../../model/Schedule';
+import { dayTitle } from '../../model/DayMode';
+import { SectionHeading, EmptyState } from '../../component/Surfaces';
 import { ProjectCard } from '../../component/ProjectCard';
 
 @ComponentV2
 export struct HomePage {
-  private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+  @Require @Param state: AppState;
   @Param scroller: Scroller = new Scroller();
   @Param topInset: number = 100;
   @Param bottomInset: number = 110;
-  @Require @Param state: AppState;
-  @Event open: (kind: string, id: string) => void = () => {};
-  @Event add: (kind: string, parent: string) => void = () => {};
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
-  @Local animStep: number = 0;
-  @Local contentWidth: number = 0;
-  @Local contentHeight: number = 0;
-  // 一级页面：进入应用后只播放一次，切回不再重播。
-  private enterAnimationPlayed: boolean = false;
-  private enterAnimationTimers: number[] = [];
-  aboutToAppear(): void { if (this.active) { this.enter(); } }
-  @Monitor('active')
-  activeChanged(): void { if (this.active) { this.enter(); } }
-  private enter(): void {
-    if (this.enterAnimationPlayed) { return; }
-    this.enterAnimationPlayed = true;
-    if (!this.entranceSession.claim('HomePage')) { this.animStep = 3; return; }
-    this.enterAnimationTimers = startStaggerEnterAnimation(this.getUIContext(), 3, (step: number): void => { this.animStep = step; });
+  @Event open: (kind: string, id: string) => void = () => {};
+  @Event add: (kind: string, parent: string) => void = () => {};
+  @Event openTask: (item: TaskQueueItem) => void = () => {};
+  private recentPlans(): CosProject[] {
+    return this.state.projects.filter((project: CosProject) => this.state.readiness(project.id).active).sort((a: CosProject, b: CosProject) => (this.state.readiness(a.id).date || '9999').localeCompare(this.state.readiness(b.id).date || '9999')).slice(0, 3);
   }
-  aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterAnimationTimers); this.animStep = 3; }
-  private current(): CosProject | undefined { return nextPlan(this.state.projects, this.state.events, today()); }
-  private packingTasks(): ChecklistItem[] {
-    const current = this.current()?.id;
-    return this.state.actionablePlans.reduce((items: ChecklistItem[], plan: PlanReadiness) => items.concat(plan.pack.pending), [])
-      .sort((a: ChecklistItem, b: ChecklistItem) => Number(b.projectId === current) - Number(a.projectId === current) || a.sortOrder - b.sortOrder);
+  private nextEvent(): CosEvent | undefined {
+    return this.state.events.filter((event: CosEvent) => event.dateMode !== 'pending' && eventEnd(event) >= this.state.localDate && event.status !== 'Attended').sort((a: CosEvent, b: CosEvent) => a.date.localeCompare(b.date))[0];
   }
-  private preparationTasks(): PreparationTask[] {
-    const current = this.current()?.id;
-    return this.state.actionablePlans.reduce((items: PreparationTask[], plan: PlanReadiness) => items.concat(plan.prep.pending), [])
-      .sort((a: PreparationTask, b: PreparationTask) => Number(b.projectId === current) - Number(a.projectId === current) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || a.sortOrder - b.sortOrder);
+  private summaryItems(): TaskQueueItem[] { return this.state.waitingItems.concat(this.state.actionItems).slice(0, 5); }
+  private recent(): CosProject | undefined {
+    return this.state.projects.filter((project: CosProject) => this.state.readiness(project.id).photos.byStage[4] > 0).sort((a: CosProject, b: CosProject) => (this.state.readiness(b.id).date || '').localeCompare(this.state.readiness(a.id).date || '') || b.updatedAt - a.updatedAt)[0];
   }
-  private next(): CosEvent | undefined { return this.state.events.filter((e: CosEvent) => e.status === 'Planned' && e.dateMode !== 'pending' && eventEnd(e) >= today())
-    .sort((a: CosEvent, b: CosEvent) => a.date.localeCompare(b.date))[0]; }
-  @Builder eventContent() {
-    Row({ space: 12 }) {
-      Column({ space: 3 }) { Text(String(Math.max(0, daysUntil(this.next()?.date || today()))))
-        .id('home-event-countdown')
-        .width('100%')
-        .fontSize(32)
-        .minFontSize(16)
-        .maxFontSize(32)
-        .maxLines(1)
-        .textAlign(TextAlign.Center)
-        .fontWeight(FontWeight.Lighter)
-        .fontColor(Theme.accent); Text(daysUntil(this.next()?.date || today()) <= 0 ? '进行中' : '天后见')
-        .id('home-event-caption')
-        .fontSize(12)
-        .fontColor(Theme.muted) }.width(64).alignItems(HorizontalAlign.Center)
-      Column({ space: 6 }) { Text(this.next()?.name || '')
-        .fontSize(17)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.ink).width('100%').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }); Text(`${this.next()?.date} · ${this.next()?.city || '地点待定'}`)
-        .fontSize(13)
-        .fontColor(Theme.muted).width('100%').maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }); StatusPill({ label: this.next()?.ticketPurchased ? '门票已准备' : '记得确认门票' }) }.layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-      Text('›').fontSize(24).fontColor(Theme.muted).accessibilityLevel('no')
-    }.width('100%')
+  @Builder next() {
+    SectionHeading({ title: '接下来' })
+    if (this.state.todayEvents.length) {
+      Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
+        .id('home-day-entry').width('100%').constraintSize({ minHeight: 64 }).fontSize(18).fontColor(Theme.accent).backgroundColor(Theme.tint)
+        .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); })
+    } else if (this.nextEvent()) {
+      Button((this.nextEvent()?.date || '') + ' · ' + (this.nextEvent()?.name || '')).width('100%').constraintSize({ minHeight: 48 })
+        .onClick((): void => { this.open('event', this.nextEvent()?.id || ''); })
+    }
+    ForEach(this.recentPlans(), (project: CosProject) => { ProjectCard({ state: this.state, project: project, open: (): void => { this.open('project', project.id); } }) }, (project: CosProject) => project.id)
+    if (!this.recentPlans().length) { Button('新建计划').constraintSize({ minHeight: 48 }).onClick((): void => { this.add('project', ''); }) }
   }
-  private greeting(): string {
-    const hour = new Date().getHours();
-    if (hour >= 6 && hour < 12) { return '上午好'; }
-    if (hour >= 12 && hour < 18) { return '下午好'; }
-    return '晚上好';
+  @Builder tasks() {
+    SectionHeading({ title: '在途与待办', trailing: '需要处理 ' + this.state.actionItems.length + ' 项' })
+    ForEach(this.summaryItems(), (item: TaskQueueItem) => {
+      Button() {
+        Column({ space: 4 }) {
+          Text((item.kind === 'waiting' ? '在途 · ' : item.group === 'overdue' ? '逾期 · ' : '') + item.title).fontSize(16).fontColor(Theme.ink)
+          Text(item.projectName + ' · ' + item.detail).fontSize(13).fontColor(Theme.muted)
+        }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+      }.width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.surface).onClick((): void => { this.openTask(item); })
+    }, (item: TaskQueueItem) => item.id)
+    if (!this.summaryItems().length) { Text('当前没有需要处理的事项；未定期和更远的任务可在全部待办查看。').fontSize(14).fontColor(Theme.muted) }
+    Button('全部待办 ' + this.state.taskQueue.length + ' 项').id('home-all-tasks').width('100%').constraintSize({ minHeight: 48 }).fontColor(Theme.accent).backgroundColor(Theme.tint).onClick((): void => { this.open('tasks', 'all'); })
   }
-  @Builder greetingHeader() {
-    Column({ space: 5 }) {
-      Text(`${this.greeting()}，${this.state.settings.username || getDeviceName()}`)
-        .fontSize(26).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
-        .accessibilityText(`${this.greeting()}，${this.state.settings.username || getDeviceName()}`)
-      Text($r('app.string.home_welcome')).fontSize(14).fontColor(Theme.muted)
-    }.width('100%').alignItems(HorizontalAlign.Start)
-      .padding({ left: 4, right: 4 }).accessibilityGroup(true)
-  }
-  @Builder overview() {
-    Column({ space: 16 }) {
-      this.greetingHeader()
-      if (this.state.todayEvents.length > 0) {
-        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
-          .id('home-day-entry').width('100%').constraintSize({ minHeight: 64 }).fontSize(18).backgroundColor(Theme.tint).fontColor(Theme.accent)
-          .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); })
-      }
-      Button('收录一条').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })
-      if (this.state.untriagedEntries.length > 0) {
-        Button('收录箱 · 未归位 ' + this.state.untriagedEntries.length + ' 条').id('home-inbox').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })
-      }
-      Button('花费统计 · ¥' + (expenseTotal(this.state.expenses) / 100)
-        .toFixed(2))
-        .accessibilityText('查看花费统计，实际花费 ' + (expenseTotal(this.state.expenses) / 100)
-        .toFixed(2) + ' 元')
-        .id('home-expenses')
-        .width('100%')
-        .backgroundColor(Theme.tint)
-        .fontColor(Theme.accent)
-        .onClick((): void => { vibration.dotVibration(); this.open('expenseStats', 'all'); })
-        .visualEffect(this.feedback.effect('button-1'))
-        .compositingFilter(this.feedback.filter('button-1'))
-        .attributeModifier(this.feedback.control('button-1'))
-      if (this.state.projects.length === 0 && this.state.characters.length === 0) {
-        EmptyState({
-          title: '开始你的第一份 Cos 计划',
-          message: '选择角色，准备装备，再打包出门。角色可以在新建时一起填写。',
-          button: '＋ 新建 Cos 计划',
-          action: (): void => this.add('project', '')
-        })
-      }
-      if (this.current()) {
-        SectionHeading({
-          title: '接下来这份计划',
-          trailing: planDate(this.current() as CosProject, this.state.events) ? planDate(this.current() as CosProject, this.state.events) : '日期待定'
-        })
-        ProjectCard({
-          state: this.state,
-          project: this.current() as CosProject,
-          hero: true,
-          open: () => this.open('project', this.current()?.id || '')
-        })
-        Row({ space: 10 }) {
-          Button('继续准备')
-            .accessibilityText('继续准备')
-            .layoutWeight(1)
-            .backgroundColor(Theme.tint)
-            .fontColor(Theme.accent)
-            .onClick((): void => { vibration.dotVibration(); this.open('project', this.current()?.id || ''); })
-            .visualEffect(this.feedback.effect('button-2'))
-            .compositingFilter(this.feedback.filter('button-2'))
-            .attributeModifier(this.feedback.control('button-2'))
-          Button('开始打包')
-            .accessibilityText('开始打包')
-            .layoutWeight(1)
-            .backgroundColor(Theme.brand)
-            .fontColor(Theme.onAccent)
-            .onClick((): void => { vibration.dotVibration(); this.open('packing', this.current()?.id || ''); })
-            .visualEffect(this.feedback.effect('button-3'))
-            .compositingFilter(this.feedback.filter('button-3'))
-            .attributeModifier(this.feedback.control('button-3'))
-        }.width('100%')
-
-      } else if (this.state.characters.length > 0) {
-        EmptyState({
-          title: '开始下一份计划',
-          message: '已有角色可以直接复用。',
-          button: '＋ 新建 Cos 计划',
-          action: (): void => this.add('project', '')
-        })
-      }
-    }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
-  }
-  @Builder nextActions() {
-    Column({ space: 16 }) {
-      if (this.next()) {
-        SectionHeading({ title: '下一场活动' })
-        InteractiveCard({
-          label: this.next()?.name || '',
-          effects: this.state.settings.effects,
-          action: () => this.open('event', this.next()?.id || ''),
-          content: (): void => this.eventContent()
-        })
-      }
-      if (this.preparationTasks()
-        .length > 0 || this.packingTasks()
-        .length > 0 || this.state.readinessPlans.some((plan: PlanReadiness) => plan.photos.byStage[0] > 0)) {
-        SectionHeading({ title: '下一步' })
-        ForEach(this.preparationTasks().slice(0, 2), (task: PreparationTask) => {
-          TaskLinkCard({
-            title: (this.state.preparationCategories.find((c) => c.id === task.categoryId)?.name || '准备') + ' · ' + task.label,
-            detail: this.state.projectName(task.projectId) + (task.dueDate ? ' · 截止 ' + task.dueDate : ''),
-            label: '继续准备 ' + task.label, hint: '双击继续准备', effects: this.state.settings.effects,
-            action: (): void => { this.open('project', task.projectId); },
-          })
-        }, (task: PreparationTask) => task.id)
-        ForEach(this.packingTasks().slice(0, 3), (item: ChecklistItem) => {
-          TaskLinkCard({
-            title: item.label, detail: this.state.projectName(item.projectId),
-            label: '待办 ' + item.label, hint: '双击继续打包', effects: this.state.settings.effects,
-            action: (): void => { this.open('packing', item.projectId); },
-          })
-        }, (item: ChecklistItem) => item.id)
-        ForEach(this.state.projects.filter((project: CosProject) => this.state.readiness(project.id).photos.byStage[0] > 0)
-          .slice(0, 2), (project: CosProject) => {
-          TaskLinkCard({
-            title: '选片 · ' + project.name,
-            detail: this.state.readiness(project.id).photos.byStage[0] + ' 张照片待选',
-            label: '打开 ' + project.name + ' 的选片', hint: '双击继续选片', effects: this.state.settings.effects,
-            action: (): void => { this.open('projectPhotos', project.id); },
-          })
-        }, (project: CosProject) => project.id)
-
-      }
-
-    }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 2 ? 1 : 0).translate({ y: this.animStep >= 2 ? 0 : 20 })
-  }
-  @Builder recentPhotoContent(photo: PhotoAsset) {
-    if (photo.thumbnailPath) {
-      ManagedImage({ sourcePath: photo.thumbnailPath, label: this.state.projectName(photo.projectId) + '照片' })
-        .width('100%').aspectRatio(0.8).borderRadius(14)
-    } else {
-      Text('照片待恢复').fontColor(Theme.muted).width('100%').aspectRatio(0.8)
-        .textAlign(TextAlign.Center).backgroundColor(Theme.surface).borderRadius(14)
+  @Builder recentSection() {
+    SectionHeading({ title: '最近' })
+    if (this.recent()) { Button('最近作品 · ' + (this.recent()?.name || '') + ' · 成片 ' + this.state.readiness(this.recent()?.id || '').photos.byStage[4] + ' 张').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('projectPhotos', this.recent()?.id || ''); }) }
+    else { Text('整理成片后，可以在这里回看。').fontSize(14).fontColor(Theme.muted) }
+    Row({ space: 10 }) {
+      Button('记一笔').constraintSize({ minHeight: 48 }).onClick((): void => { this.add('expense', ''); })
+      Button('收录一条').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
+    }
+    if (this.state.untriagedEntries.length) { Button('收录箱 · 未归位 ' + this.state.untriagedEntries.length + ' 条').id('home-inbox').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); }) }
+    Row({ space: 8 }) {
+      Button('花费统计').id('home-expenses').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('expenseStats', 'all'); })
+      Button('角色库').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('characters', 'all'); })
     }
   }
-  @Builder recentPhotos() {
-    Column({ space: 16 }) {
-      if (this.state.photos.length > 0) {
-        SectionHeading({ title: '最近照片', trailing: `${this.state.photos.length} 张` })
-        Row({ space: 10 }) {
-          ForEach(this.state.photos.slice(0, 3), (photo: PhotoAsset) => {
-            InteractiveCard({
-              label: this.state.projectName(photo.projectId) + '照片', hint: '双击打开最近照片',
-              effects: this.state.settings.effects, contentPadding: 0,
-              action: (): void => { this.open('photo', photo.id); },
-              content: (): void => { this.recentPhotoContent(photo); },
-            }).layoutWeight(1)
-          }, (photo: PhotoAsset) => photo.id)
-        }.width('100%')
-      }
-    }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 3 ? 1 : 0).translate({ y: this.animStep >= 3 ? 0 : 20 })
-  }
-  @Builder wideContent() {
-    Column({ space: Theme.sectionSpacing }) {
-      this.nextActions()
-      this.recentPhotos()
-    }.width('100%').alignItems(HorizontalAlign.Start)
-  }
-
   build() {
-    Column() {
-      if (this.contentWidth >= Theme.wideBreakpoint && this.contentHeight >= MIN_SPLIT_HEIGHT) {
-        DashboardSplitLayout({
-          scroller: this.scroller, bottomInset: this.bottomInset,
-          layoutId: 'home-wide-layout', overviewId: 'home-fixed-overview', scrollId: 'home-wide-scroll',
-          overviewLabel: '固定显示的问候与当前计划', scrollLabel: '可滚动的活动、待办与最近照片',
-          overview: (): void => { this.overview(); }, content: (): void => { this.wideContent(); },
-        })
-      } else {
-        Scroll(this.scroller) {
-          Column({ space: Theme.sectionSpacing }) {
-            Blank().height(this.topInset).width('100%')
-            this.overview()
-            this.nextActions()
-            this.recentPhotos()
-            Blank().height(this.bottomInset).width('100%')
-          }.width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
-            .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
-        }.id('home-phone-scroll').width('100%').height('100%').scrollBar(BarState.Off)
-          .align(Alignment.Top).edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-      }
-    }.width('100%').height('100%').alignItems(HorizontalAlign.Center)
-      .onAreaChange((_, area: Area): void => { this.contentWidth = Number(area.width); this.contentHeight = Number(area.height); })
-      .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
+    Scroll(this.scroller) {
+      Column({ space: 16 }) {
+        Blank().height(this.topInset).width('100%')
+        if (!this.state.projects.length && !this.state.events.length && !this.state.assets.length && !this.state.characters.length && !this.state.entries.length) {
+          EmptyState({ title: '从一次想出的角色开始', message: '建立计划，添加准备任务，再安排活动和整理照片。', button: '新建计划', action: (): void => { this.add('project', ''); } })
+          Button('先收录一个想法').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
+        } else { this.next(); this.tasks(); this.recentSection() }
+        Blank().height(this.bottomInset).width('100%')
+      }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start)
+    }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
   }
 }

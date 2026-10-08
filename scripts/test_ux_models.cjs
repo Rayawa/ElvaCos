@@ -11,6 +11,7 @@ const ts = require(path.join(studio, 'tools/ohpm/node_modules/typescript'));
 const originalLoad = Module._load;
 Module._load = function (id, parent, isMain) {
   if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID() } };
+  if (id === '@kit.ArkData') return { relationalStore: {} };
   if (['@kit.AbilityKit', '@kit.BackgroundTasksKit', '@kit.NotificationKit'].includes(id)) return {};
   if (id === '@kit.BasicServicesKit') return { deviceInfo: { sdkApiVersion: 26, distributionOSApiVersion: 60100 } };
   return originalLoad.call(this, id, parent, isMain);
@@ -22,12 +23,16 @@ require.extensions['.ets'] = function (module, filename) {
   module._compile(output, filename);
 };
 global.canIUse = () => true;
+// Host execution intentionally does not model native observation or UI lifecycle.
+global.Trace = () => undefined;
+global.ObservedV2 = value => value;
 const root = path.resolve(__dirname, '../entry/src/main/ets');
 const entities = require(root + '/model/Entities.ets');
 const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistItem, PhotoAsset, PhotoStatus, CosEvent } = entities;
 const day = require(root + '/model/DayMode.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
 const { EventSaveCoordinator } = require(root + '/common/EventSaveCoordinator.ets');
+const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/model/TaskQueue.ets');
 const { PreparationTask } = require(root + '/model/Preparation.ets');
 const { Expense } = require(root + '/model/Planning.ets');
 const { buildPlanReadiness, budgetLabel } = require(root + '/model/PlanReadiness.ets');
@@ -184,6 +189,30 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   await test('empty preparation and packing stay empty', () => {
     const r = buildPlanReadiness(project, [], [], [], [], [], [], [], '2026-12-31'); assert.equal(r.prep.total, 0); assert.equal(r.prep.percent, 0); assert.equal(r.pack.total, 0); assert.equal(r.photos.byStage.reduce((a, b) => a + b, 0), 0);
   });
+  await test('task queue uses one row per photo stage and never counts waiting as overdue', () => {
+    const queue = buildTaskQueue([read()], [project], '2026-12-31');
+    const awaiting = queue.filter(item => item.kind === 'waiting');
+    assert.equal(awaiting.filter(item => item.source === 'preparation').length, 2);
+    assert.equal(awaiting.filter(item => item.source === 'asset').length, 1);
+    const route = new TaskRoute(); const actionable = filterTaskQueue(queue, route, '2026-12-31');
+    assert.equal(actionable.some(item => item.kind === 'waiting'), false);
+    assert.equal(actionable.some(item => item.focusId === 'undated'), false);
+    assert.equal(actionable.some(item => item.focusId === 'later'), false);
+    assert.equal(actionable.filter(item => item.kind === 'photo').length, 2);
+    const manyPhotos = Array.from({ length: 32 }, () => Object.assign(new PhotoAsset(), { projectId: 'p' }));
+    const many = buildTaskQueue([buildPlanReadiness(project, [], [], [], [], manyPhotos, [], [event], '2026-12-31')], [project], '2026-12-31');
+    assert.equal(many.length, 1); assert.equal(many[0].title, '待选 32 张'); assert.equal(many[0].section, 3); assert.equal(many[0].photoFilter, 1);
+    route.category = 'waiting'; route.range = 'all'; assert.equal(filterTaskQueue(queue, route, '2026-12-31').length, 3);
+    route.range = 'overdue'; assert.equal(filterTaskQueue(queue, route, '2026-12-31').length, 0);
+    const preparationItem = queue.find(item => item.focusId === 'overdue'); assert.equal(preparationItem.section, 1);
+    const pendingPack = Object.assign(new ChecklistItem(), { projectId: 'p', done: false });
+    const packingQueue = buildTaskQueue([buildPlanReadiness(project, [], [pendingPack], [], [], [], [], [event], '2026-12-31')], [project], '2026-12-31');
+    assert.equal(packingQueue[0].section, 2); assert.equal(packingQueue[0].focusId, pendingPack.id);
+    const completed = Object.assign(new CosProject(), project, { status: ProjectStatus.COMPLETED });
+    assert.deepEqual(buildTaskQueue([buildPlanReadiness(completed, tasks, [pendingPack], [asset], [link], photos, [], [event], '2026-12-31')], [completed], '2026-12-31'), []);
+    route.category = 'preparation'; route.range = 'undated'; assert.deepEqual(filterTaskQueue(queue, route, '2026-12-31').map(item => item.focusId), ['undated']);
+    route.range = 'all'; route.projectId = 'missing'; assert.equal(filterTaskQueue(queue, route, '2026-12-31').length, 0);
+  });
   await test('all photo surfaces share six disjoint stages and final includes published', () => {
     const distribution = photoDistribution(photos); assert.deepEqual(distribution.map(g => g.value), read().photos.byStage);
     assert.equal(distribution.reduce((sum, g) => sum + g.value, 0), 8); assert.equal(photoStage(photos, 4).length, 2);
@@ -212,25 +241,50 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     for (const [id, cents, configured] of [['zero',0,1], ['unset',0,0], ['unknown',0,null], ['positive',1234,1]]) {
       await db.sql("INSERT INTO projects(id,character_id,name,status,budget_cents,budget_configured,created_at,updated_at) VALUES(?,'c',?,'Preparing',?,?,1,1)", [id,id,cents,configured]);
     }
+    await db.sql("INSERT INTO preparation_categories VALUES('waiting-category','positive','造型',0)");
+    await db.sql("INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,waiting_on,waiting_until) VALUES('persist-wait','positive','waiting-category','等假发',1,'2026-10-01','快递','2026-10-10')");
+    const { PreparationRepository } = require(root + '/data/repository/PreparationRepository.ets');
+    const preparations = new PreparationRepository(db);
+    await test('waiting fields persist through the actual preparation repository without losing completion', async () => {
+      const saved = (await preparations.tasks()).find(task => task.id === 'persist-wait');
+      assert.equal(saved.done, true); assert.equal(saved.waitingOn, '快递'); assert.equal(saved.waitingUntil, '2026-10-10');
+      saved.waitingOn = '毛娘'; saved.waitingUntil = '2026-10-11'; await preparations.saveTask(saved);
+      const updated = (await preparations.tasks()).find(task => task.id === 'persist-wait');
+      assert.equal(updated.waitingOn, '毛娘'); assert.equal(updated.waitingUntil, '2026-10-11'); assert.equal(updated.done, true);
+      updated.waitingUntil = 'bad date'; await assert.rejects(preparations.saveTask(updated), /等待日期/);
+      assert.equal((await preparations.tasks()).find(task => task.id === 'persist-wait').waitingUntil, '2026-10-11');
+    });
     const { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');
     const backup = new MetadataBackupRepository(db);
     const exported = await backup.exportMetadata();
     await test('current backup round trip preserves explicit zero, unset and unknown budgets', async () => {
-      assert.equal(JSON.parse(exported).version, 5); await backup.restoreMetadata(exported);
+      assert.equal(JSON.parse(exported).version, 6); await backup.restoreMetadata(exported);
       assert.deepEqual((await db.sql('SELECT id,budget_cents,budget_configured FROM projects ORDER BY id')).rows, [['positive',1234,1], ['unknown',0,null], ['unset',0,0], ['zero',0,1]]);
     });
     await test('v1, v2 and v3 backups infer positive budgets but preserve historical zero as unknown', async () => {
       for (const version of [1,2,3]) {
         const doc = JSON.parse(exported); doc.version = version; doc.tables = doc.tables.slice(0, version === 1 ? 10 : version === 2 ? 12 : 15);
+        for (const row of doc.tables.find(t => t.name === 'preparation_tasks')?.rows || []) { delete row.waiting_on; delete row.waiting_until; }
         for (const row of doc.tables.find(t => t.name === 'projects').rows) delete row.budget_configured;
         await backup.restoreMetadata(JSON.stringify(doc));
         assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',null], ['zero',null]]);
       }
     });
     await test('v4 backup retains budget flags and defaults the new entries table to empty', async () => {
-      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0,15); await backup.restoreMetadata(JSON.stringify(doc));
+      const doc = JSON.parse(exported); doc.version = 4; doc.tables = doc.tables.slice(0,15); for (const row of doc.tables.find(t => t.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; } await backup.restoreMetadata(JSON.stringify(doc));
       assert.deepEqual((await db.sql('SELECT id,budget_configured FROM projects ORDER BY id')).rows, [['positive',1], ['unknown',null], ['unset',0], ['zero',1]]);
       assert.equal((await db.sql('SELECT count(*) FROM entries')).rows[0][0], 0);
+    });
+    await test('v6 waiting fields round trip; v5 defaults them without changing task history', async () => {
+      await backup.restoreMetadata(exported); const current = (await preparations.tasks()).find(task => task.id === 'persist-wait');
+      assert.equal(current.waitingOn, '毛娘'); assert.equal(current.waitingUntil, '2026-10-11');
+      const old = JSON.parse(exported); old.version = 5;
+      for (const row of old.tables.find(table => table.name === 'preparation_tasks').rows) { delete row.waiting_on; delete row.waiting_until; }
+      await backup.restoreMetadata(JSON.stringify(old)); const restored = (await preparations.tasks()).find(task => task.id === 'persist-wait');
+      assert.equal(restored.waitingOn, ''); assert.equal(restored.waitingUntil, ''); assert.equal(restored.done, true); assert.equal(restored.dueDate, '2026-10-01');
+      const bad = JSON.parse(exported); bad.tables.find(table => table.name === 'preparation_tasks').rows[0].waiting_until = '2026-02-30';
+      await assert.rejects(backup.restoreMetadata(JSON.stringify(bad)), /无效日期/);
+      assert.equal((await preparations.tasks()).find(task => task.id === 'persist-wait').waitingUntil, '');
     });
     await test('invalid budget flags are rejected before replacement', async () => {
       const doc = JSON.parse(exported); doc.tables.find(t => t.name === 'projects').rows[0].budget_configured = 2;
@@ -257,9 +311,9 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     });
     await test('task conversion commits the category, task and removal together once', async () => {
       const note = (await entries.list())[0]; await entries.convert(note,'task','project','zero','','2026-10-08');
-      assert.equal((await db.sql('SELECT count(*) FROM preparation_tasks')).rows[0][0],1); assert.equal((await entries.list()).length,0);
+      assert.equal((await db.sql("SELECT count(*) FROM preparation_tasks WHERE project_id='zero'")).rows[0][0],1); assert.equal((await entries.list()).length,0);
       await assert.rejects(entries.convert(note,'task','project','zero','','2026-10-08'), /已变化/);
-      assert.equal((await db.sql('SELECT count(*) FROM preparation_tasks')).rows[0][0],1);
+      assert.equal((await db.sql("SELECT count(*) FROM preparation_tasks WHERE project_id='zero'")).rows[0][0],1);
     });
     await test('conversion failure leaves the original entry intact', async () => {
       const note = entryFromText('门票'); await entries.save(note); db.failSql = 'INSERT INTO expenses';

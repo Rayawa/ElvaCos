@@ -16,6 +16,12 @@ export class PreparationReadiness {
   pending: PreparationTask[] = [];
   next?: PreparationTask;
   percent: number = 0;
+  categories: PreparationCategoryReadiness[] = [];
+}
+export class PreparationCategoryReadiness {
+  id: string = '';
+  done: number = 0;
+  total: number = 0;
 }
 export class PackingReadiness {
   packed: number = 0;
@@ -27,6 +33,7 @@ export class EquipmentReadiness {
   available: number = 0;
   total: number = 0;
   unavailable: Asset[] = [];
+  waiting: Asset[] = [];
   percent: number = 0;
 }
 export class MoneyReadiness {
@@ -62,6 +69,11 @@ export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[]
   const preparation = tasks.filter((task: PreparationTask) => task.projectId === project.id);
   result.prep.total = preparation.length;
   result.prep.done = preparation.filter((task: PreparationTask) => task.done).length;
+  for (const task of preparation) {
+    let category = result.prep.categories.find((item: PreparationCategoryReadiness) => item.id === task.categoryId);
+    if (!category) { category = new PreparationCategoryReadiness(); category.id = task.categoryId; result.prep.categories.push(category); }
+    category.total++; if (task.done) { category.done++; }
+  }
   result.prep.waitingItems = preparation.filter(isWaiting);
   result.prep.waiting = result.prep.waitingItems.length;
   result.prep.pending = preparation.filter((task: PreparationTask) => !task.done && !isWaiting(task))
@@ -82,6 +94,7 @@ export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[]
   const equipment = assets.filter((asset: Asset) => ids.includes(asset.id));
   result.equipment.total = equipment.length;
   result.equipment.unavailable = equipment.filter((asset: Asset) => asset.status !== AssetStatus.OWNED);
+  result.equipment.waiting = equipment.filter((asset: Asset) => [AssetStatus.ORDERED, AssetStatus.REPAIR, AssetStatus.LENT].includes(asset.status));
   result.equipment.available = equipment.length - result.equipment.unavailable.length;
   result.equipment.percent = equipment.length ? Math.round(result.equipment.available * 100 / equipment.length) : 0;
   result.photos.byStage = photoStageCounts(photos.filter((photo: PhotoAsset) => photo.projectId === project.id));

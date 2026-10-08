@@ -24,7 +24,7 @@ const TABLES: TableSpec[] = [
   new TableSpec('photo_versions', ['id', 'photo_id', 'name', 'recipe', 'rendered_path', 'created_at']),
   new TableSpec('diary_entries', ['id', 'project_id', 'text', 'created_at']),
   new TableSpec('preparation_categories', ['id', 'project_id', 'name', 'sort_order']),
-  new TableSpec('preparation_tasks', ['id', 'project_id', 'category_id', 'label', 'done', 'due_date', 'notes', 'sort_order']),
+  new TableSpec('preparation_tasks', ['id', 'project_id', 'category_id', 'label', 'done', 'due_date', 'notes', 'sort_order', 'waiting_on', 'waiting_until']),
   new TableSpec('team_members', ['id', 'project_id', 'role', 'name', 'notes']),
   new TableSpec('expenses', ['id', 'project_id', 'name', 'category', 'amount_cents', 'date', 'notes', 'created_at']),
   new TableSpec('reference_images', ['id', 'project_id', 'character_id', 'source_uri', 'local_path', 'thumbnail_path', 'caption', 'created_at']),
@@ -51,7 +51,7 @@ export class MetadataBackupRepository {
       } finally { result.close(); }
       tables.push({ name: spec.name, rows: rows });
     }
-    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 5, exportedAt: Date.now(), tables: tables };
+    const doc: BackupDocument = { format: 'cos-personal-metadata', version: 6, exportedAt: Date.now(), tables: tables };
     const output = JSON.stringify(doc);
     if (output.length > 3 * 1024 * 1024) { throw new Error('元数据过大，请使用系统完整备份'); }
     return output;
@@ -59,7 +59,7 @@ export class MetadataBackupRepository {
   async restoreMetadata(input: string): Promise<void> {
     if (input.length > 10 * 1024 * 1024) { throw new Error('元数据过大'); }
     const doc = JSON.parse(input) as BackupDocument;
-    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
+    if (doc.format !== 'cos-personal-metadata' || ![1, 2, 3, 4, 5, 6].includes(doc.version) || !Array.isArray(doc.tables) || doc.tables.length !== (doc.version === 1 ? 10 : doc.version === 2 ? 12 : doc.version < 5 ? 15 : TABLES.length)) {
       throw new Error('备份格式或版本不受支持');
     }
     const existingEntries = new Map<string, relationalStore.ValuesBucket>();
@@ -96,6 +96,7 @@ export class MetadataBackupRepository {
     for (let i = 0; i < doc.tables.length; i++) {
       let spec = doc.version < 3 && TABLES[i].name === 'events' ? new TableSpec('events', LEGACY_EVENT_COLUMNS) : TABLES[i];
       if (doc.version < 4 && spec.name === 'projects') { spec = new TableSpec('projects', spec.columns.filter((col: string) => col !== 'budget_configured')); }
+      if (doc.version < 6 && spec.name === 'preparation_tasks') { spec = new TableSpec(spec.name, spec.columns.filter((col: string) => col !== 'waiting_on' && col !== 'waiting_until')); }
       const table = doc.tables[i];
       if (!table || table.name !== spec.name || !Array.isArray(table.rows) || table.rows.length > 50000) { throw new Error('备份表结构无效'); }
       for (const row of table.rows) {
@@ -117,7 +118,7 @@ export class MetadataBackupRepository {
           }
           if (typeof value === 'string' && ['name', 'label', 'role', 'category', 'event_type'].includes(col)) { requiredName(value); }
           if (typeof value === 'string' && (col === 'url' || col === 'purchase_url')) { safeUrl(value); }
-          if (typeof value === 'string' && (col === 'date' || col === 'target_date' || col === 'due_date' || col === 'end_date') && (value !== '' || (col === 'date' && !(spec.name === 'events' && row['date_mode'] === 'pending'))) && !validDate(value)) {
+          if (typeof value === 'string' && (col === 'date' || col === 'target_date' || col === 'due_date' || col === 'end_date' || col === 'waiting_until') && (value !== '' || (col === 'date' && !(spec.name === 'events' && row['date_mode'] === 'pending'))) && !validDate(value)) {
             throw new Error('备份包含无效日期');
           }
           if (typeof value === 'string' && value.length > 20000) { throw new Error('备份字段过长'); }

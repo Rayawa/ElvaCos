@@ -60,3 +60,9 @@ const MIGRATION_5: string[] = [
   `CREATE TRIGGER entries_asset_removed BEFORE DELETE ON assets BEGIN UPDATE entries SET scope_kind='global',scope_id='' WHERE scope_kind='asset' AND scope_id=OLD.id; END`
 ];
 export function migration5(): string[] { return MIGRATION_5; }
+
+const MIGRATION_6: string[] = [
+  `ALTER TABLE preparation_tasks ADD COLUMN waiting_on TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE preparation_tasks ADD COLUMN waiting_until TEXT NOT NULL DEFAULT ''`
+];
+export function migration6(): string[] { return MIGRATION_6; }

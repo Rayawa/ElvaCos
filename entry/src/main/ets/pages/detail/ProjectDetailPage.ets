@@ -1,3 +1,4 @@
+import { EntryCollection } from '../../component/EntryCollection';
 import { budgetLabel } from '../../model/PlanReadiness';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_LABELS, PROJECT_STATUSES } from '../../common/constants';
 import { PressFeedback } from '../../common/pressFeedback';
@@ -30,15 +31,42 @@ export struct ProjectDetail {
   @Event open: (kind: string, id: string) => void = () => {};
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
   @Event remove: (kind: string, id: string) => void = () => {};
-  @Local expandedCategories: string[] = [];
   @Local templateKeys: string[] = preparationKeys(1);
   @Local templateMode: number = 1;
   @Param entrance: StaggerEntrance = new StaggerEntrance();
-  aboutToAppear(): void { if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
-  aboutToDisappear(): void { if (!this.entrance.managed) { this.entrance.reset(); } }
+  private scroller: Scroller = new Scroller();
+  private displayedSection: number = 0;
+  private viewportTop: number = 0;
+  private scrollTimer: number = -1;
+  private restoring: boolean = false;
+  aboutToAppear(): void {
+    this.displayedSection = this.route.section;
+    const target = this.state.preparationTasks.find((task: PreparationTask) => task.id === this.route.focusTaskId && task.projectId === this.project.id);
+    if (target && !this.route.expandedCategories.includes(target.categoryId)) { this.route.expandedCategories = this.route.expandedCategories.concat(target.categoryId); }
+    if (target?.done) { this.route.showCompleted = true; }
+    if (!this.route.focusTaskId && !this.route.focusPackingId || this.route.focusHandled) { this.restoreOffset(); }
+    if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
+  aboutToDisappear(): void { if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } if (!this.entrance.managed) { this.entrance.reset(); } }
+  @Monitor('route.section')
+  private sectionChanged(): void { this.displayedSection = this.route.section; this.restoreOffset(); }
+  private restoreOffset(): void {
+    if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } this.restoring = true;
+    this.scrollTimer = setTimeout((): void => { this.scrollTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offsets[this.displayedSection], animation: false }); this.restoring = false; }, 0);
+  }
+  private focusItem(id: string, area: Area): void {
+    if (this.route.focusHandled || id !== (this.route.section === 2 ? this.route.focusPackingId : this.route.focusTaskId)) { return; }
+    this.route.focusHandled = true; this.restoring = true;
+    this.scrollTimer = setTimeout((): void => {
+      this.scrollTimer = -1; const offset = Math.max(0, this.scroller.currentOffset().yOffset + Number(area.globalPosition.y) - this.viewportTop - this.topInset - 12);
+      this.scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false }); this.route.offsets[this.displayedSection] = offset; this.restoring = false;
+    }, 0);
+  }
 
-  private items(): ChecklistItem[] { return this.state.checklist.filter((c: ChecklistItem) => c.projectId === this.project.id)
-    .sort((a: ChecklistItem, b: ChecklistItem) => Number(a.done) - Number(b.done) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)); }
+  private items(): ChecklistItem[] {
+    const items = this.state.checklist.filter((item: ChecklistItem) => item.projectId === this.project.id).sort((a: ChecklistItem, b: ChecklistItem) => Number(a.done) - Number(b.done) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    for (const item of items) { if (!this.route.packingOrder.includes(item.id)) { this.route.packingOrder.push(item.id); } }
+    return items.sort((a: ChecklistItem, b: ChecklistItem) => this.route.packingOrder.indexOf(a.id) - this.route.packingOrder.indexOf(b.id));
+  }
   private equipment(): Asset[] { return this.state.projectAssets(this.project.id)
     .sort((a: Asset, b: Asset) => Number(a.status === AssetStatus.OWNED) - Number(b.status === AssetStatus.OWNED) || a.name.localeCompare(b.name)); }
   private linked(asset: Asset): boolean { return this.state.projectAssets(this.project.id).some((a: Asset) => a.id === asset.id); }
@@ -118,7 +146,8 @@ export struct ProjectDetail {
   }
 
   @Builder activeSheet() {
-    if (this.route.sheetKind === 0) { this.preparationSheet() } else { this.linkSheet() }
+    if (this.route.contextSheet) { this.contextSheet() }
+    else if (this.route.sheetKind === 0) { this.preparationSheet() } else { this.linkSheet() }
   }
 
   /** 计划头：名称 + 状态 + 日期，替代原先的 26vp 大标题。 */
@@ -133,7 +162,7 @@ export struct ProjectDetail {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       StatusPill({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.project.status)] })
     }.width('100%').alignItems(VerticalAlign.Center)
-    if (planDate(this.project, this.state.events)) { Text('计划日期 · ' + planDate(this.project, this.state.events)).fontSize(13).fontColor(Theme.muted) }
+    if (planDate(this.project, this.state.events)) { Text((this.state.readiness(this.project.id).dateFromEvent ? '日期来自活动 · ' : '计划日期 · ') + planDate(this.project, this.state.events)).fontSize(13).fontColor(Theme.muted) }
     if (this.project.eventId) {
       Button('活动 · ' + (this.state.events.find((e: CosEvent) => e.id === this.project.eventId)?.name || '未关联'))
         .backgroundColor(Theme.tint)
@@ -145,16 +174,18 @@ export struct ProjectDetail {
     }
   }
 
+  private categorySummary(id: string): string { const category = this.state.readiness(this.project.id).prep.categories.find((item) => item.id === id); return category ? category.done + '/' + category.total + ' 完成' : '尚未添加任务'; }
   private categories(): PreparationCategory[] { return this.state.preparationCategories.filter((c: PreparationCategory) => c.projectId === this.project.id); }
   private tasks(categoryId: string): PreparationTask[] { return this.state.preparationTasks.filter((t: PreparationTask) => t.categoryId === categoryId)
     .sort((a: PreparationTask, b: PreparationTask) => Number(a.done) - Number(b.done) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)); }
 
   private visibleTasks(categoryId: string): PreparationTask[] {
     const tasks = this.tasks(categoryId);
-    return this.expandedCategories.includes(categoryId) ? tasks : tasks.filter((t: PreparationTask) => !t.done).slice(0, 1);
+    const visible = this.route.showCompleted ? tasks : tasks.filter((task: PreparationTask) => !task.done);
+    return this.route.expandedCategories.includes(categoryId) ? visible : visible.slice(0, 1);
   }
   private expandCategory(id: string): void {
-    vibration.dotVibration(); this.expandedCategories = this.expandedCategories.includes(id) ? this.expandedCategories.filter((key: string) => key !== id) : this.expandedCategories.concat(id);
+    vibration.dotVibration(); this.route.expandedCategories = this.route.expandedCategories.includes(id) ? this.route.expandedCategories.filter((key: string) => key !== id) : this.route.expandedCategories.concat(id);
   }
   @Builder preparationSheet() {
     Column({ space: 14 }) {
@@ -217,38 +248,11 @@ export struct ProjectDetail {
 
   @Builder preparation() {
     Column({ space: 12 }) {
-      Row() { Text('准备进度')
-        .fontSize(15)
-        .fontColor(Theme.muted)
-        .layoutWeight(1); Text(this.state.readiness(this.project.id).prep
-        .total === 0 ? '待设置' : this.state.preparationPercent(this.project.id) + '%')
-        .fontSize(24)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.accent) }.width('100%')
-      Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear })
-        .accessibilityText('准备任务完成 ' + this.state.preparationPercent(this.project.id) + '%')
-        .width('100%')
-        .color(Theme.brand)
-        .backgroundColor(Theme.tint)
-      Text(this.state.readiness(this.project.id).prep
-        .total === 0 ? '尚未添加准备任务，可以从模板开始。' : this.state.readiness(this.project.id).prep
-        .done + ' / ' + this.state.readiness(this.project.id).prep
-        .total + ' 项准备完成')
-        .fontSize(12)
-        .fontColor(Theme.muted)
-      Text('装备可用 ' + this.state.readiness(this.project.id).equipment
-        .available + ' / ' + this.state.projectAssets(this.project.id)
-        .length + ' 件 · 装包请在「打包」确认')
-        .fontSize(12)
-        .fontColor(Theme.muted)
-    }.alignItems(HorizontalAlign.Start)
-      .padding(18)
-      .width('100%')
-      .backgroundColor(Theme.surface)
-      .borderRadius(Theme.cardRadius)
-      .visualEffect(this.feedback.effect('column-9', true))
-      .compositingFilter(this.feedback.filter('column-9', true))
-      .attributeModifier(this.feedback.control('column-9', true))
+      SectionHeading({ title: '准备', trailing: this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项完成' })
+      if (this.state.readiness(this.project.id).prep.total > 8) { Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear }).width('100%').color(Theme.brand).backgroundColor(Theme.tint) }
+      Text('在途 ' + this.state.readiness(this.project.id).prep.waiting + ' 项 · 装备可用 ' + this.state.readiness(this.project.id).equipment.available + ' / ' + this.state.readiness(this.project.id).equipment.total + ' 件').fontSize(14).fontColor(Theme.muted)
+      Button(this.route.showCompleted ? '收起已完成' : '显示已完成').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.showCompleted = !this.route.showCompleted; })
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder preparationList() {
@@ -266,10 +270,7 @@ export struct ProjectDetail {
             Column({ space: 3 }) { Text(category.name)
               .fontColor(Theme.ink)
               .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis }); Text(this.tasks(category.id)
-              .filter((t: PreparationTask) => t.done)
-              .length + '/' + this.tasks(category.id)
-              .length + ' 完成 · ' + (this.expandedCategories.includes(category.id) ? '收起' : '展开'))
+              .textOverflow({ overflow: TextOverflow.Ellipsis }); Text(this.categorySummary(category.id) + ' · ' + (this.route.expandedCategories.includes(category.id) ? '收起' : '展开'))
               .fontSize(11)
               .fontColor(Theme.muted) }.alignItems(HorizontalAlign.Start)
               .width('100%')
@@ -277,7 +278,7 @@ export struct ProjectDetail {
             .backgroundColor(Theme.transparent)
             .layoutWeight(1)
             .onClick((): void => this.expandCategory(category.id))
-            .accessibilityText((this.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
+            .accessibilityText((this.route.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
             .visualEffect(this.feedback.effect('button-11' + ":" + category.id))
             .compositingFilter(this.feedback.filter('button-11' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-11' + ":" + category.id))
@@ -325,7 +326,8 @@ export struct ProjectDetail {
                 .fontSize(15)
                 .fontColor(task.done ? Theme.muted : Theme.ink)
                 .decoration({ type: task.done ? TextDecorationType.LineThrough : TextDecorationType.None })
-              if (task.dueDate) { Text('截止 ' + task.dueDate).fontSize(12).fontColor(Theme.muted) }
+              if (!task.done && (task.waitingOn || task.waitingUntil)) { Text('在途 · ' + (task.waitingOn || '等待外部进展') + (task.waitingUntil ? ' · 等待至 ' + task.waitingUntil : '')).fontSize(13).fontColor(Theme.accent) }
+              else if (task.dueDate) { Text((!task.done && task.dueDate < this.state.localDate ? '逾期 · 截止 ' : '截止 ') + task.dueDate).fontSize(13).fontColor(Theme.muted) }
               if (task.notes) { Text(task.notes).fontSize(12).fontColor(Theme.muted).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
             }.layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
@@ -343,7 +345,8 @@ export struct ProjectDetail {
               .visualEffect(this.feedback.effect('button-17' + ":" + category.id + ":" + task.id))
               .compositingFilter(this.feedback.filter('button-17' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('button-17' + ":" + category.id + ":" + task.id))
-          }.width('100%')
+          }.id('preparation-row:' + task.id).width('100%').padding(8).border({ width: task.id === this.route.focusTaskId ? 1 : 0, color: Theme.accent }).borderRadius(12)
+            .onAreaChange((_, area: Area): void => { this.focusItem(task.id, area); })
         }, (task: PreparationTask) => task.id)
         if (this.tasks(category.id).length === 0) { Text('点击 ＋ 添加第一项任务').fontSize(12).fontColor(Theme.muted) }
       }.padding(14)
@@ -358,7 +361,7 @@ export struct ProjectDetail {
   }
 
   @Builder equipmentList() {
-    SectionHeading({ title: '本次装备', trailing: this.state.projectAssets(this.project.id).length + ' 件' })
+    SectionHeading({ title: '本次装备', trailing: this.state.readiness(this.project.id).equipment.total + ' 件' })
     ForEach(this.equipment(), (asset: Asset) => {
       Row({ space: 8 }) {
         Column({ space: 5 }) { Text(asset.name)
@@ -398,13 +401,20 @@ export struct ProjectDetail {
 
   }
 
-  @Builder planning() {
-    ReferenceGallery({
-      state: this.state,
-      images: this.state.references.filter((r: ReferenceImage) => r.projectId === this.project.id),
-      add: (): void => { this.state.importReferences(this.project.id); },
-      open: (id: string): void => this.open('reference', id)
-    })
+  @Builder contextSheet() {
+    Column({ space: 16 }) {
+      SheetHeader({ title: this.route.contextSheet === 'team' ? '团队分工' : this.route.contextSheet === 'references' ? '准备参考图' : '计划收录', haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: 48, close: (): void => { this.route.contextSheet = ''; } })
+      Scroll() {
+        Column({ space: 14 }) {
+          if (this.route.contextSheet === 'team') { this.team() }
+          else if (this.route.contextSheet === 'references') {
+            ReferenceGallery({ state: this.state, images: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id), add: (): void => { this.state.importReferences(this.project.id); }, open: (id: string): void => { this.open('reference', id); } })
+          } else { EntryCollection({ state: this.state, scopeKind: 'project', scopeId: this.project.id, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
+        }.width('100%').alignItems(HorizontalAlign.Start)
+      }.layoutWeight(1).width('100%')
+    }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
+  }
+  @Builder team() {
     Row({ space: 8 }) {
       SectionHeading({ title: '团队分工' }).layoutWeight(1)
       Button('＋ 添加成员')
@@ -442,57 +452,31 @@ export struct ProjectDetail {
     width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-23' + ":" + m.id, true)).compositingFilter(this.feedback.filter('row-23' + ":" + m.id, true)).attributeModifier(this.feedback.control('row-23' + ":" + m.id, true))
     }, (m: TeamMember) => m.id)
     if (!this.state.team.some((m: TeamMember) => m.projectId === this.project.id)) { Text('记录毛娘、妆娘、摄影、后勤和后期的人选。').fontColor(Theme.muted).fontSize(13) }
-    Row({ space: 8 }) {
-      SectionHeading({ title: '实际花费' }).layoutWeight(1)
-      Button('＋ 记一笔')
-        .accessibilityText('记一笔')
-        .backgroundColor(Theme.tint)
-        .fontColor(Theme.accent)
-        .onClick((): void => { vibration.dotVibration(); this.edit('expense', '', this.project.id); })
-        .visualEffect(this.feedback.effect('button-26'))
-        .compositingFilter(this.feedback.filter('button-26'))
-        .attributeModifier(this.feedback.control('button-26'))
-    }.width('100%')
-    Text('实际 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' / ' + budgetLabel(this.project.budgetConfigured, this.project.budgetCents))
-      .fontColor(Theme.accent)
-      .fontSize(16)
-    ForEach(this.state.expenses.filter((e: Expense) => e.projectId === this.project.id), (e: Expense) => {
+  }
+  @Builder overview() {
+    Column({ space: 14 }) {
+      Text(this.state.readiness(this.project.id).blockers[0] || this.state.readiness(this.project.id).prep.next?.label || '当前没有准备卡点').fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+      Button('角色 · ' + this.state.characterName(this.project.characterId) + (this.project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在') : '')).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('character', this.project.characterId); })
       Row({ space: 8 }) {
-        Column({ space: 5 }) { Text(e.name + ' · ¥' + (e.amountCents / 100)
-          .toFixed(2))
-          .fontColor(Theme.ink); Text(e.date + ' · ' + e.category)
-          .fontSize(12)
-          .fontColor(Theme.muted) }.layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          .onClick((): void => { vibration.dotVibration(); this.edit('expense', e.id, this.project.id); })
-          .accessibilityText('编辑花费 ' + e.name)
-          .visualEffect(this.feedback.effect('column-28' + ":" + e.id))
-          .compositingFilter(this.feedback.filter('column-28' + ":" + e.id))
-          .attributeModifier(this.feedback.control('column-28' + ":" + e.id))
-        Button('−')
-          .backgroundColor(Theme.bg)
-          .fontColor(Theme.muted)
-          .enabled(!this.state.busy)
-          .onClick((): void => { vibration.dotVibration(); this.remove('expense', e.id); })
-          .accessibilityText('删除花费 ' + e.name)
-          .visualEffect(this.feedback.effect('button-29' + ":" + e.id))
-          .compositingFilter(this.feedback.filter('button-29' + ":" + e.id))
-          .attributeModifier(this.feedback.control('button-29' + ":" + e.id))
-      }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-27' + ":" + e.id, true)).compositingFilter(this.feedback.filter('row-27' + ":" + e.id, true)).attributeModifier(this.feedback.control('row-27' + ":" + e.id, true))
-    }, (e: Expense) => e.id)
-    Button('查看全部花费统计')
-      .accessibilityText('查看全部花费统计')
-      .backgroundColor(Theme.tint)
-      .fontColor(Theme.accent)
-      .onClick((): void => { vibration.dotVibration(); this.open('expenseStats', 'all'); })
-      .visualEffect(this.feedback.effect('button-30'))
-      .compositingFilter(this.feedback.filter('button-30'))
-      .attributeModifier(this.feedback.control('button-30'))
+        Button('改日期 / 关联活动').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('project', this.project.id, ''); })
+        Button('记一笔').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('expense', '', this.project.id); })
+      }.width('100%')
+      Button('准备 ' + this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项完成 · 在途 ' + this.state.readiness(this.project.id).prep.waiting + ' 项').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 1; })
+      Button('打包 ' + this.state.readiness(this.project.id).pack.packed + ' / ' + this.state.readiness(this.project.id).pack.total + ' 件确认').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 2; })
+      Text(this.state.readiness(this.project.id).equipment.total ? '装备可用 ' + this.state.readiness(this.project.id).equipment.available + ' / ' + this.state.readiness(this.project.id).equipment.total + ' 件' : '尚未关联装备').fontSize(15).fontColor(Theme.muted)
+      ForEach(this.state.readiness(this.project.id).equipment.unavailable, (asset: Asset) => {
+        Button(asset.name + ' · ' + ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)]).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('asset', asset.id); })
+      }, (asset: Asset) => asset.id)
+      Button('花费 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' · ' + budgetLabel(this.project.budgetConfigured, this.project.budgetCents)).width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('expenseStats', this.project.id); })
+      Button('团队 · ' + this.state.team.filter((member: TeamMember) => member.projectId === this.project.id).length + ' 人 · 编辑分工').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'team'; })
+      Button('参考图 · ' + this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id).length + ' 张').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'references'; })
+      this.entryLink()
+      if (this.project.notes) { Text(this.project.notes).fontSize(15).fontColor(Theme.muted) }
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder entryLink() {
-    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'project|' + this.project.id); })
+    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'entries'; })
   }
 
   @Builder packing() {
@@ -535,33 +519,35 @@ export struct ProjectDetail {
           .attributeModifier(this.feedback.control('button-32' + ":" + item.id)) }
         if (this.state.hand() !== 'left') { this.checkButton(item) }
       }.
-    width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(20).visualEffect(this.feedback.effect('row-31' + ":" + item.id, true)).compositingFilter(this.feedback.filter('row-31' + ":" + item.id, true)).attributeModifier(this.feedback.control('row-31' + ":" + item.id, true))
+    width('100%').id('packing-row:' + item.id).padding(14).backgroundColor(Theme.surface).borderRadius(20).border({ width: item.id === this.route.focusPackingId ? 1 : 0, color: Theme.accent }).onAreaChange((_, area: Area): void => { this.focusItem(item.id, area); }).visualEffect(this.feedback.effect('row-31' + ":" + item.id, true)).compositingFilter(this.feedback.filter('row-31' + ":" + item.id, true)).attributeModifier(this.feedback.control('row-31' + ":" + item.id, true))
     }, (item: ChecklistItem) => item.id)
   }
 
   build() {
-    Scroll() {
+    Scroll(this.scroller) {
       Column({ space: Theme.sectionSpacing }) {
         Blank().height(this.topInset).width('100%')
         Column({ space: 10 }) {
           this.header()
-          if (this.route.section !== 1) { this.preparation() }
+          if (this.route.section === 1) { this.preparation() }
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 1 ? 1 : 0).translate({ y: this.entrance.step >= 1 ? 0 : 20 })
         Column({ space: Theme.sectionSpacing }) {
-          if (this.route.section === 1) { this.packing() } else { this.preparationList(); this.equipmentList(); this.planning(); this.entryLink() }
+          if (this.route.section === 0) { this.overview() } else if (this.route.section === 2) { this.packing() } else { this.preparationList(); this.equipmentList() }
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
         Blank().height(Theme.contentBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%')
-    }.id(this.route.section === 1 ? 'project-packing' : 'project-preparation')
+    }.id(this.route.section === 2 ? 'project-packing' : this.route.section === 0 ? 'project-overview' : 'project-preparation')
       .width('100%')
       .height('100%')
       .scrollBar(BarState.Off)
+      .onAreaChange((_, area: Area): void => { this.viewportTop = Number(area.globalPosition.y); })
+      .onDidScroll((): void => { if (!this.restoring) { this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset; } })
       .align(Alignment.Top)
       .transition(pageTransition())
-      .bindSheet(this.route.preparing || this.route.linking, this.activeSheet(), appSheetOptions((): void => { this.route.preparing = false; this.route.linking = false; }, this.sheetEntrance, this.getUIContext()))
+      .bindSheet(this.route.preparing || this.route.linking || Boolean(this.route.contextSheet), this.activeSheet(), appSheetOptions((): void => { this.route.preparing = false; this.route.linking = false; this.route.contextSheet = ''; }, this.sheetEntrance, this.getUIContext()))
       .onDisAppear((): void => { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); this.state.suspend(); })
   }
 }

@@ -8,6 +8,7 @@ export struct DetailDestination {
   @Param customTitle: boolean = false;
   @Event back: () => void = () => {};
   @Event hidden: () => void = () => {};
+  @Event shown: () => void = () => {};
   @BuilderParam content: (entrance: StaggerEntrance) => void = this.emptyContent;
   @Local entrance: StaggerEntrance = new StaggerEntrance();
   @Param entranceSession: MainEntranceSession | undefined = undefined;
@@ -40,7 +41,7 @@ export struct DetailDestination {
       .hideToolBar(true).backgroundColor(Theme.bg)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], this.customTitle ? [LayoutSafeAreaEdge.BOTTOM] : [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .onWillShow((): void => { this.prepareEntrance(); })
-      .onShown((): void => { this.showEntrance(); })
+      .onShown((): void => { this.showEntrance(); this.shown(); })
       .onHidden((): void => { this.releaseEntrance(); this.hidden(); })
       .onBackPressed((): boolean => { this.back(); return true; })
   }

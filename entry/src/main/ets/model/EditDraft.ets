@@ -39,6 +39,8 @@ export class EditDraft {
   @Trace endTime: string = '';
   @Trace reminderMinutes: number = -1;
   @Trace categoryId: string = '';
+  @Trace waitingOn: string = '';
+  @Trace waitingUntil: string = '';
   @Trace preparationMode: number = 1;
   @Trace preparationExpanded: boolean = false;
   @Trace preparationKeys: string[] = preparationKeys(1);
@@ -129,14 +131,14 @@ export class EditDraft {
       const category = state.preparationCategories.find((c: PreparationCategory) => c.id === parent);
       d.categoryId = category?.id || state.preparationCategories.find((c: PreparationCategory) => c.projectId === parent)?.id || '';
       d.parentId = category?.projectId || parent;
-      if (t) { d.name = t.label; d.notes = t.notes; d.date = t.dueDate; d.categoryId = t.categoryId; d.parentId = t.projectId; }
+      if (t) { d.name = t.label; d.notes = t.notes; d.date = t.dueDate; d.categoryId = t.categoryId; d.parentId = t.projectId; d.waitingOn = t.waitingOn; d.waitingUntil = t.waitingUntil; }
     }
     if (kind === 'team') {
       d.type = '摄影'; const m = state.team.find((m: TeamMember) => m.id === id);
       if (m) { d.name = m.name; d.type = m.role; d.notes = m.notes; d.parentId = m.projectId; }
     }
     if (kind === 'expense') {
-      d.type = '服装'; d.date = today(); d.parentId = parent || state.projects[0]?.id || '';
+      d.type = '服装'; d.date = today(); d.parentId = parent;
       const e = state.expenses.find((e: Expense) => e.id === id);
       if (e) {
         d.name = e.name;
@@ -240,7 +242,7 @@ export class EditDraft {
       e.amountCents = moneyToCents(this.money);
       e.date = this.date;
       e.notes = this.notes;
-      if (!e.projectId) { state.reportError('请先创建花费所属计划'); return false; }
+      if (!e.projectId) { state.reportError('请选择花费所属计划'); return false; }
       return state.saveExpense(e);
     }
     if (this.kind === 'reference') {
@@ -261,7 +263,7 @@ export class EditDraft {
     if (this.kind === 'preparation') {
       const old = state.preparationTasks.find((t: PreparationTask) => t.id === this.id);
       const t = old ? JSON.parse(JSON.stringify(old)) as PreparationTask : new PreparationTask();
-      t.projectId = this.parentId; t.categoryId = this.categoryId; t.label = this.name; t.notes = this.notes; t.dueDate = this.date;
+      t.projectId = this.parentId; t.categoryId = this.categoryId; t.label = this.name; t.notes = this.notes; t.dueDate = this.date; t.waitingOn = this.waitingOn.trim(); t.waitingUntil = this.waitingUntil;
       if (!t.categoryId) { state.reportError('请先添加准备分类'); return false; }
       if (!old) { t.sortOrder = state.preparationTasks.filter((t: PreparationTask) => t.categoryId === this.categoryId).length; }
       return state.savePreparationTask(t);

@@ -20,6 +20,8 @@ export struct PhotoGrid {
   @Require @Param state: AppState;
   @Param photos: PhotoAsset[] = [];
   @Param portfolio: boolean = false;
+  @Param initialFilter: number = 0;
+  @Event filterChanged: (filter: number) => void = () => {};
   @Event open: (kind: string, id: string) => void = () => {};
   @Param topInset: number = 0;
   @Param bottomInset: number = 20;
@@ -31,7 +33,7 @@ export struct PhotoGrid {
   @Local selectedIds: string[] = [];
   @Local targetStatus: PhotoStatus = PhotoStatus.SELECTED;
   private rowsSource: ArrayDataSource<PhotoAsset[]> = new ArrayDataSource<PhotoAsset[]>([]);
-  aboutToAppear(): void { this.refreshRows(); }
+  aboutToAppear(): void { this.filter = this.initialFilter; this.refreshRows(); }
   @Monitor('photos', 'filter', 'portfolio', 'viewportWidth', 'selecting', 'selectedIds')
   private refreshRows(): void { this.rowsSource.replace(this.rows()); }
   @Monitor('photos')
@@ -54,7 +56,7 @@ export struct PhotoGrid {
         Select(this.filterLabels().map((label: string): SelectOption => { return { value: label }; }))
           .selected(this.filter).value(this.filterLabels()[this.filter]).layoutWeight(1).enabled(!this.state.busy)
           .id(this.portfolio ? 'portfolio-status-filter' : 'photo-status-filter')
-          .onSelect((index: number) => { vibration.dotVibration(); this.filter = index; this.selectedIds = []; })
+          .onSelect((index: number) => { vibration.dotVibration(); this.filter = index; this.filterChanged(index); this.selectedIds = []; })
             .accessibilityText('照片状态筛选')
             .visualEffect(this.feedback.effect('select-1'))
             .compositingFilter(this.feedback.filter('select-1'))

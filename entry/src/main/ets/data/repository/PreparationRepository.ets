@@ -12,7 +12,8 @@ export async function insertPreparation(tx: WriteTransaction, bundle: Preparatio
     await tx.execute('INSERT INTO preparation_categories(id,project_id,name,sort_order) VALUES (?,?,?,?)', [category.id, category.projectId, requiredName(category.name), category.sortOrder]);
   }
   for (const task of bundle.tasks) {
-    await tx.execute('INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order) VALUES (?,?,?,?,?,?,?,?)', [task.id, task.projectId, task.categoryId, requiredName(task.label), task.done ? 1 : 0, task.dueDate, task.notes, task.sortOrder]);
+    checkWaiting(task);
+    await tx.execute('INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order,waiting_on,waiting_until) VALUES (?,?,?,?,?,?,?,?,?,?)', [task.id, task.projectId, task.categoryId, requiredName(task.label), task.done ? 1 : 0, task.dueDate, task.notes, task.sortOrder, task.waitingOn, task.waitingUntil]);
   }
 }
 
@@ -56,6 +57,7 @@ export class PreparationRepository {
           item.done = number(rows, 'done') === 1;
           item.dueDate = text(rows, 'due_date');
           item.notes = text(rows, 'notes');
+          item.waitingOn = text(rows, 'waiting_on'); item.waitingUntil = text(rows, 'waiting_until');
           item.sortOrder = number(rows, 'sort_order');
           items.push(item);
           count++;
@@ -70,7 +72,8 @@ export class PreparationRepository {
   }
   async saveTask(item: PreparationTask): Promise<void> {
     if (item.dueDate && !validDate(item.dueDate)) { throw new Error('任务日期格式为 YYYY-MM-DD'); }
-    await this.db.getStore().executeSql('INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,label=excluded.label,done=excluded.done,due_date=excluded.due_date,notes=excluded.notes,sort_order=excluded.sort_order', [item.id, item.projectId, item.categoryId, requiredName(item.label), item.done ? 1 : 0, item.dueDate, item.notes, item.sortOrder]);
+    checkWaiting(item);
+    await this.db.getStore().executeSql('INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order,waiting_on,waiting_until) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,label=excluded.label,done=excluded.done,due_date=excluded.due_date,notes=excluded.notes,sort_order=excluded.sort_order,waiting_on=excluded.waiting_on,waiting_until=excluded.waiting_until', [item.id, item.projectId, item.categoryId, requiredName(item.label), item.done ? 1 : 0, item.dueDate, item.notes, item.sortOrder, item.waitingOn, item.waitingUntil]);
   }
   async setDone(id: string, done: boolean): Promise<void> {
     const changed = await this.db.getStore().update({ done: done ? 1 : 0 }, new relationalStore.RdbPredicates('preparation_tasks').equalTo('id', id));
@@ -91,4 +94,9 @@ export class PreparationRepository {
   async removeCategory(id: string): Promise<void> {
     await this.db.getStore().executeSql('DELETE FROM preparation_categories WHERE id=?', [id]);
   }
+}
+
+function checkWaiting(item: PreparationTask): void {
+  if (item.waitingUntil && !validDate(item.waitingUntil)) { throw new Error('等待日期格式为 YYYY-MM-DD'); }
+  if (item.waitingOn.length > 20000) { throw new Error('等待对象内容过长'); }
 }

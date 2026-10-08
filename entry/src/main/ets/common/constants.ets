@@ -129,7 +129,7 @@ export const SUPPORTS_HARMONY_API_23: boolean = deviceInfo.sdkApiVersion >= 23 &
 export const HDS_MATERIAL_TYPE_ADAPTIVE: number = 100;
 export const HDS_TITLE_SIZE_SMALL: number = 0;
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const MIN_SPLIT_HEIGHT = 600;
 export const LAYOUT_CONTENT_TOP: number = 100;
 export const LAYOUT_DETAIL_TOP: number = 90;
