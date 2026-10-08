@@ -1,3 +1,4 @@
+import { getApplicationState } from '../../../main/ets/common/appState';
 import { Driver, ON, Rect } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 
@@ -17,6 +18,7 @@ export default function fidelityLayoutTest(): void {
       await (await driver.findWindow({ bundleName: bundle })).focus();
       let matches = await driver.findComponents(ON.text(label).inWindow(bundle));
       if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id('root-action-' + label).inWindow(bundle)); }
+      if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id('detail-action-' + label).inWindow(bundle)); }
       if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id(label).inWindow(bundle)); }
       if (!matches || matches.length === 0) { throw new Error('Missing visible label: ' + label); }
       await matches[matches.length - 1].click();
@@ -58,10 +60,9 @@ export default function fidelityLayoutTest(): void {
       const window = await (await driver.findWindow({ bundleName: bundle })).getBounds();
       expect(baselineTabs.bottom < window.bottom).assertTrue();
       const views: LayoutView[] = [
-        new LayoutView('Cos', 1, '角色'), new LayoutView('Cos', 1, '计划'),
-        new LayoutView('活动', 2, '列表'), new LayoutView('活动', 2, '日历'),
-        new LayoutView('衣柜', 3, '装备'), new LayoutView('衣柜', 3, '照片'),
-        new LayoutView('我的', 4, '作品'), new LayoutView('我的', 4, '时间轴'),
+        new LayoutView('计划', 1, '进行中'), new LayoutView('计划', 1, '已完成'), new LayoutView('计划', 1, '全部'),
+        new LayoutView('日程', 2, '列表'), new LayoutView('日程', 2, '日历'),
+        new LayoutView('相册', 4, '按场次'), new LayoutView('相册', 4, '待处理'),
       ];
       let baselineSegment: Rect | undefined;
       for (const view of views) {
@@ -72,7 +73,7 @@ export default function fidelityLayoutTest(): void {
         const titleBefore = await titles[0].getBounds();
         expect(titleBefore.top > window.top).assertTrue();
         expect(segmentBefore.top < titleBefore.bottom && segmentBefore.bottom > titleBefore.top).assertTrue();
-        // Dashboard uses 50% for every title segment; Latin titles must not shrink it and wide windows must not cap it.
+        // Dashboard uses 50% for every title segment; wide windows must not cap it.
         expect(Math.abs((segmentBefore.right - segmentBefore.left) - (window.right - window.left) * 0.5) <= 2).assertTrue();
         const segmentCenter = (segmentBefore.left + segmentBefore.right) / 2;
         const windowCenter = (window.left + window.right) / 2;
@@ -88,13 +89,21 @@ export default function fidelityLayoutTest(): void {
         sameRect(titleBefore, await titles[0].getBounds());
         sameRect(baselineTabs, await tabs());
       }
+      await tap('衣柜');
+      expect((await driver.findComponents(ON.id('secondary-segment-3').inWindow(bundle))).length).assertEqual(0);
+      const gear = await driver.findComponent(ON.id('root-action-设置').inWindow(bundle)); const gearBefore = await gear.getBounds();
+      await scrollBody(); sameRect(gearBefore, await gear.getBounds()); sameRect(baselineTabs, await tabs());
     });
-    it('libraryLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop', 0, async () => {
-      await tap('衣柜'); await tap('照片'); await tap('衣柜');
+    it('albumLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop', 0, async () => {
+      await tap('相册'); await tap('按场次'); await tap('相册');
+      const source = getApplicationState().photos[0];
+      if (!source) { expect((await driver.findComponents(ON.id('root-action-导入照片').inWindow(bundle))).length > 0).assertTrue(); return; }
+      const groups = await driver.findComponent(ON.id('album-plan-list').inWindow(bundle));
+      await groups.scrollSearch(ON.id('album-plan:' + source.projectId).inWindow(bundle)); await tap('album-plan:' + source.projectId); await driver.delayMs(500);
       const before = await tabs();
       let photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
       if (!photos || photos.length === 0) {
-        expect((await driver.findComponents(ON.text('每一张，都是一次登场').inWindow(bundle))).length > 0).assertTrue();
+        expect((await driver.findComponents(ON.text('这个范围还没有照片').inWindow(bundle))).length > 0).assertTrue();
         return;
       }
       const first = await photos[0].getBounds();
@@ -112,13 +121,13 @@ export default function fidelityLayoutTest(): void {
       expect(last.bottom <= before.top).assertTrue();
       sameRect(before, await tabs());
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-library-bottom.png');
-      await tap('衣柜'); await driver.delayMs(500);
+      await tap('相册'); await driver.delayMs(500);
       photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
       sameRect(first, await photos[0].getBounds());
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-library-top.png');
     });
     it('repeatedValidationUsesToastWithoutMovingTheForm', 0, async () => {
-      await tap('Cos'); await tap('角色'); await tap('添加角色');
+      await tap('计划'); await tap('plan-role-library'); await tap('添加角色');
       const field = await driver.waitForComponent(ON.text('名称 *').inWindow(bundle), 3000);
       const before = await field.getBounds();
       await tap('保存');
@@ -129,10 +138,10 @@ export default function fidelityLayoutTest(): void {
       sameRect(before, await field.getBounds());
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-toast-repeat.png');
       await tap('sheet-close');
-      expect((await driver.findComponents(ON.id('root-action-添加角色').inWindow(bundle))).length > 0).assertTrue();
+      expect((await driver.findComponents(ON.text('添加角色').inWindow(bundle))).length > 0).assertTrue(); await back();
     });
-    it('planTaskSegmentsAndActionBarStayFixedAndReturnToTheSelectedView', 0, async () => {
-      await tap('Cos'); await tap('计划');
+    it('planTaskSegmentsAndTitleActionsStayFixedAndReturnToTheSelectedView', 0, async () => {
+      await tap('计划'); await tap('进行中');
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (!plans || plans.length === 0) { return; }
       await plans[0].click(); await driver.delayMs(800);
@@ -143,23 +152,19 @@ export default function fidelityLayoutTest(): void {
       let actionTop: number = 0;
       let actionBottom: number = 0;
       const sections = ['准备', '打包', '照片'];
-      const actions = ['准备任务', '添加物品', '导入照片'];
+      const actions = ['添加准备任务', '添加物品', '导入照片'];
       for (let index = 0; index < sections.length; index++) {
         await tap(sections[index]); await driver.delayMs(400);
         sameRect(baseline, await segment.getBounds());
-        const bars = await driver.findComponents(ON.type('Column').text(actions[index]).inWindow(bundle));
-        const bar = await bars[bars.length - 1].getBounds();
-        expect(bar.bottom < window.bottom).assertTrue();
+        expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
+        const action = await driver.findComponent(ON.id('detail-action-' + actions[index]).inWindow(bundle));
+        const bar = await action.getBounds();
+        expect(bar.top < baseline.bottom && bar.bottom > baseline.top).assertTrue();
         if (index === 0) { actionTop = bar.top; actionBottom = bar.bottom; }
         else { expect(bar.top).assertEqual(actionTop); expect(bar.bottom).assertEqual(actionBottom); }
-        const titles = await driver.findComponents(ON.text('计划').inWindow(bundle));
-        for (const title of titles || []) {
-          const bounds = await title.getBounds();
-          if (bounds.top < baseline.bottom && bounds.bottom > baseline.top) { expect(bounds.right <= baseline.left).assertTrue(); }
-        }
         await scrollBody(0.5);
         sameRect(baseline, await segment.getBounds());
-        expect((await bars[bars.length - 1].getBounds()).top).assertEqual(actionTop);
+        sameRect(bar, await action.getBounds());
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-plan-' + index + '.png');
       }
       const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
@@ -167,10 +172,10 @@ export default function fidelityLayoutTest(): void {
       for (const photo of photos || []) {
         const bounds = await photo.getBounds();
         const center = (bounds.top + bounds.bottom) / 2;
-        if (center <= baseline.bottom + 24 || center >= actionTop - 24) { continue; }
+        if (center <= baseline.bottom + 24 || center >= window.bottom - 48) { continue; }
         await (await driver.findWindow({ bundleName: bundle })).focus();
         await photo.click(); await driver.delayMs(500);
-        if (!(await driver.waitForComponent(ON.text('设为封面').inWindow(bundle), 3000))) { throw new Error('Visible photo did not open its detail'); }
+        if (!(await driver.waitForComponent(ON.text('照片工作流').inWindow(bundle), 3000))) { throw new Error('Visible photo did not open its detail'); }
         expect(((await driver.findComponents(ON.id('project-task-segment').inWindow(bundle)))?.length || 0)).assertEqual(0);
         await back();
         sameRect(baseline, await (await driver.findComponent(ON.id('project-task-segment').inWindow(bundle))).getBounds());

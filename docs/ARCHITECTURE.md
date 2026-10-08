@@ -12,15 +12,15 @@ Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。�
 
 ## 信息架构与导航
 
-当前五个一级入口仍是首页、Cos、活动、衣柜、我的，最终切换在 UX 阶段 H。首页采用接下来 / 在途与待办 / 最近三区块；打包、选片与任务入口携带视图、筛选或焦点项。Cos 根页只承载计划，标题栏为进行中 / 已完成 / 全部，日期与具体状态独立筛选，归档从全部段的状态筛选可达。角色库由计划页首部与首页文字入口进入覆盖目的地，保留来源页；角色详情仍承担角色编辑。衣柜暂保留装备 / 照片切换；我的暂保留作品 / 时间轴，标题菜单通往独立设置页。
+当前五个一级入口为首页、计划、日程、衣柜、相册；各根页右上角齿轮进入同一设置目的地。首页采用接下来 / 在途与待办 / 最近三区块。计划标题栏为进行中 / 已完成 / 全部；角色库从计划页首部与首页进入覆盖目的地，角色详情承担角色编辑与履历。日程为列表 / 日历；衣柜只承载装备；相册为按场次 / 待处理，作品集复用同一照片查询。旧独立我的页移除，计划日志移入所属计划概览的记录 Sheet。
 
 主路由 HdsNavigation + NavPathStack 承载完整主页和覆盖式 HdsNavDestination。主页内保留五个 HdsTabs，每个 Tab 各自有 HdsNavigation / NavPathStack；切换和详情返回保留 Tab、分段、查询与滚动状态。角色、计划、装备、照片详情和设置压入主路由，覆盖详情显示时主页底栏隐藏；活动详情由日程 Tab 的独立栈承载，今天入口占用底部布局高度。详情之间的关联跳转继续入主栈，返回逐层恢复。
 
-二级切换仍使用 titleBar.stackBuilder 内居中的 HdsTitleBarSegment / TabSegmentButtonV2。一级动作通过 HDS 标题菜单提供；按 2026-10-06 用户要求，详情使用 HdsTabs 浮动操作栏替代原生 toolbar，动作点击通过 onContentWillChange 拦截内容切换，继续显示当前详情。新增角色、版本、项目、装备、漫展、清单项和编辑均使用 bindSheet，关联装备与照片导入项目选择也使用 Sheet；删除继续使用确认 Dialog。
+二级切换使用 titleBar.stackBuilder 内的 HdsTitleBarSegment / TabSegmentButtonV2。根页只保留主要业务动作与设置齿轮；计划和活动详情动作使用标题菜单，底栏不混入业务动作。新增、编辑、关联与导入选择使用 Sheet；删除使用确认 Dialog。相册根页与带计划范围的相册覆盖页共用 AlbumPage，PhotoViewerRoute 返回原照片集合与位置；从计划进入的相册返回仍恢复来源计划。
 
 设置覆盖主页，第一组直接复用 Dashboard SettingsPanel，其余组统一 HdsListItemCard 的图标、文本、控件列与帮助入口。材质等级成为视效唯一选择：流畅关闭视效，轻柔/精美开启对应等级；外观提供浅色/跟随系统/深色，主题配色独立提供五组；单手操作三档为左手/智感握持/右手，只有中间档开启感知权限与检测。旧独立开关通过 Preferences v2 显式转换，业务数据库不变。
 
-以上为当前实现。下一轮体验重构（一级入口按目的重组、收录原语、今天模式、在途三态、角色履历与作品卡，以及 `entries` / 预算标记 / 在途 / 拍摄清单四项增量迁移）已整理为可执行规格，见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md)；**实施中**，阶段证据见 [实施记录](UX_IMPLEMENTATION.md)。A–C 已完成基础确认；D 正在实施，计划详情已切为概览 / 准备 / 打包 / 照片，活动与计划的详情动作已移至标题菜单；其余详情暂保留浮动动作栏。首页已采用三区块结构，完整待办共享 TaskQueue 聚合，最终五 Tab 切换留到 H。
+UX v2 的 A–H 已完成基础实现与编译确认，原生系统能力、实际返回 / 首屏 / 键盘的专项验证仍待完成；证据见 [实施记录](UX_IMPLEMENTATION.md)，规则见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md)。清空或完整替换数据后重置导航与运行时筛选，普通编辑和返回保留上下文。账号入口暂缓，现有服务与身份字段只为兼容保留。
 
 ## 实体关系
 
@@ -32,13 +32,13 @@ DiaryEntry 记录项目生命周期。照片保留项目、角色上下文，P1 
 
 ## 数据库
 
-RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v6，增量加入准备分类/任务、团队、花费、参考图、可空预算标记、收录条目与在途任务字段；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
+RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好、视效等级与可选本机账号身份；业务实体保存在 RDB。基础 v1 表：characters、variants、events、projects、assets、project_assets、checklist_items、photos、photo_versions、diary_entries。当前数据库为 v7，增量加入准备分类/任务、团队、花费、参考图、可空预算标记、收录条目、在途任务字段与拍摄清单；外键、级联/SET NULL 策略、索引和 CHECK 约束保障关系。金额以分保存，日期为 YYYY-MM-DD，时间戳为毫秒。迁移在事务中执行；拒绝打开未来版本，避免降级破坏。事务使用同一 RdbStore 写连接的 beginTransaction / commit / rollBack；真机确认 createTransaction 独立连接不继承 foreign_keys，不能混用。AppState 串行写入，Database 拒绝嵌套或并发事务。Repository 负责 SQL，页面只调用应用状态及业务方法。`PlanReadiness` 在模型层统一准备、装备、打包、照片与金额摘要；常规写入按依赖集合刷新，写入失败和已保存但刷新失败分别表达，后者仅重读数据。
 
 照片导入默认仅导入用户选中的图片，一份沙箱原文件 + 一份低分辨率缩略图；保留 source_uri 作来源标识，不依赖临时 URI 权限。图片列表只展示缩略图，详情才读取原图；不修改系统相册原文件。PhotoVersion 保存编辑参数和派生路径，与 PhotoAsset 独立。首版编辑器不扩展到重型修图。
 
 收录使用 `entries` 存放链接/票/图/笔记/想法；归属对象删除时自动回到未归位，转换为任务/花费/参考图以事务同时提交新对象与移除源条目。图片复用沙箱媒体管理与缺失修复，媒体清理保留照片、参考图与收录的文件。
 
-备份：当前元数据格式 v6，兼容 v1–v5；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
+备份：当前元数据格式 v7，兼容 v1–v6；Repository 元数据以带格式/版本的 JSON 显式导出；恢复验证表/列/类型/约束，在 RDB 事务内替换；本机可信照片匹配复用。媒体随系统 BackupExtension 的 files 目录备份；手工元数据备份不冒充完整照片备份，恢复后显示缺失照片状态。删除本地数据需确认，且不删除系统相册。
 
 ## 目录与责任
 
@@ -59,7 +59,7 @@ entry/src/main/ets/
 
 `common/scroll` 原样复用 Dashboard 的轴事件转发，五个主页与设置复用各自 Scroller；页面不访问输入设备服务或申请全局监听权限。首页与完整待办共用模型层 TaskQueue，列表动作通过带上下文的路由回到对象的家；页面不直接持有实体仓库。
 
-@ObservedV2 / @Trace 应用状态承担异步状态与 UI 刷新；实体使用明确 ArkTS 类型。不使用 any、动态属性或解构逃避 ArkTS 检查。
+@ObservedV2 / @Trace 应用状态承担异步状态与 UI 刷新；实体使用明确 ArkTS 类型。表单草稿序列化使用显式普通对象快照，避免原生观察属性不可枚举导致启动与草稿恢复失败。不使用 any、动态属性或解构逃避 ArkTS 检查。
 
 ## 首版实施过程（历史）
 

@@ -25,7 +25,8 @@ install_hap entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap
 run_hdc shell aa force-stop top.rayawa.elvacos
 TASK_REPORT=$(mktemp)
 trap 'rm -f "$TASK_REPORT"' EXIT
-# Requires an unlocked screen. Only controls this app; never writes business data.
+# Five roots, role library, contextual plan views and settings; requires an unlocked screen.
+# Only controls this app; never writes business data.
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyUITestRunner -s timeout 120000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
 rg 'Tests run: 11, Failure: 0, Error: 0, Pass: 11, Ignore: 0' "$TASK_REPORT"

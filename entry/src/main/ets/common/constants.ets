@@ -105,7 +105,7 @@ export const DEVELOPER_ENTRANCE_WINDOW_MS = 1600;
 export const DEVELOPER_PAGE_TITLE = '开发者选项';
 export const PRIVACY_RAWFILE = 'privacy.html';
 export const READING_MAX_WIDTH = 840;
-export const MAIN_PAGE_TITLES: string[] = ['首页', 'Cos', '活动', '衣柜', '我的'];
+export const MAIN_PAGE_TITLES: string[] = ['首页', '计划', '日程', '衣柜', '相册'];
 
 export const APP_LOG: ReleaseNote[] = [{
   version: APP_VERSION,

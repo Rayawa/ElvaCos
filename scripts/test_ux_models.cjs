@@ -727,6 +727,20 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const repo = new ShotRepository(db); state.shotRepo = repo; state.refresh = async () => { state.shots = await repo.list(); }; await state.refresh();
     return { ...fixture, repo, backup: new MetadataBackupRepository(db) };
   }
+  await test('plan records preserve original history while scoping and sorting its read-only home', () => {
+    const state = new AppState(), { DiaryEntry } = entities;
+    const records = [
+      Object.assign(new DiaryEntry(), { id: 'earlier', projectId: 'first', text: '创建计划', createdAt: 1 }),
+      Object.assign(new DiaryEntry(), { id: 'other', projectId: 'second', text: '其他计划', createdAt: 9 }),
+      Object.assign(new DiaryEntry(), { id: 'latest', projectId: 'first', text: '调整状态', createdAt: 5 }),
+      Object.assign(new DiaryEntry(), { id: 'unscoped', projectId: '', text: '旧的未关联记录', createdAt: 10 })
+    ];
+    state.diary = records; assert.deepEqual(state.projectDiary('first').map(record => record.id), ['latest', 'earlier']);
+    assert.equal(state.projectDiary('second')[0].text, '其他计划'); assert.deepEqual(state.projectDiary('missing'), []);
+    assert.deepEqual(records.map(record => record.id), ['earlier', 'other', 'latest', 'unscoped']);
+    state.diary = records.filter(record => record.projectId !== 'first'); assert.deepEqual(state.projectDiary('first'), []);
+    assert.equal(state.diary.length, 2); assert.equal(state.projectDiary('second').length, 1);
+  });
   await test('shot counts and completion stay independent of preparation, packing, equipment, money and photo workflow', async () => {
     const { ProjectShot } = require(root + '/model/Shot.ets'), { db, state, repo } = await shotsFixture();
     try {

@@ -5,7 +5,9 @@ import { AlbumPlan } from '../../model/AlbumSummary';
 import { PhotoViewerRoute, selectPhotoCollection } from '../../model/PhotoCollection';
 import { PHOTO_STAGE_LABELS, PHOTO_FILTER_LABELS } from '../../model/PhotoStages';
 import { CosProject, PhotoAsset } from '../../model/Entities';
-import { StaggerEntrance } from '../../common/motion';
+import { StaggerEntrance, MainEntranceSession } from '../../common/motion';
+import { DistributionChart } from '../../component/charts/DistributionChart';
+import { PhotoDistributionItem } from '../../model/Statistics';
 import { Theme } from '../../common/Theme';
 import { PhotoGrid } from '../../component/PhotoGrid';
 import { ManagedImage } from '../../component/ManagedImage';
@@ -16,19 +18,31 @@ export struct AlbumPage {
   @Require @Param state: AppState;
   @Require @Param route: AlbumRoute;
   @Param entrance: StaggerEntrance = new StaggerEntrance();
+  @Param entranceSession: MainEntranceSession = new MainEntranceSession();
+  @Param active: boolean = true;
   @Param topInset: number = Theme.detailTopWithSegment;
   @Param bottomInset: number = Theme.contentBottom;
   @Event view: (route: PhotoViewerRoute) => void = () => {};
   @Event importPhotos: (planId: string) => void = () => {};
-  private scroller: Scroller = new Scroller();
+  @Param scroller: Scroller = new Scroller();
+  @Local distributionOpen: boolean = false;
+  private entered: boolean = false;
   private restoreTimer: number = -1;
   private restoring: boolean = false;
   private measured: boolean = false;
-  aboutToAppear(): void { this.route.reconcile(this.state.projects, this.state.photos); this.restoreOffset(); }
+  aboutToAppear(): void { this.route.reconcile(this.state.projects, this.state.photos); this.restoreOffset(); if (this.active) { this.enter(); } }
+  private enter(): void {
+    if (this.entrance.managed || this.entered) { return; } this.entered = true;
+    if (this.entranceSession.claim('AlbumPage')) { this.entrance.play(this.getUIContext()); } else { this.entrance.finish(4); }
+  }
+  @Monitor('active')
+  activeChanged(): void { if (this.active) { this.enter(); this.route.restoreVersion++; this.route.collection.restoreVersion++; } }
   @Monitor('state.projects', 'state.photos')
   dataChanged(): void { this.route.reconcile(this.state.projects, this.state.photos); }
-  aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; } }
-  @Monitor('route.mode', 'route.byPlan.planId', 'route.restoreVersion')
+  aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; } if (!this.entrance.managed) { this.entrance.finish(4); } }
+  @Monitor('route.mode', 'route.byPlan.planId')
+  modeChanged(): void { this.measured = false; this.restoreOffset(); }
+  @Monitor('route.restoreVersion')
   contextChanged(): void { this.restoreOffset(); }
   private restoreOffset(): void {
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
@@ -43,6 +57,11 @@ export struct AlbumPage {
     if (collection.filter === 0 && !collection.portfolio) { return this.state.albumSummary.plans; }
     const plans = new Set<string>(selectPhotoCollection(this.state.photos, collection).map((photo: PhotoAsset) => photo.projectId));
     return this.state.albumSummary.plans.filter((plan: AlbumPlan) => plans.has(plan.id));
+  }
+  private distribution(): PhotoDistributionItem[] {
+    const planId = this.route.collection.planId;
+    const counts = planId ? this.state.readiness(planId).photos.byStage : this.state.albumSummary.counts;
+    return PHOTO_STAGE_LABELS.map((label: string, index: number): PhotoDistributionItem => ({ label: label, value: counts[index] }));
   }
   @Builder planFilter() {
     Select(new Array<SelectOption>({ value: '全部场次 / 计划' }).concat(this.state.projects.map((project: CosProject): SelectOption => { return { value: project.name }; })))
@@ -60,6 +79,9 @@ export struct AlbumPage {
           .enabled(!this.state.busy && !this.route.collection.submitting).backgroundColor(Theme.tint).fontColor(Theme.accent)
           .onClick((): void => { this.route.byPlan.setPortfolio(!this.route.byPlan.portfolio); })
       }
+      Button(this.distributionOpen ? '收起照片处理分布' : '展开照片处理分布').id('album-distribution-toggle').constraintSize({ minHeight: 48 }).width('100%')
+        .backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.distributionOpen = !this.distributionOpen; })
+      if (this.distributionOpen) { DistributionChart({ title: this.route.collection.planId ? '本计划照片处理分布' : '全仓照片处理分布', items: this.distribution(), paletteId: Theme.paletteId }) }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   @Builder planCard(plan: AlbumPlan) {
@@ -76,7 +98,7 @@ export struct AlbumPage {
   }
   build() {
     if (this.route.mode === 'queue' || this.route.byPlan.planId) {
-      PhotoGrid({ state: this.state, photos: this.state.photos, route: this.route.collection, from: 'album', entrance: this.entrance,
+      PhotoGrid({ state: this.state, photos: this.state.photos, route: this.route.collection, from: 'album', entrance: this.entrance, scroller: this.scroller,
         topInset: this.topInset, bottomInset: this.bottomInset, sidePadding: Theme.pagePadding,
         header: (): void => { this.scope(); }, view: this.view,
         addPhotos: (): void => { this.importPhotos(this.route.collection.planId); }, showAlbum: (): void => { this.route.byPlan.setPortfolio(false); } })
@@ -86,7 +108,7 @@ export struct AlbumPage {
           Blank().height(this.topInset).width('100%')
           this.scope()
           PhotoImportStatus({ state: this.state })
-          Select((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS).map((label: string): SelectOption => { return { value: label }; }))
+          Select((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS).map((label: string): SelectOption => { return { value: label }; })).id(this.route.byPlan.portfolio ? 'portfolio-status-filter' : 'album-status-filter')
             .value((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS)[this.route.byPlan.portfolio ? [0, 7].indexOf(this.route.byPlan.filter) : this.route.byPlan.filter]).constraintSize({ minHeight: 48 })
             .enabled(!this.state.busy).onSelect((filter: number): void => { this.route.byPlan.setFilter(this.route.byPlan.portfolio ? [0, 7][filter] : filter); this.route.groupOffset = 0; this.restoreOffset(); }).accessibilityText('场次照片状态筛选')
           if (this.route.byPlan.feedback) { Text(this.route.byPlan.feedback).fontSize(14).fontColor(Theme.accent) }

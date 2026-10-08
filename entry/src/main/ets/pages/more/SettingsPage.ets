@@ -62,11 +62,6 @@ export struct SettingsPage {
     this.versionTapTimer = setTimeout((): void => { this.versionTapTimer = -1; this.versionTaps = 0; }, DEVELOPER_ENTRANCE_WINDOW_MS);
   }
 
-  private toggleAccount(): void {
-    if (this.state.busy) { return; }
-    if (this.state.account.signedIn) { this.state.signOutHuawei(); } else { this.state.signInHuawei(); }
-  }
-
   private showHelp(kind: string): void { this.helpKind = kind; this.helpOpen = true; }
 
   @Builder divider() { Divider().color(Theme.divider).strokeWidth(0.5).margin({ left: 16, right: 16 }) }
@@ -90,7 +85,7 @@ export struct SettingsPage {
         Column({ space: 18 }) {
           if (this.helpKind === 'cloud') {
             Text('当前同步状态').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-            Text('应用尚未接入云端数据同步，登录华为账号不会自动上传角色、计划和照片。现有记录保存在本机。').fontSize(14).fontColor(Theme.muted)
+            Text('应用尚未接入账号登录或云端数据同步。角色、计划、照片与收录保存在本机，离线业务可直接使用。').fontSize(14).fontColor(Theme.muted)
             Text('备份到云空间').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
             Text('可以导出元数据，在系统文件选择器中选择可用的云空间位置。JSON 不包含照片，完整数据与媒体需使用系统备份。').fontSize(14).fontColor(Theme.muted)
             Button('导出元数据备份')
@@ -180,20 +175,10 @@ export struct SettingsPage {
   }
 
   @Builder
-  private accountSection(): void {
+  private storageSection(): void {
     Column({ space: Theme.sectionContentGap }) {
-      this.groupTitle('华为账号')
+      this.groupTitle('本机存储与同步')
       Column() {
-        SettingsValueRow({
-          label: '华为账号',
-          value: this.state.account.signedIn ? (this.state.account.displayName || '已登录') : '未登录',
-          hint: this.state.account.signedIn ? '登录态只保存在本机，可随时退出' : '登录后可获得本机可离线使用的账号标识',
-          icon: Icons.user,
-          actionLabel: this.state.accountBusy ? '处理中…' : this.state.account.signedIn ? '退出' : '登录',
-          isEnabled: !this.state.busy,
-          action: (): void => { this.toggleAccount(); },
-        })
-        this.actionDivider()
         SettingsValueRow({
           label: '云同步',
           value: '尚未接入',
@@ -275,7 +260,7 @@ export struct SettingsPage {
 
   @Builder settingsAndLinks() {
     Column({ space: Theme.sectionSpacing }) {
-      this.accountSection()
+      this.storageSection()
       this.dataSection()
 
       Column({ space: Theme.sectionContentGap }) {
@@ -316,7 +301,7 @@ export struct SettingsPage {
     DashboardSplitLayout({
       scroller: this.pageScroller, overviewTop: Theme.detailTop, bottomInset: this.bottomInset, scrollSpacing: 0,
       layoutId: 'settings-wide-layout', overviewId: 'settings-fixed-information', scrollId: 'settings-scroll',
-      overviewLabel: '固定显示的应用名称和版本信息', scrollLabel: '可滚动的账号、数据、设置与帮助列表',
+      overviewLabel: '固定显示的应用名称和版本信息', scrollLabel: '可滚动的数据、设置与帮助列表',
       overview: (): void => { this.wideInformation(); }, content: (): void => { this.settingsAndLinks(); },
     })
   }

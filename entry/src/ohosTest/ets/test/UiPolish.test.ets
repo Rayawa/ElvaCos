@@ -1,3 +1,4 @@
+import { getApplicationState } from '../../../main/ets/common/appState';
 import { Driver, ON } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { monthlyExpenses, photoDistribution } from '../../../main/ets/model/Statistics';
@@ -10,7 +11,8 @@ export default function uiPolishTest(): void {
     const bundle = 'top.rayawa.elvacos';
     let driver: Driver;
     const tap = async (text: string): Promise<void> => {
-      const matches = await driver.findComponents(ON.text(text).inWindow(bundle));
+      let matches = await driver.findComponents(ON.text(text).inWindow(bundle));
+      if (!matches || matches.length === 0) { matches = await driver.findComponents(ON.id(text).inWindow(bundle)); }
       if (!matches || matches.length === 0) { throw new Error('Missing ' + text); }
       await matches[matches.length - 1].click(); await driver.delayMs(450);
     };
@@ -66,27 +68,27 @@ export default function uiPolishTest(): void {
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-home.png');
     });
     it('portfolioSelectorRefreshesVisiblePhotos', 0, async () => {
-      await tap('我的'); await tap('作品'); await driver.delayMs(900);
-      expect(!!(await driver.findComponent(ON.text('照片处理分布').inWindow(bundle)))).assertTrue();
+      await tap('相册'); await tap('按场次'); await driver.delayMs(900);
+      await tap('album-distribution-toggle');
+      expect(!!(await driver.findComponent(ON.text('全仓照片处理分布').inWindow(bundle)))).assertTrue();
+      await tap('album-distribution-toggle'); await tap('作品集展示 · 成片与已发布');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-distribution.png');
-      await scroll();
       const filter = await driver.findComponent(ON.id('portfolio-status-filter').inWindow(bundle));
-      expect(!!filter).assertTrue(); await filter.click(); await driver.delayMs(250);
-      await tap('已发布'); await driver.delayMs(400);
+      expect(!!filter).assertTrue(); await filter.click(); await driver.delayMs(250); await tap('已发布');
+      const publishedPlans = getApplicationState().photos.filter((photo: PhotoAsset) => photo.status === PhotoStatus.PUBLISHED).map((photo: PhotoAsset) => photo.projectId);
+      const groups = await driver.findComponents(ON.description('双击查看本场照片').inWindow(bundle));
+      expect(groups.length <= new Set<string>(publishedPlans).size).assertTrue();
+      const published = getApplicationState().photos.find((photo: PhotoAsset) => photo.status === PhotoStatus.PUBLISHED);
+      if (published) {
+        const list = await driver.findComponent(ON.id('album-plan-list').inWindow(bundle)); await list.scrollSearch(ON.id('album-plan:' + published.projectId).inWindow(bundle));
+        await tap('album-plan:' + published.projectId); await driver.delayMs(400);
+        expect((await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle))).length > 0).assertTrue();
+        const gridFilter = await driver.findComponent(ON.id('portfolio-status-filter').inWindow(bundle)); await gridFilter.click(); await tap('全部作品');
+      } else { await filter.click(); await tap('全部作品'); }
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-portfolio.png');
-      const cards = (await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle))) || [];
-      if (cards.length > 0) {
-        expect((await driver.findComponents(ON.type('Text').text('已发布').inWindow(bundle))).length > 1).assertTrue();
-        const finalLabels = (await driver.findComponents(ON.type('Text').text('最终作品').inWindow(bundle))) || [];
-        for (const label of finalLabels) {
-          const bounds = await label.getBounds();
-          expect(bounds.right === bounds.left || bounds.bottom < 332 || bounds.top > 2550).assertTrue();
-        }
-      }
-      await filter.click(); await driver.delayMs(250); await tap('全部作品');
     });
     it('calendarAndButtonPressFeedbackRenders', 0, async () => {
-      await tap('活动'); await tap('日历');
+      await tap('日程'); await tap('日历');
       const today = await driver.findComponent(ON.text('今天').inWindow(bundle));
       const bounds = await today.getBounds();
       await driver.longClick(Math.round((bounds.left + bounds.right) / 2), Math.round((bounds.top + bounds.bottom) / 2));

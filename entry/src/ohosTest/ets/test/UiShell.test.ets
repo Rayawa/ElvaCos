@@ -1,6 +1,5 @@
 import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
-import { AccountService } from '../../../main/ets/common/AccountService';
 import { CosEvent } from '../../../main/ets/model/Entities';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
@@ -13,6 +12,7 @@ export default function uiShellTest(): void {
       await (await driver.findWindow({ bundleName: bundle })).focus();
       let components = await driver.findComponents(ON.text(text).inWindow(bundle));
       if (!components || components.length === 0) { components = await driver.findComponents(ON.id('root-action-' + text).inWindow(bundle)); }
+      if (!components || components.length === 0) { components = await driver.findComponents(ON.id('detail-action-' + text).inWindow(bundle)); }
       if (!components || components.length === 0) { components = await driver.findComponents(ON.id(text).inWindow(bundle)); }
       if (!components || components.length === 0) { throw new Error('Missing application component: ' + text); }
       // Native tab labels come after the current page's title in the layout tree.
@@ -25,6 +25,7 @@ export default function uiShellTest(): void {
     };
     const present = async (text: string): Promise<void> => {
       if (await driver.findComponent(ON.id('root-action-' + text).inWindow(bundle))) { return; }
+      if (await driver.findComponent(ON.id('detail-action-' + text).inWindow(bundle))) { return; }
       if (await driver.findComponent(ON.id(text).inWindow(bundle))) { return; }
       if (!(await driver.waitForComponent(ON.text(text).inWindow(bundle), 3000))) {
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-ui-missing.png');
@@ -62,7 +63,7 @@ export default function uiShellTest(): void {
       await present(text);
     };
     const detailActions = async (): Promise<void> => {
-      expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(1);
+      expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
       expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
       expect(((await driver.findComponents(ON.type('ToolBar').inWindow(bundle)))?.length || 0)).assertEqual(0);
     };
@@ -70,7 +71,7 @@ export default function uiShellTest(): void {
       await tap('首页'); await present('新建计划');
       await driver.delayMs(1000);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-home.png');
-      await tap('Cos'); await tap('角色'); await present('添加角色');
+      await tap('计划'); await tap('plan-role-library'); await present('添加角色');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-characters.png');
       const characters = await driver.findComponents(ON.description('双击打开角色详情').inWindow(bundle));
       if (characters.length > 0) {
@@ -86,18 +87,20 @@ export default function uiShellTest(): void {
         expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
         await back(); await driver.delayMs(350);
       }
-      await tap('计划'); await present('新建计划');
+      await back(); await tap('计划'); await present('新建计划');
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (plans.length > 0) {
-        await plans[0].click(); await driver.delayMs(500); await tap('照片'); await present('project-shots-open'); await tap('project-shots-open'); await present('拍摄清单');
+        await plans[0].click(); await driver.delayMs(500);
+        await (await driver.findComponent(ON.id('project-overview').inWindow(bundle))).scrollSearch(ON.id('project-records-open').inWindow(bundle));
+        await tap('project-records-open'); await present('计划记录'); await tap('sheet-close'); await tap('照片'); await present('project-shots-open'); await tap('project-shots-open'); await present('拍摄清单');
         await tap('添加拍摄事项'); await present('拍摄事项 *'); await present('参考图（可选）'); await tap('sheet-close'); await present('拍摄清单'); await tap('sheet-close'); await back();
       }
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
-      await tap('活动'); await present('添加活动');
+      await tap('日程'); await present('添加活动');
       await tap('日历'); await present('今天'); await tap('今天'); await tap('列表'); await present('查看某一天（可选）');
       await tap('清除'); await present('event-list-filter');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
-      await tap('衣柜'); await tap('装备'); await present('添加装备');
+      await tap('衣柜'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
       await present('全部类型'); await present('全部状态'); await present('全部位置');
       const asset = getApplicationState().assets[0];
@@ -109,7 +112,7 @@ export default function uiShellTest(): void {
         await present('加入计划'); await tap('加入计划'); await present('选择计划加入装备'); await tap('sheet-close'); await back();
         await present('全部类型'); await present('全部状态'); await present('全部位置');
       }
-      await tap('照片'); await present('打开相册'); await tap('打开相册'); await present('按场次'); await present('待处理');
+      await tap('相册'); await present('按场次'); await present('待处理');
       const albumPlans = await driver.findComponents(ON.description('双击查看本场照片').inWindow(bundle));
       if (albumPlans.length > 0) { await albumPlans[0].click(); }
       await driver.delayMs(1000);
@@ -127,30 +130,23 @@ export default function uiShellTest(): void {
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-photo-detail.png');
         await back(); await driver.delayMs(350);
       }
-      await back(); await driver.delayMs(350); await tap('我的'); await tap('时间轴'); await present('热爱的轨迹');
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-timeline.png');
-      await tap('作品'); await present('作品集');
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-me.png');
+      await present('作品集展示 · 成片与已发布');
+      await tap('首页');
     });
     it('fixedChromeAndIndependentSettingsRespectSafeAreas', 0, async () => {
-      await tap('衣柜'); await tap('装备');
+      await tap('衣柜');
       const before = await tabBounds();
-      const segment = await driver.findComponent(ON.id('secondary-segment-3').inWindow(bundle));
-      const segmentBefore = await segment.getBounds();
+      expect((await driver.findComponents(ON.id('secondary-segment-3').inWindow(bundle))).length).assertEqual(0);
       const titles = await driver.findComponents(ON.text('衣柜').inWindow(bundle));
       const titleBefore = await titles[0].getBounds();
-      const appWindow = await driver.findWindow({ bundleName: bundle });
-      const windowBounds = await appWindow.getBounds();
+      const windowBounds = await (await driver.findWindow({ bundleName: bundle })).getBounds();
       expect(titleBefore.top > windowBounds.top).assertTrue();
-      expect(segmentBefore.top < titleBefore.bottom && segmentBefore.bottom > titleBefore.top).assertTrue();
-      const scroll = await driver.findComponent(ON.id('library-scroll').inWindow(bundle));
+      const gear = await driver.findComponent(ON.id('root-action-设置').inWindow(bundle)); const gearBefore = await gear.getBounds();
       await scrollBody();
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-library-scrolled.png');
-      const segmentAfter = await (await driver.findComponent(ON.id('secondary-segment-3').inWindow(bundle))).getBounds();
-      expect(segmentAfter.top).assertEqual(segmentBefore.top);
-      expect((await tabBounds()).top).assertEqual(before.top);
-      expect(before.bottom < windowBounds.bottom).assertTrue();
-      await tap('我的'); await tap('设置'); await settingsItem('用户名'); await driver.delayMs(1000);
+      expect((await titles[0].getBounds()).top).assertEqual(titleBefore.top);
+      expect((await gear.getBounds()).top).assertEqual(gearBefore.top);
+      expect((await tabBounds()).top).assertEqual(before.top); expect(before.bottom < windowBounds.bottom).assertTrue();
+      await tap('设置'); await settingsItem('用户名'); await driver.delayMs(1000);
       expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-top.png');
       const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
@@ -159,11 +155,11 @@ export default function uiShellTest(): void {
       const footer = await driver.findComponent(ON.text('版本 1.0.0-beta.1').inWindow(bundle));
       expect((await footer.getBounds()).bottom < windowBounds.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-bottom.png');
-      await back(); await driver.delayMs(250); await present('作品集');
+      await back(); await driver.delayMs(250); await present('全部位置');
       expect((await tabBounds()).top).assertEqual(before.top);
     });
     it('titleMenuOpensCancelableCharacterFormWithoutWritingData', 0, async () => {
-      await tap('Cos'); await tap('角色'); await present('添加角色'); await tap('添加角色');
+      await tap('计划'); await tap('plan-role-library'); await present('添加角色'); await tap('添加角色');
       await present('名称 *'); await present('保存');
       await driver.delayMs(250);
       const formTitle = await driver.findComponent(ON.text('添加角色').inWindow(bundle));
@@ -180,7 +176,7 @@ export default function uiShellTest(): void {
       expect(fieldBounds.top >= viewport.top && fieldBounds.bottom <= viewport.bottom).assertTrue();
       expect((await (await driver.findComponent(ON.text('添加角色').inWindow(bundle))).getBounds()).top).assertEqual(formTitleBounds.top);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-form.png');
-      await tap('sheet-close'); await present('添加角色');
+      await tap('sheet-close'); await present('添加角色'); await back();
     });
     it('newPlanCreatesRoleInlineAndCanBeCanceledWithoutWrites', 0, async () => {
       await tap('首页'); await tap('新建计划'); await present('新建计划');
@@ -198,13 +194,13 @@ export default function uiShellTest(): void {
       await tap('sheet-close'); await present('放弃修改'); await tap('放弃修改'); await present('新建计划');
     });
     it('planViewsUseContextualActionsAndReturnToTheirTaskView', 0, async () => {
-      await tap('Cos'); await tap('计划');
+      await tap('计划');
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (plans && plans.length > 0) {
         await plans[0].click(); await driver.delayMs(400);
-        await present('准备进度'); await detailActions();
-        await tap('准备任务'); await present('补入所选任务'); await present('常用准备模板'); await tap('sheet-close');
-        await tap('从衣柜'); await present('从衣柜添加'); await tap('＋ 新装备'); await present('添加装备'); await present('名称 *');
+        await tap('准备'); await present('准备进度'); await detailActions();
+        await tap('添加准备任务'); await present('补入所选任务'); await present('常用准备模板'); await tap('sheet-close');
+        await tap('从衣柜复用'); await present('从衣柜添加'); await tap('＋ 新装备'); await present('添加装备'); await present('名称 *');
         await tap('sheet-close'); await present('准备进度');
         await tap('打包'); await present('打包清单');
         expect((await driver.findComponents(ON.id('project-packing').inWindow(bundle))).length).assertEqual(1);
@@ -228,7 +224,7 @@ export default function uiShellTest(): void {
       await tap('首页');
     });
     it('calendarChangesMonthAndCanCreatePendingOrMultidayActivityWithoutSaving', 0, async () => {
-      await tap('活动'); await tap('日历'); await present('今天'); await present('calendar-previous'); await present('calendar-next');
+      await tap('日程'); await tap('日历'); await present('今天'); await present('calendar-previous'); await present('calendar-next');
       await tap('calendar-next'); await tap('今天');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-calendar.png');
       await tap('添加活动'); await present('添加活动'); await present('form-input:dateMode');
@@ -241,13 +237,13 @@ export default function uiShellTest(): void {
       await tap('sheet-close'); await present('今天'); await tap('列表'); await present('日历'); await tap('首页');
     });
     it('photoImportPlanSheetCanBeClosedWithoutLaunchingPickerOrWritingData', 0, async () => {
-      await tap('衣柜'); await tap('照片'); await tap('打开相册'); await tap('导入照片');
+      await tap('相册'); await tap('按场次'); await tap('album-plan-filter'); await tap('全部场次 / 计划'); await tap('导入照片');
       const form = await driver.findComponents(ON.text('新建计划').inWindow(bundle));
       if (form && form.length > 0) { await tap('sheet-close'); } else {
         await present('选择照片所属计划'); await present('新建计划后继续导入');
         await tap('新建计划后继续导入'); await present('新建计划'); await present('创建计划并导入照片'); await tap('sheet-close'); await present('导入照片');
       }
-      await back(); await tap('首页');
+      await tap('首页');
     });
     it('expenseSummaryUsesCoveringRouteAndCancelableRecordSheet', 0, async () => {
       await tap('首页'); await tap('home-expenses'); await present('花费统计');
@@ -260,15 +256,16 @@ export default function uiShellTest(): void {
       await tap('记一笔'); await present('添加花费'); await present('实际花费（元） *'); await present('付款日期 *');
       await tap('sheet-close'); await present('花费统计'); await back(); await present('新建计划');
     });
-    it('unconfiguredAccountStopsBeforeSystemLoginAndKeepsLocalState', 0, async () => {
-      await tap('首页');
-      const ability = await abilityDelegatorRegistry.getAbilityDelegator().getCurrentTopAbility();
-      const configuration = AccountService.configurationMessage(ability.context);
-      if (configuration) {
-        const result = await new AccountService().signIn(ability.context);
-        expect(result.ok).assertFalse(); expect(result.message.includes('Client ID')).assertTrue();
-        await present('新建计划');
+    it('everyRootHasSettingsAndDeferredAccountHasNoLoginAction', 0, async () => {
+      const signedIn = getApplicationState().account.signedIn;
+      for (const tab of ['首页', '计划', '日程', '衣柜', '相册']) {
+        await tap(tab); await present('root-action-设置'); await tap('设置'); await present('本机存储与同步');
+        expect((await driver.findComponents(ON.text('登录').inWindow(bundle))).length).assertEqual(0);
+        expect((await driver.findComponents(ON.text('退出').inWindow(bundle))).length).assertEqual(0);
+        expect(getApplicationState().account.signedIn).assertEqual(signedIn);
+        await back(); await present('main-tabs');
       }
+      await tap('首页');
     });
     it('systemCalendarEditorCanBeCanceledWithoutCreatingDeviceOrAppData', 0, async () => {
       await tap('首页');
@@ -287,7 +284,7 @@ export default function uiShellTest(): void {
       await driver.delayMs(400); await present('新建计划');
     });
     it('settingsUseAlignedHandChoicesAndRealHelpSheets' , 0, async () => {
-      await tap('我的'); await tap('作品'); await tap('设置'); await settingsItem('云同步');
+      await tap('相册'); await tap('设置'); await settingsItem('云同步');
       await tap('说明'); await present('云空间与同步'); await present('导出元数据备份'); await tap('sheet-close');
       await settingsItem('用户名'); await settingsItem('材质等级'); await settingsItem('右手');
       await driver.delayMs(700);
@@ -309,7 +306,7 @@ export default function uiShellTest(): void {
       await tap('app-log-filter-beta'); await present('1.0.0-beta.1');
       await back();
       await tap('隐私政策'); await present('关于绮秀与隐私的声明'); await present('privacy-scroll');
-      await back(); await back(); await driver.delayMs(350); await present('作品集');
+      await back(); await back(); await driver.delayMs(350); await present('按场次');
     });
   });
 }

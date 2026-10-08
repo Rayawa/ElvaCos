@@ -17,8 +17,6 @@ export struct LibraryPage {
   @Param bottomInset: number = 110;
   @Event open: (kind: string, id: string) => void = () => {};
   @Event add: (kind: string, parent: string) => void = () => {};
-  @Param photos: boolean = false;
-  @Event selection: (value: boolean) => void = () => {};
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
   @Local animStep: number = 0;
@@ -32,8 +30,6 @@ export struct LibraryPage {
   activeChanged(): void { if (this.active) { this.enter(); this.restoreOffset(); } }
   @Monitor('route.restoreVersion')
   restoreChanged(): void { this.restoreOffset(); }
-  @Monitor('photos')
-  modeChanged(): void { this.measured = false; this.restoring = true; }
   private enter(): void {
     if (this.enterPlayed) { return; }
     this.enterPlayed = true;
@@ -45,7 +41,7 @@ export struct LibraryPage {
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
   }
   private restoreOffset(): void {
-    if (!this.measured || this.photos) { return; }
+    if (!this.measured) { return; }
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
     this.restoring = true;
     this.restoreTimer = setTimeout((): void => {
@@ -88,18 +84,6 @@ export struct LibraryPage {
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   build() {
-    if (this.photos) {
-      Scroll(this.scroller) {
-        Column({ space: 16 }) {
-          Blank().height(this.topInset).width('100%')
-          SectionHeading({ title: '相册', trailing: this.state.albumSummary.total + ' 张照片' })
-          Text('按场次整理照片，或处理跨计划的待选与待修队列。').fontSize(16).fontColor(Theme.muted)
-          Button('打开相册').id('open-album').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.brand).fontColor(Theme.onAccent).onClick((): void => { this.open('album', 'all'); })
-          Button('查看待处理照片').constraintSize({ minHeight: 52 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('albumQueue', 'all'); })
-          Blank().height(this.bottomInset).width('100%')
-        }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').alignItems(HorizontalAlign.Start)
-      }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)
-    } else {
       List({ space: 12, scroller: this.scroller }) {
         ListItem() { Column({ space: 12 }) { Blank().height(this.topInset).width('100%'); this.controls() }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0) }
         ForEach(this.assets(), (asset: Asset) => {
@@ -116,6 +100,5 @@ export struct LibraryPage {
         .onAreaChange((_old: Area, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })
         .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offset = this.scroller.currentOffset().yOffset; } })
         .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
-    }
   }
 }

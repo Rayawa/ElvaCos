@@ -115,7 +115,7 @@
 | 衣柜 | 装备列表，支持分类/状态/位置筛选 | 查看被哪些计划使用 | 添加装备 |
 | 相册 | 按场次组织的照片 | 待处理队列、作品集、归档 | 导入照片 |
 
-**设置与数据**（账号、外观、主题、材质、触觉、备份、更新日志、隐私正文、示例数据、帮助）不是一级入口，由**各根页右上角齿轮**进入同一目的地（`pages/more/SettingsPage.ets`）。未登录与已登录入口一致，业务操作不放进账户菜单。
+**设置与数据**（外观、主题、材质、触觉、备份、更新日志、隐私正文、示例数据、帮助）不是一级入口，由**各根页右上角齿轮**进入同一目的地（`pages/more/SettingsPage.ets`）。账号入口按第 12 章暂缓，离线业务不要求登录。
 
 角色库以文字入口出现在**计划页首部**，同时进入首页业务入口区与全局搜索。花费统计以完整文字常驻**首页财务行**与统计页。
 
@@ -167,7 +167,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 | 花费/统计 | `LedgerRoute { projectId?, range?, category? }` | 本月 | 保留筛选 |
 | 收录箱 | `InboxRoute { kind?, scope?, untriagedOnly? }` | 未归位 | 保留筛选 |
 
-现有实现基础：`model/ProjectRoute.ets:3-10` 已有 `id / section / outing / sheetKind / preparing / linking`；本版只做两处改动——`section` 索引重排（新增概览为 0，原准备/打包/照片顺延为 1/2/3，所有调用点同步更新，无数据迁移），以及活动详情新增 `dayMode`。
+运行时路由保存分段、筛选、焦点、各视图偏移与来源引用；计划 section 索引重排不涉及数据迁移。相册根页与从计划进入的范围相册复用同一组件，后者返回所属计划，照片查看返回原集合与缩略图位置。各根页设置返回保留来源 Tab、筛选与偏移；清空或完整替换数据后统一重置这些上下文。
 
 ### 3.6 视图可以多处，家只能一个
 
@@ -658,7 +658,7 @@ H1/H10 的落地。
 | 导航与入口 | `pages/Dashboard.ets`、`component/DetailDestination.ets`、`component/HdsActionTabs.ets`、`model/ProjectRoute.ets` | 路由参数规范化（3.5）；详情动作与根导航分离；底栏只切换页面 |
 | 首页 / 完整待办 | `pages/main/HomePage.ets`、`component/TaskLinkCard.ets` | 三区块；共用待办聚合；新增完整待办目的地 |
 | 计划与角色 | `pages/main/CosPage.ets`、`component/ProjectCard.ets`、`pages/detail/ProjectDetailPage.ets`、`pages/detail/CharacterDetailPage.ets` | 四视图工作台（含概览与卡点）；角色履历；卡片去重进度 |
-| 相册 / 衣柜 | `pages/main/LibraryPage.ets`、`pages/main/MePage.ets`、`component/PhotoGrid.ets`、`component/ManagedImage.ets` | 拆分：相册独立、衣柜只留装备；照片两模式；作品集不复制数据 |
+| 相册 / 衣柜 | `pages/main/LibraryPage.ets`、`pages/main/AlbumPage.ets`、`component/PhotoGrid.ets`、`component/ManagedImage.ets` | 拆分：相册独立、衣柜只留装备；照片两模式；作品集不复制数据 |
 | 日程与今天模式 | `pages/main/EventsPage.ets`、`component/EventCalendar.ets`、`pages/detail/EventDetailPage.ets`、`model/Schedule.ets` | `dayMode` 与模块装配；提醒状态模型；跨日一致性 |
 | 收录 | 新增 `data/repository/`、`data/database/Schema.ets`、`model/Entities.ets` | 表、仓库、收录箱页、归位流程 |
 | 花费与统计 | `pages/more/ExpenseSummaryPage.ets`、`model/Statistics.ets`、`model/Rules.ets` | 统一范围与聚合；预算语义；明细下钻 |

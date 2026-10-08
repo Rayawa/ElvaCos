@@ -25,7 +25,8 @@ install_hap entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap
 run_hdc shell aa force-stop top.rayawa.elvacos
 TASK_REPORT=$(mktemp)
 trap 'rm -f "$TASK_REPORT"' EXIT
-# Read-only layout coverage; requires an unlocked screen and no concurrent device UI task.
+# Read-only five-root title segments, album and plan-view layout coverage.
+# Requires an unlocked screen and no concurrent device UI task.
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyFidelityUITestRunner -s timeout 180000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
 rg 'Tests run: 4, Failure: 0, Error: 0, Pass: 4, Ignore: 0' "$TASK_REPORT"

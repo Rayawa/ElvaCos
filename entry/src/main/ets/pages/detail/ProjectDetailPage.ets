@@ -1,4 +1,6 @@
 import { WorkCard } from '../../component/WorkCard';
+import { formatTimestamp } from '../../common/format';
+import { DiaryEntry } from '../../model/Entities';
 import { ProjectStatus } from '../../model/Entities';
 import { EntryCollection } from '../../component/EntryCollection';
 import { budgetLabel } from '../../model/PlanReadiness';
@@ -407,10 +409,20 @@ export struct ProjectDetail {
 
   @Builder contextSheet() {
     Column({ space: 16 }) {
-      SheetHeader({ title: this.route.contextSheet === 'team' ? '团队分工' : this.route.contextSheet === 'references' ? '准备参考图' : '计划收录', haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: 48, close: (): void => { this.route.contextSheet = ''; } })
+      SheetHeader({ title: this.route.contextSheet === 'team' ? '团队分工' : this.route.contextSheet === 'references' ? '准备参考图' : this.route.contextSheet === 'records' ? '计划记录' : '计划收录', haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: 48, close: (): void => { this.route.contextSheet = ''; } })
       Scroll() {
         Column({ space: 14 }) {
           if (this.route.contextSheet === 'team') { this.team() }
+          else if (this.route.contextSheet === 'records') {
+            Text(this.project.name + ' · 自动记录的操作历程').fontSize(15).fontColor(Theme.muted)
+            ForEach(this.state.projectDiary(this.project.id), (entry: DiaryEntry) => {
+              Column({ space: 8 }) {
+                Text(formatTimestamp(entry.createdAt)).fontSize(14).fontColor(Theme.accent)
+                Text(entry.text).fontSize(17).fontColor(Theme.ink)
+              }.width('100%').alignItems(HorizontalAlign.Start).padding(12).backgroundColor(Theme.tint).borderRadius(12)
+            }, (entry: DiaryEntry) => entry.id)
+            if (!this.state.projectDiary(this.project.id).length) { Text('这份计划还没有操作记录，后续记录会显示在这里。').fontSize(16).fontColor(Theme.muted) }
+          }
           else if (this.route.contextSheet === 'references') {
             ReferenceGallery({ state: this.state, images: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id), add: (): void => { this.state.importReferences(this.project.id); }, open: (id: string): void => { this.open('reference', id); } })
           } else { EntryCollection({ state: this.state, scopeKind: 'project', scopeId: this.project.id, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
@@ -476,6 +488,8 @@ export struct ProjectDetail {
       Button('团队 · ' + this.state.team.filter((member: TeamMember) => member.projectId === this.project.id).length + ' 人 · 编辑分工').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'team'; })
       Button('参考图 · ' + this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id).length + ' 张').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'references'; })
       this.entryLink()
+      Button('计划记录 · ' + this.state.projectDiary(this.project.id).length + ' 条').id('project-records-open').width('100%').constraintSize({ minHeight: 48 })
+        .onClick((): void => { this.route.contextSheet = 'records'; })
       if (this.project.notes) { Text(this.project.notes).fontSize(15).fontColor(Theme.muted) }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }

@@ -11,10 +11,9 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 export class Icons {
   // 一级导航与标题菜单
   static home: Resource = $r('sys.media.return_home_fill');
-  static cos: Resource = $r('sys.media.ohos_user_auth_icon_face');
+  static plan: Resource = $r('sys.media.ohos_ic_public_edit');
   static event: Resource = $r('sys.media.ohos_ic_public_clock');
   static library: Resource = $r('sys.media.rectangle_filled_and_line_horizontal_and_rectangle');
-  static me: Resource = $r('sys.media.person_badge_waveform');
   static settings: Resource = $r('sys.symbol.gearshape');
 
   // 设置页列表项图标（app.media，浅/深各一版）

@@ -8,7 +8,7 @@ TASK_DEVECO=${DEVECO_HOME:-"$HOME/Applications/DevEco-Studio.app/Contents"}
 TASK_HDC="$TASK_DEVECO/sdk/default/openharmony/toolchains/hdc"
 if [ -z "${HDC_TARGET_ID:-}" ]; then
   "$TASK_HDC" list targets
-  echo 'Set HDC_TARGET_ID to the unlocked test device before running real account integration.' >&2
+  echo 'Set HDC_TARGET_ID to the unlocked test device before running the deferred-account UI boundary check.' >&2
   exit 2
 fi
 run_hdc() {
@@ -25,8 +25,8 @@ run_hdc install entry/build/default/outputs/ohosTest/entry-ohosTest-signed.hap
 run_hdc shell aa force-stop top.rayawa.elvacos
 TASK_REPORT=$(mktemp)
 trap 'rm -f "$TASK_REPORT"' EXIT
-# Explicit production login; saves the ordinary local login state if successful.
-# Does not modify business records or revoke authorization.
+# Explicit read-only deferred-account boundary check; never opens system authentication.
+# Does not modify business records or stored identity.
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyAccountTestRunner -s timeout 60000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
 rg 'Tests run: 1, Failure: 0, Error: 0, Pass: 1, Ignore: 0' "$TASK_REPORT"

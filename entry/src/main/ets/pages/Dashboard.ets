@@ -56,7 +56,6 @@ import { CosPage } from './main/CosPage';
 import { EventsPage } from './main/EventsPage';
 import { LibraryPage } from './main/LibraryPage';
 import { SettingsPage } from './more/SettingsPage';
-import { MePage } from './main/MePage';
 import { CharacterDetail } from './detail/CharacterDetailPage';
 import { ProjectDetail } from './detail/ProjectDetailPage';
 import { AssetDetail } from './detail/AssetDetailPage';
@@ -83,8 +82,7 @@ import { EmptyState } from '../component/Surfaces';
   @Local planListRoute: PlanListRoute = new PlanListRoute();
   @Local wardrobeRoute: WardrobeRoute = new WardrobeRoute();
   @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
-  @Local meSection: number = 0;
-  @Local libraryPhotos: boolean = false;
+  @Local albumRoute: AlbumRoute = new AlbumRoute();
   @Local rootSheetKind: string = 'form';
   @Local creatingForImport: boolean = false;
   @Local pendingImportPlanId: string = '';
@@ -350,7 +348,13 @@ import { EmptyState } from '../component/Surfaces';
       return;
     }
     const accepted = await confirm(this.getUIContext(), '清空本地数据？', '全部本地记录和照片副本将删除，系统相册原图保留。建议先完成备份。', '清空');
-    if (accepted && await this.state.clearData()) { this.detailStack.clear(); }
+    if (accepted && await this.state.clearData()) { this.resetNavigation(); }
+  }
+  private resetNavigation(): void {
+    this.detailStack.clear(); this.stacks.forEach((stack: NavPathStack): void => { stack.clear(); });
+    this.planListRoute = new PlanListRoute(); this.wardrobeRoute = new WardrobeRoute(); this.scheduleRoute = new ScheduleRoute(today()); this.albumRoute = new AlbumRoute();
+    this.editingShotRoute = undefined; this.pendingImportPlanId = ''; this.creatingForImport = false;
+    this.tab = 0; this.tabsController.changeIndex(0);
   }
   private closeRestore(): void {
     if (this.state.busy) { return; }
@@ -382,7 +386,7 @@ import { EmptyState } from '../component/Surfaces';
   @Builder rootSheet() {
     if (this.rootSheetKind === 'form') { this.form() }
     else if (this.rootSheetKind === 'restore') {
-      BackupRestoreSheet({ state: this.state, close: (): void => { this.closeRestore(); }, done: (): void => { this.restoreOpen = false; this.detailStack.clear(); this.stacks.forEach((stack: NavPathStack): void => { stack.clear(); }); } })
+      BackupRestoreSheet({ state: this.state, close: (): void => { this.closeRestore(); }, done: (): void => { this.restoreOpen = false; this.resetNavigation(); } })
     } else { this.importSheet() }
   }
   @Builder form() {
@@ -630,26 +634,19 @@ import { EmptyState } from '../component/Surfaces';
   }
 
   private rootTools(index: number): ToolbarItem[] {
-    if (index === 1) {
-      return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }];
-    }
-    if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: () => this.edit('event') }]; }
-    if (index === 3) { return this.libraryPhotos ? [] : [{ value: '添加装备', icon: Icons.add, action: (): void => { this.edit('asset'); } }]; }
-    return [{ value: '新建计划', icon: Icons.add, action: () => this.edit('project') }, { value: '添加活动', icon: Icons.event, action: () => this.edit('event') }, { value: '导入照片', icon: Icons.importPhoto, action: () => this.chooseImport() }];
+    if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: (): void => { this.edit('event'); } }]; }
+    if (index === 3) { return [{ value: '添加装备', icon: Icons.add, action: (): void => { this.edit('asset'); } }]; }
+    if (index === 4) { return [{ value: '导入照片', icon: Icons.importPhoto, action: (): void => { this.chooseImport(this.albumRoute.collection.planId); } }]; }
+    return [{ value: '新建计划', icon: Icons.add, action: (): void => { this.edit('project'); } }];
   }
   private rootMenus(index: number): HdsNavigationMenuItemOptions[] {
-    if (index === 4) {
-      return [{
-        content: {
-          label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy, action: (): void => {
-            this.open('settings', 'settings');
-          }
-        }
-      }];
-    }
-    return this.rootTools(index).map((item: ToolbarItem): HdsNavigationMenuItemOptions => {
-      return { content: { label: item.value, icon: item.icon as Resource, isEnabled: this.state.ready && !this.state.busy, action: item.action, componentId: 'root-action-' + item.value } };
+    const enabled = this.state.ready && !this.state.busy && !this.state.staleScopes.length;
+    const menus = this.rootTools(index).map((item: ToolbarItem): HdsNavigationMenuItemOptions => {
+      return { content: { label: item.value, icon: item.icon as Resource, isEnabled: enabled, action: item.action, componentId: 'root-action-' + item.value } };
     });
+    menus.push({ content: { label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy,
+      action: (): void => { this.open('settings', 'settings'); } } });
+    return menus;
   }
 
   @Builder projectSegment(route: ProjectRoute) {
@@ -723,7 +720,7 @@ import { EmptyState } from '../component/Surfaces';
       tools.push({ value: '分享', icon: Icons.share, action: (): void => { this.state.shareProject(route.id); } });
       tools.push({ value: '删除计划', icon: Icons.remove, action: (): void => { this.remove('project', route.id); } });
     }
-    return tools.map((item: ToolbarItem): HdsNavigationMenuItemOptions => { return { content: { label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy, action: item.action } }; });
+    return tools.map((item: ToolbarItem): HdsNavigationMenuItemOptions => { return { content: { label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy && !this.state.staleScopes.length, action: item.action, componentId: 'detail-action-' + item.value } }; });
   }
 
   private detailTools(kind: string, param: Object): ToolbarItem[] {
@@ -759,15 +756,14 @@ import { EmptyState } from '../component/Surfaces';
   private segmentLabels(index: number): string[] {
     if (index === 1) { return ['进行中', '已完成', '全部']; }
     if (index === 2) { return ['列表', '日历']; }
-    if (index === 3) { return ['装备', '照片']; }
-    return ['作品', '时间轴'];
+    if (index === 4) { return ['按场次', '待处理']; }
+    return [];
   }
 
   private segmentSelection(index: number): number {
     if (index === 1) { return this.planListRoute.section; }
     if (index === 2) { return this.scheduleRoute.calendar ? 1 : 0; }
-    if (index === 3) { return this.libraryPhotos ? 1 : 0; }
-    return this.meSection;
+    return index === 4 && this.albumRoute.mode === 'queue' ? 1 : 0;
   }
 
   private buildSegmentItems(labels: string[]): SegmentButtonV2Items {
@@ -790,8 +786,7 @@ import { EmptyState } from '../component/Surfaces';
         onSelectedIndexChanged: (selected: number): void => {
           if (index === 1) { this.planListRoute.status = ''; this.planListRoute.section = selected; }
           else if (index === 2) { this.scheduleRoute.showCalendar(selected === 1); }
-          else if (index === 3) { this.libraryPhotos = selected === 1; }
-          else { this.meSection = selected; }
+          else if (index === 4) { this.albumRoute.showMode(selected ? 'queue' : 'byPlan'); }
         },
         onItemClicked: (_selected: number): void => { HapticService.confirm(this.state.settings.haptic); },
       }).align(Alignment.Center).margin({ top: 8 })
@@ -910,24 +905,17 @@ import { EmptyState } from '../component/Surfaces';
             bottomInset: Theme.contentBottom,
             active: this.tab === index,
             route: this.wardrobeRoute,
-            photos: this.libraryPhotos,
-            selection: (photos: boolean) => { this.libraryPhotos = photos; },
             open: (k: string, id: string) => this.open(k, id),
             add: (k: string, parent: string) => this.edit(k, '', parent)
           })
         }
         else {
-          MePage({
+          AlbumPage({
+            state: this.state, route: this.albumRoute,
+            scroller: this.pageScrollers[index], entranceSession: this.mainEntranceSession,
+            topInset: Theme.contentTop, bottomInset: Theme.contentBottom, active: this.tab === index,
             view: (route: PhotoViewerRoute): void => { this.openPhoto(route); },
-            entranceSession: this.mainEntranceSession,
-            scroller: this.pageScrollers[index],
-            state: this.state,
-            topInset: Theme.contentTop,
-            bottomInset: Theme.contentBottom,
-            active: this.tab === index,
-            section: this.meSection,
-            open: (k: string, id: string) => this.open(k, id),
-            destructive: (kind: string) => this.destructive(kind)
+            importPhotos: (id: string): void => { this.chooseImport(id); }
           })
         }
       }.width('100%').height('100%')
@@ -941,7 +929,7 @@ import { EmptyState } from '../component/Surfaces';
       // 外层 HdsTabs 已忽略安全区，内层 HdsNavigation 需要显式避让，标题才不会进入状态栏。
       .titleBar(SystemCapability.titleBar(
         MAIN_PAGE_TITLES[index], this.state.settings.effects, this.state.settings.materialLevel,
-        index > 0 ? (): void => { this.titleSegment(index); } : undefined,
+        (index === 1 || index === 2 || index === 4) ? (): void => { this.titleSegment(index); } : undefined,
         this.rootMenus(index), true,
       ))
       .hideToolBar(true)
@@ -954,13 +942,13 @@ import { EmptyState } from '../component/Surfaces';
       TabContent() { this.mainNavigation(0) }
         .tabBar(new BottomTabBarStyle(Icons.home, '首页')).accessibilityText('首页标签页')
       TabContent() { this.mainNavigation(1) }
-        .tabBar(new BottomTabBarStyle(Icons.cos, 'Cos')).accessibilityText('角色和计划标签页')
+        .tabBar(new BottomTabBarStyle(Icons.plan, '计划')).accessibilityText('计划标签页')
       TabContent() { this.mainNavigation(2) }
-        .tabBar(new BottomTabBarStyle(Icons.event, '活动')).accessibilityText('活动标签页')
+        .tabBar(new BottomTabBarStyle(Icons.event, '日程')).accessibilityText('日程标签页')
       TabContent() { this.mainNavigation(3) }
         .tabBar(new BottomTabBarStyle(Icons.library, '衣柜')).accessibilityText('衣柜标签页')
       TabContent() { this.mainNavigation(4) }
-        .tabBar(new BottomTabBarStyle(Icons.me, '我的')).accessibilityText('我的标签页')
+        .tabBar(new BottomTabBarStyle(Icons.importPhoto, '相册')).accessibilityText('相册标签页')
     }.id('main-tabs')
       .barPosition(BarPosition.End)
       .barWidth(Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)))
@@ -986,7 +974,7 @@ import { EmptyState } from '../component/Surfaces';
       .layoutWeight(1).width('100%')
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg)
-      .accessibilityText('首页、角色和计划、活动、衣柜、我的五个标签页')
+      .accessibilityText('首页、计划、日程、衣柜、相册五个标签页')
       .onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
   }
 

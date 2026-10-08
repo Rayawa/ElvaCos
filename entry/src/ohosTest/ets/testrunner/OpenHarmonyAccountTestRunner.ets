@@ -10,7 +10,7 @@ export default class OpenHarmonyAccountTestRunner implements TestRunner {
       const suite = await import('../test/AccountIntegration.test');
       Hypium.hypiumTest(delegator, abilityDelegatorRegistry.getArguments(), suite.default);
     } catch (error) {
-      delegator.finishTest('Account integration requires an unlocked application window', -1, () => {});
+      delegator.finishTest('Account boundary check requires an unlocked application window', -1, () => {});
     }
   }
 }

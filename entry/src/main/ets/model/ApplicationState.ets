@@ -336,6 +336,17 @@ export class AppState {
   }
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
   @Computed
+  get diaryByProject(): Map<string, DiaryEntry[]> {
+    const grouped = new Map<string, DiaryEntry[]>();
+    for (const entry of this.diary) {
+      if (!entry.projectId) { continue; }
+      const entries = grouped.get(entry.projectId) || []; entries.push(entry); grouped.set(entry.projectId, entries);
+    }
+    grouped.forEach((entries: DiaryEntry[]): void => { entries.sort((a: DiaryEntry, b: DiaryEntry): number => b.createdAt - a.createdAt || a.id.localeCompare(b.id)); });
+    return grouped;
+  }
+  projectDiary(id: string): DiaryEntry[] { return this.diaryByProject.get(id) || []; }
+  @Computed
   get workCards(): ProjectWork[] {
     const readiness = this.readinessPlans;
     return workHistory(this.projects.map((project: CosProject) => buildProjectWork(project,
