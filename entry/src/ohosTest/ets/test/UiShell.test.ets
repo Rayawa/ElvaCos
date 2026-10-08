@@ -92,6 +92,12 @@ export default function uiShellTest(): void {
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (plans.length > 0) {
         await plans[0].click(); await driver.delayMs(500);
+        const viewport = await (await driver.findComponent(ON.id('project-overview').inWindow(bundle))).getBounds();
+        for (const id of ['project-money-open', 'project-team-open']) {
+          const bounds = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+          expect(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom).assertTrue();
+        }
+        await tap('project-team-open'); await present('团队分工'); await tap('sheet-close');
         await (await driver.findComponent(ON.id('project-overview').inWindow(bundle))).scrollSearch(ON.id('project-records-open').inWindow(bundle));
         await tap('project-records-open'); await present('计划记录'); await tap('sheet-close'); await tap('照片'); await present('project-shots-open'); await tap('project-shots-open'); await present('拍摄清单');
         await tap('添加拍摄事项'); await present('拍摄事项 *'); await present('参考图（可选）'); await tap('sheet-close'); await present('拍摄清单'); await tap('sheet-close'); await back();

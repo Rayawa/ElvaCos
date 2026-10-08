@@ -196,6 +196,8 @@ import { EmptyState } from '../component/Surfaces';
         if (top < 0 || this.detailStack.getAllPathName()[top] !== 'asset' || (this.detailStack.getParamByIndex(top) as AssetRoute).id !== parts[1]) {
           this.detailStack.pushPathByName('asset', new AssetRoute(parts[1], 'collection', '', this.tab), false);
         }
+        const owner = this.detailStack.getParamByIndex(this.detailStack.size() - 1) as AssetRoute;
+        this.detailStack.pushPathByName('inbox', owner.entries); return;
       }
       this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
     } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos' || kind === 'outing' || kind === 'projectPreparation') {

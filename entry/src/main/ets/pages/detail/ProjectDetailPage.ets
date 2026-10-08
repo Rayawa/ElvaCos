@@ -491,8 +491,26 @@ export struct ProjectDetail {
   }
   @Builder overview() {
     Column({ space: 14 }) {
-      if ([ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status) && this.state.projectWork(this.project.id)) { WorkCard({ work: this.state.projectWork(this.project.id)!, hint: '双击查看本计划照片', open: (): void => { this.route.section = 3; } }) }
       if (![ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status)) { Text(this.state.readiness(this.project.id).blockers[0] || this.state.readiness(this.project.id).prep.next?.label || '当前没有准备卡点').fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink) }
+      Row({ space: 8 }) {
+        Button() {
+          Column({ space: 4 }) {
+            Text('花费 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2)).fontSize(17).fontColor(Theme.ink)
+            Text(budgetLabel(this.project.budgetConfigured, this.project.budgetCents)).fontSize(13).fontColor(Theme.muted)
+          }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+        }.id('project-money-open').layoutWeight(1).constraintSize({ minHeight: 64 }).type(ButtonType.Normal)
+          .backgroundColor(Theme.surface).borderRadius(16).onClick((): void => { this.open('expenseStats', this.project.id); })
+          .accessibilityText('查看本计划花费统计，已记录支出 ' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' 元')
+        Button() {
+          Column({ space: 4 }) {
+            Text('团队 · ' + (this.state.projectWork(this.project.id)?.value.credits.length || 0) + ' 人').fontSize(17).fontColor(Theme.ink)
+            Text('查看 / 编辑分工').fontSize(13).fontColor(Theme.muted)
+          }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+        }.id('project-team-open').layoutWeight(1).constraintSize({ minHeight: 64 }).type(ButtonType.Normal)
+          .backgroundColor(Theme.surface).borderRadius(16).onClick((): void => { this.route.contextSheet = 'team'; })
+          .accessibilityText('查看团队并编辑分工')
+      }.width('100%').alignItems(VerticalAlign.Top)
+      if ([ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status) && this.state.projectWork(this.project.id)) { WorkCard({ work: this.state.projectWork(this.project.id)!, hint: '双击查看本计划照片', open: (): void => { this.route.section = 3; } }) }
       Button('角色 · ' + this.state.characterName(this.project.characterId) + (this.project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在') : '')).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('character', this.project.characterId); })
       Row({ space: 8 }) {
         Button('改日期 / 关联活动').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('project', this.project.id, ''); })
@@ -501,11 +519,12 @@ export struct ProjectDetail {
       Button('准备 ' + this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项完成 · 在途 ' + this.state.readiness(this.project.id).prep.waiting + ' 项').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 1; })
       Button('打包 ' + this.state.readiness(this.project.id).pack.packed + ' / ' + this.state.readiness(this.project.id).pack.total + ' 件确认').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 2; })
       Text(this.state.readiness(this.project.id).equipment.total ? '装备可用 ' + this.state.readiness(this.project.id).equipment.available + ' / ' + this.state.readiness(this.project.id).equipment.total + ' 件' : '尚未关联装备').fontSize(15).fontColor(Theme.muted)
-      ForEach(this.state.readiness(this.project.id).equipment.unavailable, (asset: Asset) => {
+      ForEach(this.state.readiness(this.project.id).equipment.unavailable.slice(0, 1), (asset: Asset) => {
         Button(asset.name + ' · ' + ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)]).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('asset', asset.id); })
       }, (asset: Asset) => asset.id)
-      Button('花费 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' · ' + budgetLabel(this.project.budgetConfigured, this.project.budgetCents)).width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('expenseStats', this.project.id); })
-      Button('团队 · ' + this.state.team.filter((member: TeamMember) => member.projectId === this.project.id).length + ' 人 · 编辑分工').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'team'; })
+      if (this.state.readiness(this.project.id).equipment.unavailable.length > 0) {
+        Button('查看装备问题 · ' + this.state.readiness(this.project.id).equipment.unavailable.length + ' 件').id('project-equipment-issues').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 1; })
+      }
       Button('参考图 · ' + this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id).length + ' 张').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'references'; })
       this.entryLink()
       Button('计划记录 · ' + this.state.projectDiary(this.project.id).length + ' 条').id('project-records-open').width('100%').constraintSize({ minHeight: 48 })

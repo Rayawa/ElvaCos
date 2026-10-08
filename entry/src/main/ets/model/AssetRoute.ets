@@ -2,6 +2,7 @@ import { WardrobeRoute } from './Wardrobe';
 import { ProjectRoute } from './ProjectRoute';
 import { TaskRoute } from './TaskQueue';
 import { EventRoute } from './EventRoute';
+import { InboxRoute } from './CollectedEntry';
 
 @ObservedV2
 export class AssetRoute {
@@ -18,8 +19,10 @@ export class AssetRoute {
   project?: ProjectRoute;
   event?: EventRoute;
   tasks?: TaskRoute;
+  entries: InboxRoute;
   constructor(id: string, from: string = 'wardrobe', projectId: string = '', sourceTab: number = 3) {
     this.id = id; this.from = from; this.projectId = projectId; this.sourceTab = sourceTab;
+    this.entries = new InboxRoute('asset', id);
   }
   restoreSource(deleted: boolean = false): void {
     if (this.wardrobe) {

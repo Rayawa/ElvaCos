@@ -223,8 +223,14 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     restored.reconcile([]); assert.equal(route.anchorId,''); assert.match(route.feedback,/当前范围/); assert.equal(route.offset,640); assert.equal(route.kind,'map');
     const generation=route.restoreVersion; route.setKind('invalid'); assert.equal(route.restoreVersion,generation); route.setKind('map'); assert.equal(route.offset,640);
     route.setKind('ticket'); assert.equal(route.offset,0); assert.equal(route.feedback,''); assert.equal(route.restoreVersion,generation+1); assert.equal(route.content,'尚未收录的想法');
-    const { ProjectRoute }=require(root+'/model/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/model/CharacterRoute.ets');
-    for(const owner of [new ProjectRoute('plan'),new CharacterRoute('role'),event]) { owner.entries.setKind('link'); assert.equal(owner.entries.kind,'link'); assert.equal(owner.entries.scopeId,owner.id); assert.equal(owner.entries.content,''); }
+    const { ProjectRoute }=require(root+'/model/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/model/CharacterRoute.ets'),{ AssetRoute }=require(root+'/model/AssetRoute.ets');
+    for(const owner of [new ProjectRoute('plan'),new CharacterRoute('role'),event,new AssetRoute('equipment')]) {
+      const entries=owner.entries; entries.setKind('link'); entries.content='尚未收录'; entries.offset=400;
+      const roundTrip=new EventReturnPath('inbox',entries); roundTrip.param.restoreVersion++;
+      assert.equal(owner.entries,entries); assert.equal(roundTrip.param,entries); assert.equal(entries.kind,'link'); assert.equal(entries.scopeId,owner.id);
+      assert.equal(entries.content,'尚未收录'); assert.equal(entries.offset,400);
+      if(owner instanceof AssetRoute) assert.equal(entries.scopeKind,'asset');
+    }
   });
   await test('shooting labels and timeline share plan dates, show unknown dates honestly, order cross-day boundaries and disappear without recorded times', () => {
     const { eventTimeline, planShootingLabel, availableDayModules }=day;
