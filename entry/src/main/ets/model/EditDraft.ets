@@ -329,6 +329,17 @@ export class EditDraft {
     return false;
   }
   committedCreation(state: AppState): boolean { return !this.id && this.exists(state, this.creationId); }
+  eventAssociationHint(state: AppState): string {
+    if (this.kind !== 'project' || !this.id) { return ''; }
+    const source = state.projects.find((project: CosProject) => project.id === this.id);
+    if (!source || source.eventId === this.eventId) { return ''; }
+    const old = state.events.find((event: CosEvent) => event.id === source.eventId);
+    const next = state.events.find((event: CosEvent) => event.id === this.eventId);
+    if (this.eventId && !next) { return '所选活动已不存在，请重新选择。'; }
+    const change = source.eventId ? next ? '保存后将用「' + next.name + '」替换原活动「' + (old?.name || '已不存在的活动') + '」。计划只关联一场活动。' : '保存后将解除与「' + (old?.name || '已不存在的活动') + '」的关联。' : '保存后将关联「' + next!.name + '」。';
+    const date = this.date ? '计划继续使用填写的目标日期 ' + this.date + '。' : next && next.dateMode !== 'pending' && next.date ? '未填写目标日期，计划日期将来自该活动：' + next.date + '。' : '未填写目标日期，计划日期将显示为待定。';
+    return change + '\n' + date;
+  }
   issues(state: AppState): FormIssue[] {
     const errors: FormIssue[] = [];
     const check = (field: string, action: () => void): void => { try { action(); } catch (error) { errors.push(new FormIssue(field, (error as Error).message)); } };

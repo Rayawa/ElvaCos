@@ -20,7 +20,7 @@ export struct AlbumPage {
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = true;
-  @Param topInset: number = Theme.detailTopWithSegment;
+  @Param topInset: number = Theme.detailTop;
   @Param bottomInset: number = Theme.contentBottom;
   @Event view: (route: PhotoViewerRoute) => void = () => {};
   @Event importPhotos: (planId: string) => void = () => {};

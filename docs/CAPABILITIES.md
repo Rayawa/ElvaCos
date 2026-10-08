@@ -8,7 +8,7 @@
 
 | 能力 | 起始版本/限制 | API 23 基线策略 |
 |---|---|---|
-| HdsNavigation / HdsNavDestination / HdsTabs | HdsNavigation 18、HdsNavDestination/HdsTabs 20；UIDesign.HDSComponent.Core；Stage | API 23 直接使用；主路由覆盖式详情，详情使用标题菜单与分段，主页五 Tab 独立导航 |
+| HdsNavigation / HdsNavDestination / HdsTabs | HdsNavigation 18、HdsNavDestination/HdsTabs 20；UIDesign.HDSComponent.Core；Stage | API 23 直接使用；主路由覆盖式详情，二级多视图页使用 HdsTabs，动作使用标题菜单，主页五 Tab 独立导航 |
 | TabSegmentButtonV2 $selectedIndex / onItemClicked | 18；ArkUI.Full；Stage；无新增权限；已核对本机 SDK @ohos.arkui.advanced.SegmentButtonV2.d.ets | 分别更新选中状态与处理点击反馈，直接复用 Dashboard 原调用方式 |
 | onAxisEvent / AxisEvent / getVerticalAxisValue / getHorizontalAxisValue | 17；ArkUI.ArkUI.Full；Stage；无额外权限；common.d.ts 核验；修饰键查询继承 BaseEvent（12） | 直接复制 Dashboard common/scroll.ets，五个主页和设置将滚轮 / 触控板纵向轴事件交给页面 Scroller；忽略 Ctrl、纯横向与无效值 |
 | ToolbarItem.symbolIcon / SymbolGlyphModifier | 12；ArkUI.Full；Stage；无额外权限 | Icons 集中提供原生 toolbar 加号/照片 Symbol，避免图片资源图标在详情工具栏缺失；其余语义图标保留原资源 |
@@ -45,9 +45,10 @@ UX v2 的安装清单仅声明 Phone，Tablet / 2in1 在获得真实窗口和输
 
 - [HDS 导航官方示例](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/ui-design-navigation-customized-area)
 
-HDS 导航不是把 Navigation 简单改名：titleBar.content/style、HdsNavigationTitleMode 与 HdsTabsFloatingStyle 均按真实 SDK 声明使用；详情 HdsActionTabs 使用 ToolbarItem 的动作、图片/原生 Symbol 描述；HdsTabs.onContentWillChange 拦截内容切换，onTabBarClick 执行动作。两者本机 SDK since 20、syscap UIDesign.HDSComponent.Core、Stage、无新增权限，兼容 API 23。页面覆盖使用主 NavPathStack 与标准 HdsNavDestination，依据上述 Navigation 官方来源。
+HDS 导航的 titleBar.content/style、HdsNavigationTitleMode 与 HdsTabsFloatingStyle 按真实 SDK 声明使用。HdsViewTabs 由 HdsTabs / TabContent 切换二级视图，onChange 更新原路由的视图索引，onTabBarClick 只做触觉反馈；不把新增 / 删除动作放进 TabBar。标题栏 menu.value 与 maxCount 使用 HdsNavigationMenuContentOptions，默认最多三个直接操作，空间与溢出由 HDS 管理。根页保留五个业务 Tab 与标题分段；只有首页提供「我的」，含偏好设置与数据入口。HdsTabs since 20，浮动材质 since 23，syscap UIDesign.HDSComponent.Core、Stage，不新增权限；主包与测试包编译通过不替代 API 23 实机验证。
 
-安全区：当前不再维护无消费的 WindowInsets 监听。根 HdsNavigation / HdsTabs 与覆盖目的地协调背景扩展和标题避让，内层 titleBar 开启避让，覆盖 HdsNavDestination 由 HDS 自行处理，避免重复下移。详情覆盖主 Tabs，只显示本页的 HdsTabs 操作栏，滚动内容底部留白避让。参见 UI_STYLE.md 的官方依据。
+安全区：根 HdsNavigation / HdsTabs 与覆盖目的地协调背景扩展和标题避让，内层 titleBar 开启避让，覆盖 HdsNavDestination 由 HDS 自行处理。详情覆盖主 Tabs，只显示自己的视图页签；滚动内容顶部不再为标题 SegmentButton 留额外高度，末项仍保留浮动栏避让。今天模式的底线信息标题常驻，页签在底部。参考图单视图只显示标题菜单，不创建操作页签。
+
 
 - [Image 加载沙箱图片 URI](https://developer.huawei.com/consumer/cn/doc/doccenter-dev-faq/faqs-arkui-903)
 

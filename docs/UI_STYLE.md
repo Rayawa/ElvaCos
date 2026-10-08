@@ -11,7 +11,7 @@
 | Dashboard 来源 | ElvaCos 接入 | 当前用途 |
 |---|---|---|
 | pages/Dashboard | pages/Dashboard、SystemCapability | 五个 Tab、标题区、导航与滚动状态 |
-| HdsMiniBarButton、HdsTitleBarSegment | component 下同名组件 | 浮动栏、分段、材质与按压反馈 |
+| HdsMiniBarButton、HdsTitleBarSegment、HdsViewTabs | component 下同名组件 | 浮动栏、分段、材质与按压反馈 |
 | common/vibration、visualEffects、motion、scroll | common 下对应工具 | 触觉、光场、入场、鼠标与触控板滚动 |
 | SettingsPanel、DiskStorage、storage | component / common | 用户名、材质、振动、偏好持久化 |
 | MyPage MoreRow | SettingsActionRow | 设置入口与 HDS 图标/控件列 |
@@ -22,7 +22,7 @@
 
 ## 当前页面与交互
 
-主页五个 HdsTabs 各有独立 HdsNavigation / NavPathStack；外层主栈承载覆盖式详情和设置。详情显示时隐藏主页底栏，业务详情保留 HdsActionTabs 动作栏；更新日志与政策为阅读页。设置页版本信息不再显示构建号：连点版本号五次进入开发者选项（pages/more/DevPage），示例数据载入与只读诊断信息沿用设置页的 HDS 列表行，入口点击不振动，页面仍由公共 DetailDestination 承载。更新日志标题栏提供 Beta / RC / 正式版三个独立开关，复用 Dashboard 的开启/关闭图标、Toast 与触觉；包含空结果、正式版标识和卡片按压反馈，设置入口使用 app_log 图标。表单、关联选择、帮助使用 bindSheet 与 SheetHeader，删除/替换通过确认 Dialog。
+主页五个 HdsTabs 各有独立 HdsNavigation / NavPathStack；外层主栈承载覆盖式详情和设置。详情显示时隐藏主页底栏，二级多视图页用 HdsViewTabs 承载原生 HdsTabs / TabContent；底部只切换视图，动作在原生标题菜单或段内按钮。根页已有五入口页签，页内状态仍用标题分段。首页右上角仅有「我的」，其余根页保留本页新增 / 导入；更新日志与政策为阅读页。设置页版本信息不再显示构建号：连点版本号五次进入开发者选项（pages/more/DevPage），示例数据载入与只读诊断信息沿用设置页的 HDS 列表行，入口点击不振动，页面仍由公共 DetailDestination 承载。更新日志标题栏提供 Beta / RC / 正式版三个独立开关，复用 Dashboard 的开启/关闭图标、Toast 与触觉；包含空结果、正式版标识和卡片按压反馈，设置入口使用 app_log 图标。表单、关联选择、帮助使用 bindSheet 与 SheetHeader，删除/替换通过确认 Dialog。
 
 标题分段使用原生 TabSegmentButtonV2，当前宽度为标题区的 50%。选中变化和重复点击分别处理，切换保留各页查询、滚动和路由上下文。页面承载多于一类内容家族时的分段设计（哪些页面分段、分段与筛选的分工）见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md) 第 3.8 节，尚未执行。
 

@@ -223,7 +223,7 @@ export struct FormEditor {
             this.fieldIssue('variantId')
             Text('关联活动').fontColor(Theme.muted).fontSize(13)
             Select(new Array<SelectOption>({ value: '不关联活动' }).concat(this.state.events.map((e: CosEvent): SelectOption => { return { value: e.name }; })))
-              .value(this.state.events.find((e: CosEvent) => e.id === this.draft.eventId)?.name || '不关联活动')
+              .value(this.draft.eventId ? this.state.events.find((e: CosEvent) => e.id === this.draft.eventId)?.name || '活动已不存在，请重新选择' : '不关联活动')
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.eventId = index === 0 ? '' : this.state.events[index - 1].id; })
                 .accessibilityText('关联活动')
                 .visualEffect(this.feedback.effect('select-5'))
@@ -231,6 +231,7 @@ export struct FormEditor {
                 .attributeModifier(this.feedback.control('select-5'))
               .id('form-input:eventId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => { this.fieldArea('eventId', area); })
             this.fieldIssue('eventId')
+            if (this.draft.eventAssociationHint(this.state)) { Text(this.draft.eventAssociationHint(this.state)).id('form-project-event-change').fontSize(14).fontColor(Theme.muted) }
             Select(PROJECT_LABELS.map((label: string): SelectOption => { return { value: label }; }))
               .value(PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.draft.status as ProjectStatus)])
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.status = PROJECT_STATUSES[index]; })

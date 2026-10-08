@@ -1,7 +1,7 @@
 import { getApplicationState } from '../../../main/ets/common/appState';
 import { DeviceCalendarService } from '../../../main/ets/common/DeviceCalendarService';
 import { CollectedEntry } from '../../../main/ets/model/CollectedEntry';
-import { CosEvent } from '../../../main/ets/model/Entities';
+import { CosEvent, CosProject, Character } from '../../../main/ets/model/Entities';
 import { localDay } from '../../../main/ets/model/DayMode';
 import { Driver, ON, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, it, expect } from '@ohos/hypium';
@@ -70,7 +70,7 @@ export default function uiShellTest(): void {
       expect(((await driver.findComponents(ON.type('ToolBar').inWindow(bundle)))?.length || 0)).assertEqual(0);
     };
     it('tabsSecondarySegmentsAndTitleMenusWork', 0, async () => {
-      await tap('首页'); await present('新建计划');
+      await tap('首页'); await present('root-action-我的');
       await driver.delayMs(1000);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-home.png');
       await tap('计划'); await tap('plan-role-library'); await present('添加角色');
@@ -79,7 +79,7 @@ export default function uiShellTest(): void {
       if (characters.length > 0) {
         await characters[0].click(); await driver.delayMs(500); await present('添加版本');
         expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
-        await present('用这个角色新建计划'); await present('character-detail-segment');
+        await present('用这个角色新建计划'); await present('character-view-tabs');
         await tap('履历'); await present('角色履历'); await tap('参考图'); await present('参考图片'); await tap('资料');
         await tap('用这个角色新建计划'); await present('新建计划'); await tap('sheet-close');
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-character-detail.png');
@@ -116,7 +116,7 @@ export default function uiShellTest(): void {
         const wardrobe = await driver.findComponent(ON.id('library-scroll').inWindow(bundle));
         await wardrobe.scrollSearch(ON.id('wardrobe-asset:' + asset.id).inWindow(bundle)); await tap('wardrobe-asset:' + asset.id);
         expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
-        if (await driver.findComponent(ON.id('asset-detail-segment').inWindow(bundle))) { await tap('使用计划'); }
+        if (await driver.findComponent(ON.id('asset-view-tabs').inWindow(bundle))) { await tap('使用计划'); }
         await present('加入计划'); await tap('加入计划'); await present('选择计划加入装备'); await tap('sheet-close'); await back();
         await present('全部类型'); await present('全部状态'); await present('全部位置');
       }
@@ -144,15 +144,15 @@ export default function uiShellTest(): void {
     it('globalSearchRestoresItsQueryAndOffersTheExistingObjectHomes', 0, async () => {
       await tap('首页');
       await (await driver.findComponent(ON.id('home-scroll').inWindow(bundle))).scrollSearch(ON.id('home-search').inWindow(bundle));
-      await tap('home-search'); await present('全局搜索'); await present('search-segment'); await present('global-search-input');
+      await tap('home-search'); await present('全局搜索'); await present('search-view-tabs'); await present('global-search-input');
       await tap('search-role-library'); await present('添加角色'); await back(); await present('全局搜索');
       const role = getApplicationState().characters[0];
       if (role) {
         await tap('角色'); await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).inputText(role.name); await driver.delayMs(400);
-        await driver.pressBack(); await driver.delayMs(350); await present('search-segment');
+        await driver.pressBack(); await driver.delayMs(350); await present('search-view-tabs');
         const resultId = 'search-result:character:' + role.id;
         await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id(resultId).inWindow(bundle)); await tap(resultId);
-        await present('character-detail-segment'); await back(); await present('search-segment');
+        await present('character-view-tabs'); await back(); await present('search-view-tabs');
         await (await driver.findComponent(ON.id('search-results').inWindow(bundle))).scrollSearch(ON.id('global-search-input').inWindow(bundle));
         expect(await (await driver.findComponent(ON.id('global-search-input').inWindow(bundle))).getText()).assertEqual(role.name);
         await present(resultId);
@@ -163,8 +163,9 @@ export default function uiShellTest(): void {
       expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
       await back(); await present('home-search');
     });
-    it('inboxReturnsFromEventWithTheSameKindScopeAndScrolledRow', 0, async () => {
+    it('inboxAndOwnerCollectionsKeepKindAndScrolledRowsThroughReturnAndSheetReopening', 0, async () => {
       const state = getApplicationState(); const oldEntries = state.entries; const oldEvents = state.events;
+      const oldProjects = state.projects; const oldCharacters = state.characters;
       const event = new CosEvent(); event.id = 'ui-inbox-context-event'; event.name = '收录返回验证'; event.dateMode = 'pending';
       const fixtures: CollectedEntry[] = [];
       for (let index = 0; index < 32; index++) {
@@ -178,14 +179,47 @@ export default function uiShellTest(): void {
         const id = 'entry-row:ui-inbox-context-30'; const scroll = await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle));
         await scroll.scrollSearch(ON.id(id).inWindow(bundle)); await driver.delayMs(350);
         const before = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds(); await tap(id);
-        await present('event-detail-segment'); await present('收录'); await back(); await present(id);
+        await present('event-view-tabs'); await present('收录');
+        await tap('entry-kind-filter'); await tap('地图');
+        await (await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle))).scrollSearch(ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+        const eventBefore = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+        await tap('概览'); await tap('收录'); await present('地图');
+        const eventAfter = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+        expect(Math.abs(eventAfter.top - eventBefore.top) <= 2 && Math.abs(eventAfter.bottom - eventBefore.bottom) <= 2).assertTrue();
+        await (await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350);
+        await tap('entry-kind-filter'); await tap('链接'); await present('没有匹配的收录'); await tap('entry-kind-filter'); await tap('地图');
+        await present('entry-kind-filter'); await back(); await present(id);
         const after = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
         expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
         await (await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350);
         await present('全部收录'); await present('地图'); await back();
+        const role = new Character(); role.id = 'ui-owner-collection-role'; role.name = '收录位置验证角色';
+        const plan = new CosProject(); plan.id = 'ui-owner-collection-plan'; plan.name = '收录位置验证计划'; plan.characterId = role.id;
+        state.characters = oldCharacters.concat(role); state.projects = oldProjects.concat(plan);
+        const checkOwnerSheet = async (kind: string, ownerId: string, sheetScrollId: string, pageScrollId: string, entryButtonId: string): Promise<void> => {
+          state.entries = fixtures.map((entry: CollectedEntry): CollectedEntry => {
+            const copy = new CollectedEntry(); copy.id = entry.id; copy.kind = entry.kind; copy.title = entry.title; copy.text = entry.text;
+            copy.scopeKind = entry.scopeKind === 'global' ? 'global' : kind; copy.scopeId = copy.scopeKind === 'global' ? '' : ownerId; return copy;
+          });
+          await tap('首页'); await (await driver.findComponent(ON.id('home-scroll').inWindow(bundle))).scrollSearch(ON.id('home-inbox').inWindow(bundle)); await tap('home-inbox');
+          await tap('entry-scope-filter'); await tap('全部收录'); await tap('entry-kind-filter'); await tap('地图');
+          await (await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle))).scrollSearch(ON.id(id).inWindow(bundle)); await tap(id);
+          await present(sheetScrollId); await tap('entry-kind-filter'); await tap('地图');
+          await (await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle))).scrollSearch(ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+          const sheetBefore = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+          await tap('sheet-close');
+          await (await driver.findComponent(ON.id(pageScrollId).inWindow(bundle))).scrollSearch(ON.id(entryButtonId).inWindow(bundle)); await tap(entryButtonId);
+          await present(sheetScrollId);
+          const sheetAfter = await (await driver.findComponent(ON.id(id).inWindow(bundle))).getBounds();
+          expect(Math.abs(sheetAfter.top - sheetBefore.top) <= 2 && Math.abs(sheetAfter.bottom - sheetBefore.bottom) <= 2).assertTrue();
+          await (await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle))).scrollToTop(1000); await driver.delayMs(350); await present('地图');
+          await tap('sheet-close'); await back(); await back();
+        };
+        await checkOwnerSheet('project', plan.id, 'project-entries-scroll', 'project-overview', 'project-entry-link');
+        await checkOwnerSheet('character', role.id, 'character-entries-scroll', 'character-detail-scroll', 'character-entry-link');
       } finally {
         for (let attempt = 0; attempt < 4 && !(await driver.findComponent(ON.id('main-tabs').inWindow(bundle))); attempt++) { await back(); }
-        state.entries = oldEntries; state.events = oldEvents;
+        state.entries = oldEntries; state.events = oldEvents; state.projects = oldProjects; state.characters = oldCharacters;
       }
     });
     it('residentTodaySnackBarFloatsAboveStableTabsAndReturnsFromDayMode', 0, async () => {
@@ -223,12 +257,12 @@ export default function uiShellTest(): void {
       const titleBefore = await titles[0].getBounds();
       const windowBounds = await (await driver.findWindow({ bundleName: bundle })).getBounds();
       expect(titleBefore.top > windowBounds.top).assertTrue();
-      const gear = await driver.findComponent(ON.id('root-action-设置').inWindow(bundle)); const gearBefore = await gear.getBounds();
+      const add = await driver.findComponent(ON.id('root-action-添加装备').inWindow(bundle)); const addBefore = await add.getBounds();
       await scrollBody();
       expect((await titles[0].getBounds()).top).assertEqual(titleBefore.top);
-      expect((await gear.getBounds()).top).assertEqual(gearBefore.top);
+      expect((await add.getBounds()).top).assertEqual(addBefore.top);
       expect((await tabBounds()).top).assertEqual(before.top); expect(before.bottom < windowBounds.bottom).assertTrue();
-      await tap('设置'); await settingsItem('用户名'); await driver.delayMs(1000);
+      await tap('首页'); await tap('我的'); await settingsItem('用户名'); await driver.delayMs(1000);
       expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-top.png');
       const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
@@ -237,7 +271,7 @@ export default function uiShellTest(): void {
       const footer = await driver.findComponent(ON.text('版本 1.0.0-beta.1').inWindow(bundle));
       expect((await footer.getBounds()).bottom < windowBounds.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-bottom.png');
-      await back(); await driver.delayMs(250); await present('全部位置');
+      await back(); await driver.delayMs(250); await present('root-action-我的'); await tap('衣柜'); await present('全部位置');
       expect((await tabBounds()).top).assertEqual(before.top);
     });
     it('titleMenuOpensCancelableCharacterFormWithoutWritingData', 0, async () => {
@@ -261,7 +295,7 @@ export default function uiShellTest(): void {
       await tap('sheet-close'); await present('添加角色'); await back();
     });
     it('newPlanCreatesRoleInlineAndCanBeCanceledWithoutWrites', 0, async () => {
-      await tap('首页'); await tap('新建计划'); await present('新建计划');
+      await tap('计划'); await tap('新建计划'); await present('新建计划');
       await present('计划名称 *'); await present('创建计划并开始准备');
       const selector = await driver.findComponent(ON.type('Select').inWindow(bundle));
       await selector.click(); await driver.delayMs(250); await tap('＋ 创建新角色');
@@ -344,16 +378,23 @@ export default function uiShellTest(): void {
       await tap('sheet-close'); await present('花费统计');
       const after = await (await driver.findComponent(ON.text('花费明细').inWindow(bundle))).getBounds();
       expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
-      await back(); await present('新建计划');
+      await back(); await present('root-action-我的');
     });
-    it('everyRootHasSettingsAndDeferredAccountHasNoLoginAction', 0, async () => {
+    it('myIsOnlyOnHomeAndCreationBelongsToEachBusinessRoot', 0, async () => {
       const signedIn = getApplicationState().account.signedIn;
-      for (const tab of ['首页', '计划', '日程', '衣柜', '相册']) {
-        await tap(tab); await present('root-action-设置'); await tap('设置'); await present('本机存储与同步');
-        expect((await driver.findComponents(ON.text('登录').inWindow(bundle))).length).assertEqual(0);
-        expect((await driver.findComponents(ON.text('退出').inWindow(bundle))).length).assertEqual(0);
-        expect(getApplicationState().account.signedIn).assertEqual(signedIn);
-        await back(); await present('main-tabs');
+      await tap('首页'); await present('root-action-我的');
+      expect((await driver.findComponents(ON.id('root-action-新建计划').inWindow(bundle))).length).assertEqual(0);
+      await tap('我的'); await present('本机存储与同步');
+      expect((await driver.findComponents(ON.text('登录').inWindow(bundle))).length).assertEqual(0);
+      expect((await driver.findComponents(ON.text('退出').inWindow(bundle))).length).assertEqual(0);
+      expect(getApplicationState().account.signedIn).assertEqual(signedIn);
+      await back(); await present('root-action-我的');
+      const tabs = ['计划', '日程', '衣柜', '相册'];
+      const actions = ['新建计划', '添加活动', '添加装备', '导入照片'];
+      for (let index = 0; index < tabs.length; index++) {
+        await tap(tabs[index]); await present('root-action-' + actions[index]);
+        expect((await driver.findComponents(ON.id('root-action-我的').inWindow(bundle))).length).assertEqual(0);
+        expect((await driver.findComponents(ON.id('root-action-设置').inWindow(bundle))).length).assertEqual(0);
       }
       await tap('首页');
     });
@@ -371,10 +412,10 @@ export default function uiShellTest(): void {
       const discard = await driver.findComponent(ON.text('放弃'));
       if (discard) { await discard.click(); }
       await operation; expect(failure).assertEqual(''); expect(added).assertFalse();
-      await driver.delayMs(400); await present('新建计划');
+      await driver.delayMs(400); await present('root-action-我的');
     });
     it('settingsUseAlignedHandChoicesAndRealHelpSheets' , 0, async () => {
-      await tap('相册'); await tap('设置'); await settingsItem('云同步');
+      await tap('首页'); await tap('我的'); await settingsItem('云同步');
       await tap('说明'); await present('云空间与同步'); await present('导出元数据备份'); await tap('sheet-close');
       await settingsItem('用户名'); await settingsItem('材质等级'); await settingsItem('右手');
       await driver.delayMs(700);

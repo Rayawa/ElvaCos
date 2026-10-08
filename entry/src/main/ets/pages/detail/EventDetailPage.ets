@@ -1,7 +1,6 @@
 import { ProjectShot } from '../../model/Shot';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { SegmentButtonV2Items } from '@kit.ArkUI';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_STATUSES, PROJECT_LABELS } from '../../common/constants';
 import { Theme } from '../../common/Theme';
 import { AppState } from '../../model/ApplicationState';
@@ -16,9 +15,10 @@ import { appSheetOptions } from '../../common/sheet';
 import { confirm } from '../../common/Confirm';
 import { operationCommitted } from '../../model/OperationResult';
 import { SheetHeader } from '../../component/SheetHeader';
-import { HdsTitleBarSegment } from '../../component/HdsTitleBarSegment';
+import { HdsViewTabs } from '../../component/HdsViewTabs';
+import { Icons } from '../../common/Icons';
 import { SectionHeading, StatusPill, FactRow, EmptyState } from '../../component/Surfaces';
-import { EntryCollection } from '../../component/EntryCollection';
+import { EntryCollectionView } from '../../component/EntryCollectionView';
 import { ManagedImage } from '../../component/ManagedImage';
 import { ProjectCard } from '../../component/ProjectCard';
 
@@ -50,10 +50,14 @@ export struct EventDetail {
   private offsetIndex(): number { return this.route.dayMode ? 4 + this.route.section : this.route.section; }
   aboutToAppear(): void { this.displayedIndex = this.offsetIndex(); this.restoreScroll(); }
   aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } }
-  @Monitor('route.section', 'route.dayMode', 'route.restoreVersion')
+  @Monitor('route.section', 'route.dayMode')
   private viewChanged(): void {
+    if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; }
+    this.measured = false; this.restoring = true;
     this.displayedIndex = this.offsetIndex(); this.restoreScroll();
   }
+  @Monitor('route.restoreVersion')
+  private contextChanged(): void { this.restoreScroll(); }
   private restoreScroll(): void {
     if (!this.measured) { return; }
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
@@ -220,8 +224,6 @@ export struct EventDetail {
           .onSelect((index: number): void => { this.recordKind = index; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
       }.width('100%')
       Text((this.event.venue || this.event.city || '地点待定') + ' · ' + eventTimeLabel(this.event) + (dayNumber(this.event, this.state.clockTime) ? ' · ' + dayNumber(this.event, this.state.clockTime) : '')).fontSize(15).fontColor(Theme.muted).width('100%')
-      HdsTitleBarSegment({ items: new SegmentButtonV2Items([{ text: '出发前' }, { text: '现场' }]), selectedIndexes: [this.route.section], segmentHeight: 72, experimentalHeight: 76, minimumTargetHeight: 64,
-        onSelectedIndexChanged: (index: number): void => { this.route.section = index; } }).width('100%')
     }.padding({ top: 16, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 12 }).width('100%').backgroundColor(Theme.bg)
   }
   @Builder packing(project: CosProject) {
@@ -295,16 +297,30 @@ export struct EventDetail {
         Button('导入照片').constraintSize({ minHeight: 64 }).onClick((): void => { this.recordKind = 2; this.recording = true; }) }
     }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
   }
+  @Local availableWidth: number = 360;
   build() {
     Column() {
       if (this.route.dayMode) { this.dayHeader() }
+      HdsViewTabs({ labels: this.route.dayMode ? ['出发前', '现场'] : ['概览', '本场计划', '收录', '提醒'],
+        icons: this.route.dayMode ? [Icons.library, Icons.event] : [Icons.home, Icons.plan, Icons.importPhoto, Icons.event],
+        selectedIndex: this.route.section, componentId: 'event-view-tabs', effects: this.state.settings.effects,
+        materialLevel: this.state.settings.materialLevel, availableWidth: this.availableWidth,
+        haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+        changed: (index: number): void => { this.route.section = index; }, content: (): void => { this.viewContent(); } }).layoutWeight(1)
+    }.width('100%').height('100%').onAreaChange((_, area: Area): void => { this.availableWidth = Number(area.width); })
+  }
+  @Builder viewContent() {
+    Column() {
+      if (!this.route.dayMode && this.route.section === 2) {
+        EntryCollectionView({ state: this.state, route: this.route.entries, componentId: 'event-entries-scroll', restoreVersion: this.route.restoreVersion,
+          topInset: Theme.detailTop, bottomInset: Theme.contentBottom, horizontalPadding: Theme.pagePadding, open: this.open }).layoutWeight(1)
+      } else {
       Scroll(this.scroller) {
         Column({ space: Theme.sectionSpacing }) {
           if (!this.route.dayMode) {
-            Blank().height(Theme.detailTopWithSegment).width('100%')
+            Blank().height(Theme.detailTop).width('100%')
             if (this.route.section === 0) { this.overview() }
             else if (this.route.section === 1) { this.plans() }
-            else if (this.route.section === 2) { EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
             else { this.reminders() }
           } else {
             ForEach(this.modules(), (module: DayModule) => { this.dayModule(module) }, (module: DayModule) => module.id)
@@ -317,6 +333,7 @@ export struct EventDetail {
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top)
         .onAreaChange((_, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreScroll(); } })
         .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset; } })
+      }
     }.width('100%').height('100%')
       .bindSheet(this.linking || this.configuring || this.recording || this.viewing, this.activeSheet(), this.sheetOptions())
   }

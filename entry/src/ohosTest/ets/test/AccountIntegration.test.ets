@@ -9,8 +9,10 @@ export default function accountIntegrationTest(): void {
       const driver = Driver.create(); const bundle = 'top.rayawa.elvacos';
       await driver.waitForComponent(ON.id('main-tabs').inWindow(bundle), 5000);
       await (await driver.findWindow({ bundleName: bundle })).focus();
+      const homes = await driver.findComponents(ON.text('首页').inWindow(bundle));
+      await homes[homes.length - 1].click(); await driver.delayMs(350);
       const signedIn = getApplicationState().account.signedIn;
-      await (await driver.findComponent(ON.id('root-action-设置').inWindow(bundle))).click(); await driver.delayMs(600);
+      await (await driver.findComponent(ON.id('root-action-我的').inWindow(bundle))).click(); await driver.delayMs(600);
       expect(!!(await driver.findComponent(ON.id('settings-scroll').inWindow(bundle)))).assertTrue();
       expect((await driver.findComponents(ON.text('华为账号').inWindow(bundle))).length).assertEqual(0);
       expect((await driver.findComponents(ON.text('登录').inWindow(bundle))).length).assertEqual(0);

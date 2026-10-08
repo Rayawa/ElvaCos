@@ -47,7 +47,7 @@ export class SystemCapability {
           materialLevel: level,
         } : undefined,
       },
-      content: { title: { mainTitle: title, mainTitleSize: HDS_TITLE_SIZE_SMALL, mainTitleAccessibilityText: title }, stackBuilder: segment, menu: { value: menus } },
+      content: { title: { mainTitle: title, mainTitleSize: HDS_TITLE_SIZE_SMALL, mainTitleAccessibilityText: title }, stackBuilder: segment, menu: { value: menus, maxCount: 3 } },
     };
     if (backAction !== undefined && options.content !== undefined) {
       // 与 Dashboard AppDetailPage 一致：返回按钮走调用方动作，保证返回振动与栈操作不被 HDS 默认行为吞掉。

@@ -115,7 +115,7 @@ export struct AssetDetail {
   build() {
     Scroll(this.scroller) {
       Column({ space: Theme.sectionSpacing }) {
-        Blank().height(this.segmented() ? Theme.detailTopWithSegment : Theme.detailTop).width('100%')
+        Blank().height(this.segmented() ? Theme.detailTop : Theme.detailTop).width('100%')
         this.heading()
         if (this.route.section === 0 || !this.segmented()) { this.facts() }
         if (this.route.section === 1 || !this.segmented()) { this.uses() }

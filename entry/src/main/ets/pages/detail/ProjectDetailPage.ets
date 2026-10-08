@@ -3,7 +3,7 @@ import { WorkCard } from '../../component/WorkCard';
 import { formatTimestamp } from '../../common/format';
 import { DiaryEntry } from '../../model/Entities';
 import { ProjectStatus } from '../../model/Entities';
-import { EntryCollection } from '../../component/EntryCollection';
+import { EntryCollectionView } from '../../component/EntryCollectionView';
 import { budgetLabel } from '../../model/PlanReadiness';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_LABELS, PROJECT_STATUSES } from '../../common/constants';
 import { PressFeedback } from '../../common/pressFeedback';
@@ -430,6 +430,10 @@ export struct ProjectDetail {
   @Builder contextSheet() {
     Column({ space: 16 }) {
       SheetHeader({ title: this.route.contextSheet === 'team' ? '团队分工' : this.route.contextSheet === 'references' ? '准备参考图' : this.route.contextSheet === 'records' ? '计划记录' : '计划收录', haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: 48, close: (): void => { this.route.contextSheet = ''; } })
+      if (this.route.contextSheet === 'entries') {
+        EntryCollectionView({ state: this.state, route: this.route.entries, componentId: 'project-entries-scroll', active: this.route.contextSheet === 'entries',
+          restoreVersion: this.route.restoreVersion, open: (kind: string, id: string): void => { this.open(kind, id); } }).layoutWeight(1)
+      } else {
       Scroll() {
         Column({ space: 14 }) {
           if (this.route.contextSheet === 'team') { this.team() }
@@ -445,9 +449,10 @@ export struct ProjectDetail {
           }
           else if (this.route.contextSheet === 'references') {
             ReferenceGallery({ state: this.state, images: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id), add: (): void => { this.state.importReferences(this.project.id); }, open: (id: string): void => { this.open('reference', id); } })
-          } else { EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } }) }
+          }
         }.width('100%').alignItems(HorizontalAlign.Start)
       }.layoutWeight(1).width('100%')
+      }
     }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
   }
   @Builder team() {
@@ -534,7 +539,7 @@ export struct ProjectDetail {
   }
 
   @Builder entryLink() {
-    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'entries'; })
+    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条').id('project-entry-link').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'entries'; })
   }
 
   @Builder packing() {

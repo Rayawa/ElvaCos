@@ -5,7 +5,7 @@
 ## 证据范围
 
 - 当前主包：`./scripts/build.sh`，33 tasks 编译通过。
-- 主机领域：DevEco 自带 Node 执行 `scripts/test_ux_models.cjs`，108 项通过。它执行实际模型与仓库，事务使用隔离 SQLite；原生服务、观察系统和 UI 生命周期被模拟，不能证明设备交互。
+- 主机领域：DevEco 自带 Node 执行 `scripts/test_ux_models.cjs`，109 项通过。它执行实际模型与仓库，事务使用隔离 SQLite；原生服务、观察系统和 UI 生命周期被模拟，不能证明设备交互。
 - UI：`UiShell.test.ets` 已加入官方驻留通知位置用例，`scripts/ui-test.sh` 期望同步为 14；最新 `./scripts/build.sh assembleHap ohosTest` 34 tasks 编译通过。测试包编译与 Hypium 执行分开记录；当前没有 14 项设备 Pass / Failure / Error 结果。
 - Schema v8 增量迁移已有上一工作包的 `test_schema.py` 20 项证据；本轮没有结构或颜色资源变化。真实个人数据库尚未由最新包执行 v8 迁移。
 - 可用性、设备、压力规模和发布检查见文末，不能用上述编译或主机检查替代。
@@ -14,17 +14,17 @@
 
 | 要求 | 当前源码与领域证据 | 尚缺的证据 / 工作 |
 |---|---|---|
-| H1：5 个一级入口 + 设置 | `constants.MAIN_PAGE_TITLES` 与 `Dashboard.mainTabs/rootMenus` 为首页 / 计划 / 日程 / 衣柜 / 相册，根页设置入口；旧 Me 页不再承担根导航 | 最新五入口与设置返回的设备结果 |
+| H1：5 个一级入口 + 首页我的 | `constants.MAIN_PAGE_TITLES` 与 `Dashboard.mainTabs/rootMenus` 为首页 / 计划 / 日程 / 衣柜 / 相册，仅首页的「我的」入口（含设置）；旧 Me 页不再承担根导航 | 最新五入口、我的入口范围与返回的设备结果 |
 | H2：收录原语；角色 ★ 收藏独立 | `CollectedEntry`、`EntryRepository`、Schema `entries`；`CharacterLibrary` 用 favorite 筛选，保留旧 Wishlist 存储；主机 capture / assignment / conversion / role favorite 用例 | 粘贴、原生图片 Picker 的完整设备路径 |
 | H3：唯一编辑家；3.3 / 3.6 | `Dashboard.edit` 统一 FormSession / FormEditor；相册与计划照片复用 PhotoGrid；ReferenceGallery、团队 / 日志 / 拍摄清单在归属对象内；搜索只跳转对象家 | 六条核心流程的真实点击与返回 |
-| H4：带上下文跳转；3.5 / 3.7 | Project / Event / Character / Asset / Album / PhotoViewer / Task / Ledger / Inbox / Search 路由保存运行时筛选和位置；EventReturnPath 保留跨 Tab 来源；删除仅修剪失效路由；主机检查搜索、相册、装备、收录、角色与日期上下文 | 最新滚动与焦点恢复；归属页收录 Sheet 的偏移保存还需逐处核对，不能把全局 Inbox 的结果外推 |
+| H4：带上下文跳转；3.5 / 3.7 | Project / Event / Character / Asset / Album / PhotoViewer / Task / Ledger / Inbox / Search 路由保存运行时筛选和位置；EventReturnPath 保留跨 Tab 来源；删除仅修剪失效路由；主机检查搜索、相册、装备、收录、角色与日期上下文 | 最新滚动与焦点恢复；EntryCollectionView 已共用于收录箱、计划 / 角色 Sheet 与活动收录页；已增补对应原生断言，实际结果仍待执行 |
 | H5：反向链接；3.4 | 角色履历含场次、日期、成片、花费、署名；计划概览含角色版本、活动日期来源、装备问题、团队、花费预算、参考图；活动含本场计划 / 收录；装备含使用计划与影响；相册含计划 / 成片 / 归档；收录显示归属；Ledger 显示时间 / 计划 / 分类 / 来源 | 各家实际可发现性与失效关联返回 |
 | H6：模型聚合一次 | `PlanReadiness`、TaskQueue、AlbumSummary、ProjectWork、LedgerSummary；主机独立准备 / 装包 / 装备 / 拍摄、日期、在途、照片与金额一致性检查 | 设备上的数字与刷新时序 |
 | H7：保存失败与刷新失败分开 | `OperationResult.executeOperation` / `AppState.performResult/reloadRecords`；实际仓库故障注入、批量、草稿、导入、替换与归档用例 | 原生持续错误、按钮锁定和结果播报 |
 | H8：入口自动退场 | DayMode 前夜 20:00、结束次日 00:00、跨日关闭与多活动排序检查；Dashboard 官方 HdsSnackBar 只在根页展示 | 设备定时退场、后台与 Sheet 生命周期、字体与安全区 |
 | H9：捕获不要求额外元数据 | `entryFromText` / `EntryCollection.capture`，类型、标题和归属无需预先填写；主机直接捕获 / 可选归位 / 转换检查 | 文字、链接、图片三种实际捕获路径 |
 | H10：复杂度抵消 | 规格第 11 章；我的 Tab 与衣柜照片分支已移除；无新增 Tab，搜索复用既有编辑家，今天模块按数据出现 | 不另加规格外目的地；设备流程继续核对 |
-| 3.8：标题分段 | 计划四段、活动平时四段 / 今天两段、角色三段、装备按内容两段、相册两段、计划列表三段、搜索四段；首页不分段 | 原生标题与分段布局，窄窗与大字 |
+| 3.8：原生页签优先 | 二级计划四视图、活动平时四视图 / 今天两视图、角色三视图、装备按内容两视图、范围相册两视图、搜索四视图为真实 HdsTabs；根计划 / 日程 / 相册仍为标题分段；首页不分段 | 原生标题操作与底部页签位置、切换 / 外部跳转同步，窄窗与大字 |
 
 ## 页面 4
 
@@ -37,11 +37,11 @@
 | 4.5 日程 | ScheduleRoute / EventsPage / EventCalendar：列表 / 月历共用日期、多日持续、日期待定、真实任务截止；主机分组、跨年月份、勾选稳定性检查 | 原生日历点击、跨 Tab 返回；通知与设备日历见发布边界 |
 | 4.6 衣柜 | Wardrobe 搜索 / 类型 / 状态 / 位置；AssetUsage 真实共享状态与删除影响；AssetDetail 使用计划 / 加入 / 解除；实际 SQL 原子关联 / 删除 / 失败回滚检查 | 归属装备、返回原行、控件面积；不新增库存或归还日期 |
 | 4.7 相册 | AlbumRoute 两模式、状态筛选与作品集；PhotoCollection 当前范围选择、提交锁定、失败保留；PhotoImport 进度 / 去重 / 部分失败 / 取消；MediaRepository 与 ManagedImage 区分路径 / 文件 / 权限 / 缩略图错误；300 来源顺序导入主机检查 | 真正 300 张媒体 Picker、取消与修复，原图退出原缩略图；惰性消费不等于已测大规模性能 |
-| 4.8 收录箱 | EntryCollection + InboxPage：捕获、类型、未归位、对象归属、任务 / 花费 / 参考图转换；实际事务失败保留源记录 | 归属页 Sheet 偏移、媒体离线与归位交互 |
+| 4.8 收录箱 | EntryCollection + EntryCollectionView + InboxPage：捕获、类型、未归位、对象归属、任务 / 花费 / 参考图转换；实际事务失败保留源记录 | 归属页 Sheet 偏移、媒体离线与归位交互 |
 | 4.9 角色 | CharacterLibrary / CharacterRoute / CharacterDetail：搜索收藏、资料 / 履历 / 参考图、常驻新建计划并带版本；主机版本归属、收藏失败、历史日期检查 | 三段返回、版本上下文与读屏 |
 | 4.10 花费与数据 | LedgerSummary 单一范围生成金额、分类、趋势、明细与预算覆盖；FormEditor 全局记账显式选计划；Ledger 先测量再恢复偏移；相册分布是状态统计 | 表单键盘、明细编辑返回与图表输入；不冒充完成时间趋势 |
 | 4.11 作品卡 | ProjectWork / WorkCard / ShareService 共用 ProjectShareObject v2；日期 / 成片 / 费用 / 署名 / 当前衣柜原值真实，未知保持未知；主机分享拒绝与路径排除检查 | 原生系统文本分享；图片导出按规格留作增强 |
-| 4.12 设置与数据 | SettingsPage、BackupRestoreSheet：本机范围、媒体限制、成功导出时间；校验预览 → 可先导出 → 最终替换确认 → 事务结果；主机非法文件、短写、取消、回滚与已提交不重放检查 | 原生文件 Picker、替换确认 / 应用中断恢复；不使用个人数据测试替换 |
+| 4.12 我的（设置与数据） | 首页唯一入口、Dashboard 风格应用身份 / 偏好 / 帮助布局；SettingsPage、BackupRestoreSheet：本机范围、媒体限制、成功导出时间；校验预览 → 可先导出 → 最终替换确认 → 事务结果；主机非法文件、短写、取消、回滚与已提交不重放检查 | 原生文件 Picker、替换确认 / 应用中断恢复；不使用个人数据测试替换 |
 
 ## 原语、今天模式与数据 5–8
 

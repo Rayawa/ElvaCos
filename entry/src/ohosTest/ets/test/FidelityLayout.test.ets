@@ -91,7 +91,7 @@ export default function fidelityLayoutTest(): void {
       }
       await tap('衣柜');
       expect((await driver.findComponents(ON.id('secondary-segment-3').inWindow(bundle))).length).assertEqual(0);
-      const gear = await driver.findComponent(ON.id('root-action-设置').inWindow(bundle)); const gearBefore = await gear.getBounds();
+      const gear = await driver.findComponent(ON.id('root-action-添加装备').inWindow(bundle)); const gearBefore = await gear.getBounds();
       await scrollBody(); sameRect(gearBefore, await gear.getBounds()); sameRect(baselineTabs, await tabs());
     });
     it('albumLastPhotoClearsFloatingTabsAndRepeatedTabReturnsToTop', 0, async () => {
@@ -140,15 +140,15 @@ export default function fidelityLayoutTest(): void {
       await tap('sheet-close');
       expect((await driver.findComponents(ON.text('添加角色').inWindow(bundle))).length > 0).assertTrue(); await back();
     });
-    it('planTaskSegmentsAndTitleActionsStayFixedAndReturnToTheSelectedView', 0, async () => {
+    it('nativePlanViewTabsAndTitleActionsStayFixedAndReturnToTheSelectedView', 0, async () => {
       await tap('计划'); await tap('进行中');
       const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
       if (!plans || plans.length === 0) { return; }
       await plans[0].click(); await driver.delayMs(800);
-      const segment = await driver.findComponent(ON.id('project-task-segment').inWindow(bundle));
+      const segment = await driver.findComponent(ON.id('project-view-tabs-0').inWindow(bundle));
       const baseline = await segment.getBounds();
       const window = await (await driver.findWindow({ bundleName: bundle })).getBounds();
-      expect(Math.abs((baseline.right - baseline.left) - (window.right - window.left) * 0.5) <= 2).assertTrue();
+      expect(baseline.bottom < window.bottom && baseline.top > window.top + (window.bottom - window.top) * 0.5).assertTrue();
       let actionTop: number = 0;
       let actionBottom: number = 0;
       const sections = ['准备', '打包', '照片'];
@@ -159,7 +159,7 @@ export default function fidelityLayoutTest(): void {
         expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
         const action = await driver.findComponent(ON.id('detail-action-' + actions[index]).inWindow(bundle));
         const bar = await action.getBounds();
-        expect(bar.top < baseline.bottom && bar.bottom > baseline.top).assertTrue();
+        expect(bar.bottom < baseline.top && bar.top > window.top).assertTrue();
         if (index === 0) { actionTop = bar.top; actionBottom = bar.bottom; }
         else { expect(bar.top).assertEqual(actionTop); expect(bar.bottom).assertEqual(actionBottom); }
         await scrollBody(0.5);
@@ -172,15 +172,15 @@ export default function fidelityLayoutTest(): void {
       for (const photo of photos || []) {
         const bounds = await photo.getBounds();
         const center = (bounds.top + bounds.bottom) / 2;
-        if (center <= baseline.bottom + 24 || center >= window.bottom - 48) { continue; }
+        if (center <= window.top + 120 || center >= baseline.top - 8) { continue; }
         await (await driver.findWindow({ bundleName: bundle })).focus();
         await photo.click(); await driver.delayMs(500);
         if (!(await driver.waitForComponent(ON.text('照片工作流').inWindow(bundle), 3000))) { throw new Error('Visible photo did not open its detail'); }
-        expect(((await driver.findComponents(ON.id('project-task-segment').inWindow(bundle)))?.length || 0)).assertEqual(0);
+        expect(((await driver.findComponents(ON.id('project-view-tabs-0').inWindow(bundle)))?.length || 0)).assertEqual(0);
         await back();
-        sameRect(baseline, await (await driver.findComponent(ON.id('project-task-segment').inWindow(bundle))).getBounds());
+        sameRect(baseline, await (await driver.findComponent(ON.id('project-view-tabs-0').inWindow(bundle))).getBounds());
         // The photo list preserves its scroll position when returning.
-        const segmentAfter = await driver.findComponent(ON.id('project-task-segment').inWindow(bundle));
+        const segmentAfter = await driver.findComponent(ON.id('project-view-tabs-0').inWindow(bundle));
         sameRect(baseline, await segmentAfter.getBounds());
         const returnedPhotos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
         let restoredPosition: boolean = false;

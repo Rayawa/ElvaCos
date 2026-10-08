@@ -48,7 +48,7 @@ import { Icons } from '../common/Icons';
 import { SheetHeader } from '../component/SheetHeader';
 import { LengthMetrics, SegmentButtonV2Items, SegmentButtonV2ItemOptions } from '@kit.ArkUI';
 import { HdsTitleBarSegment } from '../component/HdsTitleBarSegment';
-import { HdsActionTabs } from '../component/HdsActionTabs';
+import { HdsViewTabs } from '../component/HdsViewTabs';
 import { HapticService } from '../common/HapticService';
 import { ProjectRoute } from '../model/ProjectRoute';
 import { EditDraft } from '../model/EditDraft';
@@ -286,13 +286,6 @@ import { EmptyState } from '../component/Surfaces';
     return [{ content: { label: '编辑活动', icon: Icons.edit, isEnabled: !this.state.busy, action: (): void => { this.edit('event', route.id); } } },
       { content: { label: '删除活动', icon: Icons.remove, isEnabled: !this.state.busy, action: (): void => { this.remove('event', route.id); } } }];
   }
-  @Builder eventSegment(route: EventRoute) {
-    HdsTitleBarSegment({ componentId: 'event-detail-segment', items: this.buildSegmentItems(['概览', '本场计划', '收录', '提醒']), selectedIndexes: [route.section],
-      minimumTargetHeight: 48, segmentHeight: 56, experimentalHeight: 60,
-      experimentalWidth: Math.max(240, Math.min(460, this.viewportWidth - 100)),
-      onSelectedIndexChanged: (section: number): void => { route.section = section; },
-      onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
-  }
   @Builder eventContent(route: EventRoute, entrance: StaggerEntrance) {
     if (this.state.events.some((event: CosEvent) => event.id === route.id)) {
       EventDetail({ state: this.state, event: this.state.events.find((event: CosEvent) => event.id === route.id) as CosEvent, route: route, entrance: entrance,
@@ -305,8 +298,8 @@ import { EmptyState } from '../component/Surfaces';
   }
   @Builder scheduleDestination(kind: string, param: Object) {
     if (kind === 'event') {
-      DetailDestination({ customTitle: (param as EventRoute).dayMode, titleOptions: SystemCapability.titleBar((param as EventRoute).dayMode ? '今天模式' : '', this.state.settings.effects, this.state.settings.materialLevel,
-        (param as EventRoute).dayMode ? undefined : (): void => { this.eventSegment(param as EventRoute); }, this.eventMenus(param as EventRoute), false, (): void => { this.closeEvent(param as EventRoute); }),
+      DetailDestination({ customTitle: (param as EventRoute).dayMode, titleOptions: SystemCapability.titleBar((param as EventRoute).dayMode ? '今天模式' : this.destinationTitle('event', (param as EventRoute).id), this.state.settings.effects, this.state.settings.materialLevel,
+        undefined, this.eventMenus(param as EventRoute), false, (): void => { this.closeEvent(param as EventRoute); }),
         back: (): void => { this.closeEvent(param as EventRoute); }, shown: (): void => { (param as EventRoute).restoreVersion++; }, content: this.eventContent.bind(this, param as EventRoute) })
     }
   }
@@ -470,7 +463,7 @@ import { EmptyState } from '../component/Surfaces';
           PhotoGrid({
             entrance: entrance,
             state: this.state,
-            topInset: Theme.detailTopWithSegment,
+            topInset: Theme.detailTop,
             bottomInset: Theme.contentBottom,
             sidePadding: Theme.pagePadding,
             route: (param as ProjectRoute).photos, from: 'project',
@@ -485,7 +478,7 @@ import { EmptyState } from '../component/Surfaces';
             entrance: entrance,
             state: this.state,
             route: param as ProjectRoute,
-            topInset: Theme.detailTopWithSegment,
+            topInset: Theme.detailTop,
             project: this.state.projects.find((p: CosProject) => p.id === (param as ProjectRoute).id) as CosProject,
             open: (k: string, id: string) => this.open(k, id),
             edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
@@ -528,7 +521,46 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%')
   }
 
+  private viewLabels(kind: string, param: Object): string[] {
+    if (kind === 'project') { return ['概览', '准备', '打包', '照片']; }
+    if (kind === 'character') { return ['资料', '履历', '参考图']; }
+    if (kind === 'asset' && this.assetSegmented(param as AssetRoute)) { return ['资料', '使用计划']; }
+    if (kind === 'album') { return ['按场次', '待处理']; }
+    if (kind === 'search') { return SEARCH_SECTIONS; }
+    return [];
+  }
+  private viewIcons(kind: string): Resource[] {
+    if (kind === 'project') { return [Icons.home, Icons.check, Icons.library, Icons.importPhoto]; }
+    if (kind === 'character') { return [Icons.profile, Icons.plan, Icons.importPhoto]; }
+    if (kind === 'asset') { return [Icons.library, Icons.plan]; }
+    if (kind === 'album') { return [Icons.importPhoto, Icons.check]; }
+    return [Icons.plan, Icons.profile, Icons.event, Icons.library];
+  }
+  private viewIndex(kind: string, param: Object): number {
+    if (kind === 'project') { return (param as ProjectRoute).section; }
+    if (kind === 'character') { return (param as CharacterRoute).section; }
+    if (kind === 'asset') { return (param as AssetRoute).section; }
+    if (kind === 'album') { return (param as AlbumRoute).mode === 'queue' ? 1 : 0; }
+    return (param as SearchRoute).section;
+  }
+  private changeView(kind: string, param: Object, index: number): void {
+    if (kind === 'project') { const route = param as ProjectRoute; route.section = index; route.outing = false; this.state.suspend(); }
+    else if (kind === 'character') { (param as CharacterRoute).section = index; }
+    else if (kind === 'asset') { (param as AssetRoute).section = index; }
+    else if (kind === 'album') { (param as AlbumRoute).showMode(index ? 'queue' : 'byPlan'); }
+    else { (param as SearchRoute).setSection(index); }
+  }
   @Builder destinationBody(kind: string, param: Object, entrance: StaggerEntrance) {
+    if (this.viewLabels(kind, param).length > 0) {
+      HdsViewTabs({ labels: this.viewLabels(kind, param), icons: this.viewIcons(kind), selectedIndex: this.viewIndex(kind, param),
+        componentId: kind + '-view-tabs', effects: this.state.settings.effects, materialLevel: this.state.settings.materialLevel,
+        availableWidth: this.viewportWidth, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+        changed: (index: number): void => { this.changeView(kind, param, index); },
+        content: this.destinationPage.bind(this, kind, param, entrance) })
+    } else { this.destinationPage(kind, param, entrance) }
+  }
+
+  @Builder destinationPage(kind: string, param: Object, entrance: StaggerEntrance) {
     if (kind === 'search') {
       SearchPage({ state: this.state, route: param as SearchRoute, open: (hit: SearchHit): void => { this.openSearchResult(param as SearchRoute, hit); }, library: (): void => { this.open('characters', 'all'); } })
     } else if (kind === 'characters') {
@@ -561,12 +593,7 @@ import { EmptyState } from '../component/Surfaces';
     } else if (kind === 'developer') {
       DevPage({ entrance: entrance, state: this.state })
     } else {
-      HdsActionTabs({
-        items: this.detailTools(kind, param), effects: this.state.settings.effects,
-        materialLevel: this.state.settings.materialLevel, availableWidth: this.viewportWidth,
-        busy: this.state.busy, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
-        content: (): void => { this.detailContent(kind, param, entrance); },
-      })
+      this.detailContent(kind, param, entrance)
     }
   }
 
@@ -582,11 +609,11 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' || kind === 'album' || kind === 'character' || kind === 'asset' && this.assetSegmented(param as AssetRoute) ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'asset' ? (param as AssetRoute).id : param as string),
+          kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'project' ? (param as ProjectRoute).id : kind === 'character' ? (param as CharacterRoute).id : kind === 'asset' ? (param as AssetRoute).id : param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
-          kind === 'search' ? (): void => { this.searchSegment(param as SearchRoute); } : kind === 'character' ? (): void => { this.characterSegment(param as CharacterRoute); } : kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
-          kind === 'character' ? this.characterMenus(param as CharacterRoute) : kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
+          undefined,
+          kind === 'character' ? this.characterMenus(param as CharacterRoute) : kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'reference' ? this.referenceMenus(param as string) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
@@ -619,7 +646,7 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'album') { return '相册'; }
     if (kind === 'characters') { return '角色库'; }
     if (kind === 'privacy') { return '隐私政策'; }
-    if (kind === 'settings') { return '设置'; }
+    if (kind === 'settings') { return '我的'; }
     if (kind === 'developer') { return DEVELOPER_PAGE_TITLE; }
     if (kind === 'reference') { return '准备参考图'; }
     if (kind === 'expenseStats') { return '花费统计'; }
@@ -693,6 +720,7 @@ import { EmptyState } from '../component/Surfaces';
     if (index === 2) { return [{ value: '添加活动', icon: Icons.add, action: (): void => { this.edit('event'); } }]; }
     if (index === 3) { return [{ value: '添加装备', icon: Icons.add, action: (): void => { this.edit('asset'); } }]; }
     if (index === 4) { return [{ value: '导入照片', icon: Icons.importPhoto, action: (): void => { this.chooseImport(this.albumRoute.collection.planId); } }]; }
+    if (index === 0) { return []; }
     return [{ value: '新建计划', icon: Icons.add, action: (): void => { this.edit('project'); } }];
   }
   private rootMenus(index: number): HdsNavigationMenuItemOptions[] {
@@ -700,32 +728,13 @@ import { EmptyState } from '../component/Surfaces';
     const menus = this.rootTools(index).map((item: ToolbarItem): HdsNavigationMenuItemOptions => {
       return { content: { label: item.value, icon: item.icon as Resource, isEnabled: enabled, action: item.action, componentId: 'root-action-' + item.value } };
     });
-    menus.push({ content: { label: '设置', componentId: 'root-action-设置', icon: Icons.settings, isEnabled: this.state.ready && !this.state.busy,
-      action: (): void => { this.open('settings', 'settings'); } } });
+    if (index === 0) {
+      menus.push({ content: { label: '我的', componentId: 'root-action-我的', icon: Icons.profile, isEnabled: this.state.ready && !this.state.busy,
+        action: (): void => { this.open('settings', 'settings'); } } });
+    }
     return menus;
   }
 
-  @Builder projectSegment(route: ProjectRoute) {
-    Column() {
-      HdsTitleBarSegment({
-        componentId: 'project-task-segment',
-        items: this.buildSegmentItems(['概览', '准备', '打包', '照片']),
-        selectedIndexes: [route.section],
-        experimentalWidth: Theme.titleSegmentWidth,
-        onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); },
-        onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); },
-      }).margin({ top: 8 })
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
-  }
-
-  @Builder searchSegment(route: SearchRoute) {
-    HdsTitleBarSegment({ componentId: 'search-segment', items: this.buildSegmentItems(SEARCH_SECTIONS), selectedIndexes: [route.section], minimumTargetHeight: 48,
-      onSelectedIndexChanged: (section: number): void => { route.setSection(section); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
-  }
-  @Builder characterSegment(route: CharacterRoute) {
-    HdsTitleBarSegment({ componentId: 'character-detail-segment', items: this.buildSegmentItems(['资料', '履历', '参考图']), selectedIndexes: [route.section], minimumTargetHeight: 48,
-      onSelectedIndexChanged: (section: number): void => { route.section = section; } })
-  }
   private characterMenus(route: CharacterRoute): HdsNavigationMenuItemOptions[] {
     if (!this.state.characters.some((character: Character) => character.id === route.id)) { return []; }
     const enabled = !this.state.busy && !this.state.staleScopes.length;
@@ -736,20 +745,11 @@ import { EmptyState } from '../component/Surfaces';
     const asset = this.state.assets.find((item: Asset) => item.id === route.id);
     return !!asset && (route.section === 1 || assetUsesSegments(asset, this.state.assetUsage(route.id)));
   }
-  @Builder assetSegment(route: AssetRoute) {
-    HdsTitleBarSegment({ componentId: 'asset-detail-segment', items: this.buildSegmentItems(['资料', '使用计划']), selectedIndexes: [route.section], minimumTargetHeight: 48,
-      onSelectedIndexChanged: (section: number): void => { route.section = section; } })
-  }
   private assetMenus(route: AssetRoute): HdsNavigationMenuItemOptions[] {
     if (!this.state.assets.some((asset: Asset) => asset.id === route.id)) { return []; }
     const enabled = !this.state.busy && !this.state.staleScopes.length;
     return [{ content: { label: '编辑装备', icon: Icons.edit, isEnabled: enabled, action: (): void => { this.edit('asset', route.id); } } },
       { content: { label: '删除装备', icon: Icons.remove, isEnabled: enabled, action: (): void => { void this.remove('asset', route.id); } } }];
-  }
-  @Builder albumSegment(route: AlbumRoute) {
-    HdsTitleBarSegment({ componentId: 'album-mode-segment', items: this.buildSegmentItems(['按场次', '待处理']), selectedIndexes: [route.mode === 'queue' ? 1 : 0],
-      experimentalWidth: Theme.titleSegmentWidth, minimumTargetHeight: 48,
-      onSelectedIndexChanged: (section: number): void => { route.showMode(section ? 'queue' : 'byPlan'); }, onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
   }
   @Builder projectPhotoHeader(route: ProjectRoute) {
     ProjectPhotoHeader({ state: this.state, route: route,
@@ -786,34 +786,14 @@ import { EmptyState } from '../component/Surfaces';
     return tools.map((item: ToolbarItem): HdsNavigationMenuItemOptions => { return { content: { label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy && !this.state.staleScopes.length, action: item.action, componentId: 'detail-action-' + item.value } }; });
   }
 
-  private detailTools(kind: string, param: Object): ToolbarItem[] {
-    const id = kind === 'project' ? (param as ProjectRoute).id : param as string;
-    if (kind === 'settings') { return []; }
-    if (kind === 'developer') { return []; }
-    if (kind === 'reference') {
-      return [
-        { value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => this.referenceCover(id) },
-        { value: '编辑说明', icon: Icons.edit, action: () => this.edit('reference', id) },
-        { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
-      ];
-    }
-    if (kind === 'character') { return []; }
-    if (kind === 'asset') { return []; }
-    return [{
-      value: '选中照片', icon: Icons.check, action: () => {
-        const photo = this.state.photos.find((p: PhotoAsset) => p.id === id);
-        if (photo) {
-          this.state.setPhotoStatus(photo, PhotoStatus.SELECTED);
-        }
-      }
-    }, {
-      value: '设为封面', symbolIcon: Icons.toolbarCover(), action: () => {
-        const photo = this.state.photos.find((p: PhotoAsset) => p.id === id);
-        if (photo) {
-          this.setCover(photo);
-        }
-      }
-    }, { value: '删除', icon: Icons.remove, action: () => this.remove('photo', id) }];
+  private referenceMenus(id: string): HdsNavigationMenuItemOptions[] {
+    if (!this.state.references.some((reference: ReferenceImage) => reference.id === id)) { return []; }
+    const enabled = !this.state.busy && !this.state.staleScopes.length;
+    return [
+      { content: { label: '设为封面', icon: Icons.importPhoto, isEnabled: enabled, action: (): void => { this.referenceCover(id); } } },
+      { content: { label: '编辑说明', icon: Icons.edit, isEnabled: enabled, action: (): void => { this.edit('reference', id); } } },
+      { content: { label: '删除', icon: Icons.remove, isEnabled: enabled, action: (): void => { void this.remove('reference', id); } } },
+    ];
   }
 
   private segmentLabels(index: number): string[] {

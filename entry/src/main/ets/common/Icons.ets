@@ -14,6 +14,7 @@ export class Icons {
   static plan: Resource = $r('sys.media.ohos_ic_public_edit');
   static event: Resource = $r('sys.media.ohos_ic_public_clock');
   static library: Resource = $r('sys.media.rectangle_filled_and_line_horizontal_and_rectangle');
+  static profile: Resource = $r('sys.media.person_badge_waveform');
   static settings: Resource = $r('sys.symbol.gearshape');
 
   // 设置页列表项图标（app.media，浅/深各一版）

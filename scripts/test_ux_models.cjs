@@ -971,6 +971,27 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal((await db.sql('SELECT count(*) FROM characters')).rows[0][0], 1); assert.equal((await db.sql('SELECT count(*) FROM variants')).rows[0][0], 1);
     } finally { db.close(); }
   });
+  await test('activity replacement explains one-event ownership and effective date before actual persistence, while explicit dates survive reassociation', async () => {
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository, CosEventRepository, CharacterRepository, DiaryEntryRepository }=require(root+'/data/repository/Repositories.ets');
+    try {
+      state.projectRepo=new CosProjectRepository(db); state.eventRepo=new CosEventRepository(db); state.characterRepo=new CharacterRepository(db); state.diaryRepo=new DiaryEntryRepository(db);
+      for(const [id,name,date,dateMode] of [['old-event','原场次','2026-10-08','single'],['new-event','新场次','2026-10-10','single'],['pending-event','日期待定场次','','pending']]) await state.eventRepo.save(Object.assign(new CosEvent(),{id,name,date,dateMode}));
+      await db.sql("UPDATE projects SET event_id='old-event' WHERE id='p1'");
+      state.refresh=async()=>{state.projects=await state.projectRepo.list(); state.events=await state.eventRepo.list(); state.characters=await state.characterRepo.list(); state.diary=await state.diaryRepo.list();}; await state.refresh();
+      let draft=EditDraft.make(state,'project','p1'); assert.equal(draft.eventAssociationHint(state),''); draft.eventId='new-event';
+      let hint=draft.eventAssociationHint(state); for(const text of ['替换原活动','原场次','新场次','只关联一场活动','2026-10-10']) assert.ok(hint.includes(text),text);
+      assert.equal(state.readiness('p1').date,'2026-10-08'); assert.equal((await db.sql("SELECT event_id FROM projects WHERE id='p1'")).rows[0][0],'old-event');
+      assert.equal(await draft.save(state),true); assert.equal(state.readiness('p1').date,'2026-10-10'); assert.equal(draft.eventAssociationHint(state),'');
+      assert.equal((await db.sql('SELECT count(*) FROM events')).rows[0][0],3); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0],3);
+      draft=EditDraft.make(state,'project','p1'); draft.eventId='old-event'; draft.date='2026-10-12'; assert.match(draft.eventAssociationHint(state),/继续使用填写的目标日期 2026-10-12/);
+      assert.equal(await draft.save(state),true); assert.equal(state.readiness('p1').date,'2026-10-12'); assert.equal(state.readiness('p1').dateFromEvent,false);
+      draft=EditDraft.make(state,'project','p1'); draft.eventId=''; draft.date=''; assert.match(draft.eventAssociationHint(state),/解除/); assert.match(draft.eventAssociationHint(state),/显示为待定/);
+      assert.equal(await draft.save(state),true); assert.equal(state.readiness('p1').date,''); assert.deepEqual((await db.sql("SELECT event_id,target_date FROM projects WHERE id='p1'")).rows[0],[null,'']);
+      draft=EditDraft.make(state,'project','p1'); draft.eventId='pending-event'; assert.match(draft.eventAssociationHint(state),/日期将显示为待定/);
+      draft.eventId='missing'; assert.match(draft.eventAssociationHint(state),/已不存在/); assert.ok(draft.issues(state).some(issue=>issue.field==='eventId'));
+      assert.equal((await db.sql("SELECT event_id FROM projects WHERE id='p1'")).rows[0][0],null);
+    } finally { db.close(); }
+  });
   await test('named removal confirmation counts match actual plan cascades and keep reassigned collections and shared wardrobe records', async () => {
     const { db, state, repo } = await shotsFixture();
     const { CosProjectRepository, PhotoAssetRepository, DiaryEntryRepository, CharacterRepository } = require(root+'/data/repository/Repositories.ets');

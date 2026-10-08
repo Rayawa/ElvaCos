@@ -34,7 +34,7 @@ export struct SearchPage {
     List({ space: 12, scroller: this.scroller }) {
       ListItem() {
         Column({ space: 12 }) {
-          Blank().height(Theme.detailTopWithSegment).width('100%')
+          Blank().height(Theme.detailTop).width('100%')
           DashboardSearch({ value: this.route.query, placeholder: '输入名称、说明或地点', label: '全局搜索关键词', componentId: 'global-search-input', changed: (value: string): void => { this.route.setQuery(value); } })
           if (this.route.section === 3) {
             Select(SEARCH_RESOURCE_LABELS.map((value: string): SelectOption => { return { value: value }; }))

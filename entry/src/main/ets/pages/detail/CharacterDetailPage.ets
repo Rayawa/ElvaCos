@@ -1,4 +1,4 @@
-import { EntryCollection } from '../../component/EntryCollection';
+import { EntryCollectionView } from '../../component/EntryCollectionView';
 import { SheetHeader } from '../../component/SheetHeader';
 import { appSheetOptions } from '../../common/sheet';
 import { StaggerEntrance, pageTransition } from '../../common/motion';
@@ -91,14 +91,13 @@ export struct CharacterDetail {
   @Builder entriesSheet() {
     Column({ space: 14 }) {
       SheetHeader({ title: '角色收录', hint: this.character.name, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => { this.route.entriesOpen = false; } })
-      Scroll() {
-        EntryCollection({ state: this.state, route: this.route.entries, open: (kind: string, id: string): void => { this.open(kind, id); } })
-      }.layoutWeight(1).width('100%')
+      EntryCollectionView({ state: this.state, route: this.route.entries, componentId: 'character-entries-scroll', active: this.route.entriesOpen,
+        restoreVersion: this.route.restoreVersion, open: (kind: string, id: string): void => { this.open(kind, id); } }).layoutWeight(1)
     }.width('100%').height('100%').padding(Theme.pagePadding).backgroundColor(Theme.surface)
   }
   build() {
     Column({ space: 12 }) {
-      Blank().height(Theme.detailTopWithSegment).width('100%')
+      Blank().height(Theme.detailTop).width('100%')
       Column({ space: 8 }) { this.header() }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: Theme.pagePadding, right: Theme.pagePadding })
       Scroll(this.scroller) {
         Column({ space: Theme.sectionSpacing }) {
