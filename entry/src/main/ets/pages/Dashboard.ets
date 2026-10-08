@@ -1,3 +1,4 @@
+import { CharacterRoute } from '../model/CharacterRoute';
 import { AssetRoute } from '../model/AssetRoute';
 import { WardrobeRoute, assetUsesSegments } from '../model/Wardrobe';
 import { AlbumRoute } from '../model/AlbumRoute';
@@ -138,6 +139,7 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
     if (this.detailStack.size() > 0) {
       const index = this.detailStack.size() - 1;
+      if (this.detailStack.getAllPathName()[index] === 'character') { (this.detailStack.getParamByIndex(index) as CharacterRoute).restoreSource(); }
       if (this.detailStack.getAllPathName()[index] === 'asset') { const route = this.detailStack.getParamByIndex(index) as AssetRoute; route.restoreSource(); this.tab = route.sourceTab; this.tabsController.changeIndex(route.sourceTab); }
       if (this.detailStack.getAllPathName()[index] === 'photo') { returnToPhotoCollection(this.detailStack.getParamByIndex(index) as PhotoViewerRoute, this.state.photos); }
       this.detailStack.pop();
@@ -148,6 +150,14 @@ import { EmptyState } from '../component/Surfaces';
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
     if (kind === 'asset') { this.openAsset(id); return; }
+    if (kind === 'character') {
+      const top = this.detailStack.size() - 1;
+      const project = top >= 0 && this.detailStack.getAllPathName()[top] === 'project' ? this.state.projects.find((item: CosProject) => item.id === (this.detailStack.getParamByIndex(top) as ProjectRoute).id) : undefined;
+      const route = new CharacterRoute(id, project?.characterId === id ? project.variantId : '');
+      if (project) { route.project = this.detailStack.getParamByIndex(top) as ProjectRoute; }
+      if (top >= 0 && this.detailStack.getAllPathName()[top] === 'characters') { route.library = this.detailStack.getParamByIndex(top) as PlanListRoute; route.library.anchorId = id; }
+      this.detailStack.pushPathByName('character', route); return;
+    }
     if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
     if (kind === 'album' || kind === 'albumQueue') { this.detailStack.pushPathByName('album', new AlbumRoute(id === 'all' ? '' : id, kind === 'albumQueue')); return; }
     if (kind === 'photo') { this.openPhoto(new PhotoViewerRoute(id, 'collection', new PhotoCollectionRoute(), this.state.photos)); return; }
@@ -161,6 +171,12 @@ import { EmptyState } from '../component/Surfaces';
       const projectId = id.slice(8); const current = this.detailStack.size() > 0 ? this.detailStack.getParamByIndex(this.detailStack.size() - 1) as ProjectRoute : undefined;
       if (current && current.id === projectId && this.detailStack.getAllPathName()[this.detailStack.size() - 1] === 'project') { current.contextSheet = 'entries'; }
       else { const route = new ProjectRoute(projectId); route.contextSheet = 'entries'; this.detailStack.pushPathByName('project', route); }
+      return;
+    }
+    if (kind === 'inbox' && id.startsWith('character|')) {
+      const characterId = id.slice(10); const top = this.detailStack.size() - 1;
+      if (top >= 0 && this.detailStack.getAllPathName()[top] === 'character' && (this.detailStack.getParamByIndex(top) as CharacterRoute).id === characterId) { (this.detailStack.getParamByIndex(top) as CharacterRoute).entriesOpen = true; }
+      else { const route = new CharacterRoute(characterId); route.entriesOpen = true; this.detailStack.pushPathByName('character', route); }
       return;
     }
     if (kind === 'inbox' && id.startsWith('event|')) { this.openEvent(id.slice(6), false, 2); return; }
@@ -251,12 +267,12 @@ import { EmptyState } from '../component/Surfaces';
     this.state.suspend();
     this.detailStack.pushPathByName('developer', 'developer');
   }
-  private edit(kind: string, id: string = '', parent: string = ''): void {
+  private edit(kind: string, id: string = '', parent: string = '', variant: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
     if (!this.state.staleScopes.length) { this.state.error = ''; }
     this.creatingForImport = false; this.pendingImportPlanId = '';
     this.rootSheetKind = 'form';
-    this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent), formDraftStore);
+    this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent, variant), formDraftStore);
     void this.formSession.initialize(this.state);
     this.formOpen = true;
   }
@@ -290,10 +306,10 @@ import { EmptyState } from '../component/Surfaces';
     }
   }
   private validDetailPath(name: string, param: Object, deletedKind: string = '', deletedId: string = ''): boolean {
-    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : name === 'photo' ? (param as PhotoViewerRoute).id : name === 'asset' ? (param as AssetRoute).id : param as string) === deletedId) { return false; }
+    if (name === deletedKind && (name === 'project' ? (param as ProjectRoute).id : name === 'photo' ? (param as PhotoViewerRoute).id : name === 'asset' ? (param as AssetRoute).id : name === 'character' ? (param as CharacterRoute).id : param as string) === deletedId) { return false; }
     if (name === 'project') { return this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id); }
     if (name === 'asset') { return this.state.assets.some((asset: Asset) => asset.id === (param as AssetRoute).id); }
-    if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as string)); }
+    if (name === 'character') { return this.state.characters.some((character: Character) => character.id === (param as CharacterRoute).id); }
     if (name === 'photo') { return this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id && !(deletedKind === 'project' && photo.projectId === deletedId)); }
     if (name === 'album') {
       (param as AlbumRoute).reconcile(this.state.projects, this.state.photos, deletedKind === 'project' ? deletedId : '');
@@ -308,6 +324,7 @@ import { EmptyState } from '../component/Surfaces';
     this.detailStack.getAllPathName().forEach((name: string, index: number): void => {
       const param = this.detailStack.getParamByIndex(index) as Object;
       if (!this.validDetailPath(name, param, deletedKind, deletedId)) {
+        if (name === 'character') { (param as CharacterRoute).restoreSource(true); }
         if (name === 'asset') { (param as AssetRoute).restoreSource(true); }
         if (name === 'photo') { (param as PhotoViewerRoute).context.feedback = '照片记录已不存在，已保留原范围与附近位置'; (param as PhotoViewerRoute).context.restoreVersion++; }
         indexes.push(index);
@@ -380,14 +397,15 @@ import { EmptyState } from '../component/Surfaces';
   @Builder detailContent(kind: string, param: Object, entrance: StaggerEntrance) {
     Column() {
       if (kind === 'character') {
-        CharacterDetail({
-          entrance: entrance,
-          state: this.state,
-          character: this.state.characters.find((c: Character) => c.id === (param as string)) || new Character(),
-          open: (k: string, id: string) => this.open(k, id),
-          edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
-          remove: (k: string, id: string) => this.remove(k, id)
-        })
+        if (this.state.characters.some((character: Character) => character.id === (param as CharacterRoute).id)) {
+          CharacterDetail({ entrance: entrance, state: this.state, route: param as CharacterRoute,
+            character: this.state.characters.find((character: Character) => character.id === (param as CharacterRoute).id)!,
+            open: (k: string, id: string): void => { this.open(k, id); },
+            edit: (k: string, id: string, parent: string): void => { this.edit(k, id, parent); },
+            createPlan: (characterId: string, variantId: string): void => { this.edit('project', '', characterId, variantId); },
+            remove: (k: string, id: string): void => { void this.remove(k, id); }
+          })
+        } else { EmptyState({ title: '角色已不存在', message: '返回继续查看已有资料。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTopWithSegment }) }
       }
       else if (kind === 'project') {
         if (!this.state.projects.some((project: CosProject) => project.id === (param as ProjectRoute).id)) {
@@ -458,7 +476,7 @@ import { EmptyState } from '../component/Surfaces';
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
     } else if (kind === 'album') {
       AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }, importPhotos: (id: string): void => { this.chooseImport(id); } })
-    } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo' || kind === 'asset') {
+    } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo' || kind === 'asset' || kind === 'character') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
       TasksPage({ state: this.state, route: param as TaskRoute, openItem: (item: TaskQueueItem): void => { this.openTaskItem(item); }, addPlan: (): void => { this.edit('project'); } })
@@ -500,15 +518,17 @@ import { EmptyState } from '../component/Surfaces';
         entranceSession: kind === 'settings' ? this.mainEntranceSession : undefined,
         entranceKey: kind === 'settings' ? SETTINGS_ENTRANCE_KEY : '',
         titleOptions: SystemCapability.titleBar(
-          kind === 'project' || kind === 'album' || kind === 'asset' && this.assetSegmented(param as AssetRoute) ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'asset' ? (param as AssetRoute).id : param as string),
+          kind === 'project' || kind === 'album' || kind === 'character' || kind === 'asset' && this.assetSegmented(param as AssetRoute) ? '' : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'asset' ? (param as AssetRoute).id : param as string),
           this.state.settings.effects,
           this.state.settings.materialLevel,
-          kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
-          kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
+          kind === 'character' ? (): void => { this.characterSegment(param as CharacterRoute); } : kind === 'project' ? (): void => { this.projectSegment(param as ProjectRoute); } : kind === 'album' ? (): void => { this.albumSegment(param as AlbumRoute); } : kind === 'asset' && this.assetSegmented(param as AssetRoute) ? (): void => { this.assetSegment(param as AssetRoute); } : undefined,
+          kind === 'character' ? this.characterMenus(param as CharacterRoute) : kind === 'project' ? this.projectMenus(param as ProjectRoute) : kind === 'album' ? [{ content: { label: '导入照片', icon: Icons.importPhoto, isEnabled: !this.state.busy, action: (): void => { this.chooseImport((param as AlbumRoute).collection.planId); } } }] : kind === 'asset' ? this.assetMenus(param as AssetRoute) : kind === 'photo' ? this.photoMenus(param as PhotoViewerRoute) : kind === 'expenseStats' ? [{ content: { label: '记一笔', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('expense', '', (param as LedgerRoute).projectId); } } }] : kind === 'characters' ? [{ content: { label: '添加角色', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { this.edit('character'); } } }] : [], false,
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
         shown: (): void => {
+          if (kind === 'characters') { (param as PlanListRoute).restoreVersion++; }
+          if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }
           if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
           if (kind === 'tasks') { (param as TaskRoute).restoreVersion++; }
           if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).outing) { this.state.resume(); } }
@@ -637,6 +657,16 @@ import { EmptyState } from '../component/Surfaces';
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
   }
 
+  @Builder characterSegment(route: CharacterRoute) {
+    HdsTitleBarSegment({ componentId: 'character-detail-segment', items: this.buildSegmentItems(['资料', '履历', '参考图']), selectedIndexes: [route.section], minimumTargetHeight: 48,
+      onSelectedIndexChanged: (section: number): void => { route.section = section; } })
+  }
+  private characterMenus(route: CharacterRoute): HdsNavigationMenuItemOptions[] {
+    if (!this.state.characters.some((character: Character) => character.id === route.id)) { return []; }
+    const enabled = !this.state.busy && !this.state.staleScopes.length;
+    return [{ content: { label: '编辑角色', icon: Icons.edit, isEnabled: enabled, action: (): void => { this.edit('character', route.id); } } },
+      { content: { label: '删除角色', icon: Icons.remove, isEnabled: enabled, action: (): void => { void this.remove('character', route.id); } } }];
+  }
   private assetSegmented(route: AssetRoute): boolean {
     const asset = this.state.assets.find((item: Asset) => item.id === route.id);
     return !!asset && (route.section === 1 || assetUsesSegments(asset, this.state.assetUsage(route.id)));
@@ -700,9 +730,7 @@ import { EmptyState } from '../component/Surfaces';
         { value: '删除', icon: Icons.remove, action: () => this.remove('reference', id) }
       ];
     }
-    if (kind === 'character') {
-      return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }];
-    }
+    if (kind === 'character') { return []; }
     if (kind === 'asset') { return []; }
     return [{
       value: '选中照片', icon: Icons.check, action: () => {

@@ -1,3 +1,4 @@
+import { filterCharacters } from '../../model/CharacterLibrary';
 import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
@@ -27,6 +28,7 @@ export struct CosPage {
   @Param active: boolean = false;
   private displayedSection: number = 0;
   private restoring: boolean = true;
+  private measured: boolean = false;
   private restoreTimer: number = -1;
   @Local animStep: number = 0;
   private enterPlayed: boolean = false;
@@ -44,26 +46,25 @@ export struct CosPage {
     cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2;
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; }
   }
-  @Monitor('route.section')
+  @Monitor('route.section', 'route.restoreVersion')
   sectionChanged(): void { this.restore(); }
   private restore(): void {
     this.restoring = true; this.displayedSection = this.route.section;
+    if (!this.measured) { return; }
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); }
     this.restoreTimer = setTimeout((): void => {
       this.restoreTimer = -1;
       this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offsets[this.displayedSection], animation: false });
+      if (!this.projects && this.route.anchorId) { try { this.getUIContext().getFocusController().requestFocus('character-library:' + this.route.anchorId); } catch (error) {} }
       this.restoring = false;
     }, 0);
   }
   private resetPosition(): void {
-    this.route.offsets[this.route.section] = 0;
+    this.route.anchorId = ''; this.route.offsets[this.route.section] = 0;
     this.scroller.scrollTo({ xOffset: 0, yOffset: 0, animation: false });
   }
   private plans(): CosProject[] { return filterPlanList(this.state.projects, this.state.readinessPlans, this.state.characters, this.route, this.state.localDate); }
-  private characters(): Character[] {
-    const query = this.route.query.trim().toLocaleLowerCase();
-    return this.state.characters.filter((c: Character) => (c.name + ' ' + c.workName).toLocaleLowerCase().includes(query));
-  }
+  private characters(): Character[] { return filterCharacters(this.state.characters, this.route); }
   private statuses(): ProjectStatus[] {
     return PROJECT_STATUSES.filter((status: ProjectStatus): boolean => this.route.section === 2 || (this.route.section === 0 ? status !== ProjectStatus.COMPLETED && status !== ProjectStatus.ARCHIVED : status === ProjectStatus.COMPLETED));
   }
@@ -72,7 +73,7 @@ export struct CosPage {
     return options.concat(this.statuses().map((status: ProjectStatus): SelectOption => { return { value: PROJECT_LABELS[PROJECT_STATUSES.indexOf(status)] }; }));
   }
   private filtered(): boolean { return !!this.route.query.trim() || !!this.route.status || this.route.dateRange !== 'all'; }
-  private clearFilters(): void { this.route.query = ''; this.route.status = ''; this.route.dateRange = 'all'; this.resetPosition(); }
+  private clearFilters(): void { this.route.query = ''; this.route.status = ''; this.route.dateRange = 'all'; this.route.favoriteOnly = false; this.resetPosition(); }
   @Builder characterBody(character: Character) {
     Row({ space: 16 }) {
       if (character.cover) { ManagedImage({ sourcePath: character.cover, label: character.name + '封面' })
@@ -95,6 +96,8 @@ export struct CosPage {
       Column({ space: 6 }) {
         Text(character.name + (character.favorite ? ' ★' : '')).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
         Text(character.workName || '所属作品待补充').fontSize(13).fontColor(Theme.muted)
+        Text('版本 ' + this.state.characterSummary(character.id).variants.length + ' 个 · 关联计划 ' + this.state.characterSummary(character.id).planCount + ' 份').fontSize(14).fontColor(Theme.muted)
+        if (this.state.characterSummary(character.id).variants.length) { Text(this.state.characterSummary(character.id).variants.join(' / ')).fontSize(14).fontColor(Theme.muted).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Text('›').fontColor(Theme.muted).fontSize(26).accessibilityLevel('no')
     }.width('100%')
@@ -139,18 +142,21 @@ export struct CosPage {
                 action: (): void => { if (this.filtered()) { this.clearFilters(); } else { this.add('project', ''); } }
               }) }
           } else {
+            Select([{ value: '全部角色' }, { value: '已收藏角色' }]).value(this.route.favoriteOnly ? '已收藏角色' : '全部角色').constraintSize({ minHeight: 48 }).accessibilityText('角色收藏筛选')
+              .onSelect((index: number): void => { this.route.favoriteOnly = index === 1; this.resetPosition(); })
+            if (this.route.query.trim() || this.route.favoriteOnly) { Button('清除角色筛选').constraintSize({ minHeight: 48 }).onClick((): void => { this.clearFilters(); }) }
             ForEach(this.characters(), (c: Character) => { InteractiveCard({
                 label: c.name,
                 hint: '双击打开角色详情',
                 effects: this.state.settings.effects,
                 action: () => this.open('character', c.id),
                 content: (): void => this.characterBody(c)
-              }) }, (c: Character) => c.id)
+              }).id('character-library:' + c.id) }, (c: Character) => c.id)
             if (this.characters().length === 0) { EmptyState({
-                title: this.route.query.trim() ? '没有找到角色' : '让喜欢有迹可循',
-                message: this.route.query.trim() ? '换个角色名或作品名试试。' : '添加一个角色，开始你的 Cos 记录。',
-                button: this.route.query.trim() ? '清除搜索' : '＋ 添加角色',
-                action: (): void => { if (this.route.query.trim()) { this.clearFilters(); } else { this.add('character', ''); } }
+                title: this.route.query.trim() || this.route.favoriteOnly ? '没有找到角色' : '让喜欢有迹可循',
+                message: this.route.query.trim() || this.route.favoriteOnly ? '调整搜索或收藏筛选，再查看已有角色。' : '添加一个角色，开始你的 Cos 记录。',
+                button: this.route.query.trim() || this.route.favoriteOnly ? '清除角色筛选' : '＋ 添加角色',
+                action: (): void => { if (this.route.query.trim() || this.route.favoriteOnly) { this.clearFilters(); } else { this.add('character', ''); } }
               }) }
           }
           }.
@@ -158,7 +164,8 @@ export struct CosPage {
           Blank().height(this.bottomInset).width('100%')
         }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top).edgeEffect(EdgeEffect.Spring)
-        .onDidScroll((): void => { if (!this.restoring) { this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset; } })
+        .onAreaChange((_, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restore(); } })
+        .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset; } })
     }.width('100%').height('100%')
       .onAxisEvent((event: AxisEvent): void => { scrollByAxis(this.scroller, event); })
   }

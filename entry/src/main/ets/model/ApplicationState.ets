@@ -1,3 +1,5 @@
+import { CharacterSummary, buildCharacterSummaries } from './CharacterLibrary';
+import { ProjectWork, buildProjectWork, workHistory } from './ProjectWork';
 import { PhotoImportJob, PhotoImportPorts } from './PhotoImport';
 import { AssetUsage, buildAssetUsage } from './Wardrobe';
 import { AlbumSummary, buildAlbumSummary } from './AlbumSummary';
@@ -326,6 +328,19 @@ export class AppState {
     return this.projects.map((project: CosProject) => buildPlanReadiness(project, this.preparationTasks, this.checklist, this.assets, this.links, this.photos, this.expenses, this.events, this.localDate));
   }
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
+  @Computed
+  get workCards(): ProjectWork[] {
+    const readiness = this.readinessPlans;
+    return workHistory(this.projects.map((project: CosProject) => buildProjectWork(project,
+      readiness.find((plan: PlanReadiness) => plan.id === project.id) || new PlanReadiness(),
+      this.characters.find((character: Character) => character.id === project.characterId),
+      this.variants.find((variant: CharacterVariant) => variant.id === project.variantId && variant.characterId === project.characterId),
+      this.events.find((event: CosEvent) => event.id === project.eventId), this.photos, this.team, this.projectAssets(project.id))));
+  }
+  @Computed
+  get characterSummaries(): CharacterSummary[] { return buildCharacterSummaries(this.characters, this.variants, this.workCards); }
+  characterSummary(id: string): CharacterSummary { return this.characterSummaries.find((summary: CharacterSummary) => summary.id === id) || new CharacterSummary(); }
+  projectWork(id: string): ProjectWork | undefined { return this.workCards.find((work: ProjectWork) => work.value.projectId === id); }
   @Computed
   get albumSummary(): AlbumSummary { return buildAlbumSummary(this.readinessPlans, this.projects, this.events, this.photos); }
   @Computed
@@ -814,10 +829,10 @@ export class AppState {
   }
   async shareProject(id: string): Promise<boolean> {
     return this.perform(async () => {
-      const p = this.projects.find((item: CosProject) => item.id === id);
-      if (p && this.context) {
-        await ShareService.project(this.context, ShareService.object(p, this.characters.find((c: Character) => c.id === p.characterId), this.events.find((e: CosEvent) => e.id === p.eventId)));
-      }
+      const work = this.projectWork(id);
+      if (!work) { throw new Error('计划已不存在，无法分享'); }
+      if (!this.context) { throw new Error('应用尚未就绪，无法分享'); }
+      await ShareService.project(this.context, ShareService.object(work));
     }, false);
   }
   async exportData(): Promise<boolean> {

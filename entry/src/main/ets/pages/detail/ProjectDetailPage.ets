@@ -1,3 +1,5 @@
+import { WorkCard } from '../../component/WorkCard';
+import { ProjectStatus } from '../../model/Entities';
 import { EntryCollection } from '../../component/EntryCollection';
 import { budgetLabel } from '../../model/PlanReadiness';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_LABELS, PROJECT_STATUSES } from '../../common/constants';
@@ -457,7 +459,8 @@ export struct ProjectDetail {
   }
   @Builder overview() {
     Column({ space: 14 }) {
-      Text(this.state.readiness(this.project.id).blockers[0] || this.state.readiness(this.project.id).prep.next?.label || '当前没有准备卡点').fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+      if ([ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status) && this.state.projectWork(this.project.id)) { WorkCard({ work: this.state.projectWork(this.project.id)!, hint: '双击查看本计划照片', open: (): void => { this.route.section = 3; } }) }
+      if (![ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status)) { Text(this.state.readiness(this.project.id).blockers[0] || this.state.readiness(this.project.id).prep.next?.label || '当前没有准备卡点').fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink) }
       Button('角色 · ' + this.state.characterName(this.project.characterId) + (this.project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在') : '')).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('character', this.project.characterId); })
       Row({ space: 8 }) {
         Button('改日期 / 关联活动').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('project', this.project.id, ''); })

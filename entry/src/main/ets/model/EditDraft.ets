@@ -52,7 +52,7 @@ export class EditDraft {
   @Trace preparationMode: number = 1;
   @Trace preparationExpanded: boolean = false;
   @Trace preparationKeys: string[] = preparationKeys(1);
-  static make(state: AppState, kind: string, id: string = '', parent: string = ''): EditDraft {
+  static make(state: AppState, kind: string, id: string = '', parent: string = '', variant: string = ''): EditDraft {
     const d = new EditDraft(); d.kind = kind; d.id = id; d.parentId = parent;
     if (kind === 'photo') { const photo = state.photos.find((item: PhotoAsset) => item.id === id); if (photo) { d.notes = photo.caption; d.parentId = photo.projectId; } }
     if (kind === 'character') {
@@ -77,6 +77,7 @@ export class EditDraft {
       d.characterId = state.characters.some((c: Character) => c.id === parent) ? parent : state.characters[0]?.id || '';
       const event = state.events.find((e: CosEvent) => e.id === parent);
       if (event) { d.eventId = event.id; d.date = event.date; }
+      if (!id && variant) { d.variantId = variant; d.advanced = true; }
       d.newCharacter = !d.characterId; d.status = ProjectStatus.PREPARING;
       d.name = d.characterId ? state.characterName(d.characterId) + ' · 计划' : '';
       const p = state.projects.find((item: CosProject) => item.id === id);

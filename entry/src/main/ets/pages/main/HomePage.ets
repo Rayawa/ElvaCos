@@ -1,3 +1,5 @@
+import { WorkCard } from '../../component/WorkCard';
+import { ProjectWork, recentWork } from '../../model/ProjectWork';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
 import { MainEntranceSession } from '../../common/motion';
@@ -50,9 +52,7 @@ export struct HomePage {
   private nextEvent(): CosEvent | undefined {
     return this.state.events.filter((event: CosEvent) => event.dateMode !== 'pending' && eventEnd(event) >= this.state.localDate && event.status !== 'Attended').sort((a: CosEvent, b: CosEvent) => a.date.localeCompare(b.date))[0];
   }
-  private recent(): CosProject | undefined {
-    return this.state.projects.filter((project: CosProject) => this.state.readiness(project.id).photos.byStage[4] > 0).sort((a: CosProject, b: CosProject) => (this.state.readiness(b.id).date || '').localeCompare(this.state.readiness(a.id).date || '') || b.updatedAt - a.updatedAt)[0];
-  }
+  private recent(): ProjectWork | undefined { return recentWork(this.state.workCards, this.state.localDate); }
   private planDateLabel(project: CosProject): string {
     const readiness = this.state.readiness(project.id);
     if (!readiness.date) { return '日期待定'; }
@@ -148,8 +148,8 @@ export struct HomePage {
         Text('最近').fontSize(15).fontWeight(FontWeight.Medium).fontColor(Theme.muted)
         Button('本月已记录支出 ¥' + (this.state.monthSpendingCents / 100).toFixed(2) + ' · 花费统计').fontSize(14).layoutWeight(1).id('home-expenses').constraintSize({ minHeight: 48 }).fontColor(Theme.accent).backgroundColor(Theme.bg).onClick((): void => { this.open('expenseStats', 'all'); })
       }.width('100%')
-      if (this.recent()) { Button('最近作品 · ' + (this.recent()?.name || '') + ' · 成片 ' + this.state.readiness(this.recent()?.id || '').photos.byStage[4] + ' 张').width('100%').fontSize(16).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('projectPhotos', this.recent()?.id || ''); }) }
-      else { Text('整理成片后，可以在这里回看。').fontSize(14).fontColor(Theme.muted) }
+      if (this.recent()) { WorkCard({ work: this.recent()!, compact: true, open: (): void => { this.open('project', this.recent()?.value.projectId || ''); } }) }
+      else { Text('完成一次计划或整理成片后，可以在这里回看。').fontSize(14).fontColor(Theme.muted) }
       Row({ space: 8 }) {
         Button('记一笔').layoutWeight(1).fontSize(16).constraintSize({ minHeight: 48 }).onClick((): void => { this.add('expense', ''); })
         Button() {

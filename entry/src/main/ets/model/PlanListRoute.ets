@@ -7,8 +7,11 @@ import { dateGroup } from './TaskQueue';
 export class PlanListRoute {
   @Trace section: number = 0;
   @Trace query: string = '';
+  @Trace favoriteOnly: boolean = false;
   @Trace status: string = '';
   @Trace dateRange: string = 'all';
+  @Trace restoreVersion: number = 0;
+  anchorId: string = '';
   offsets: number[] = [0, 0, 0];
 }
 

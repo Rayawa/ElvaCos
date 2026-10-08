@@ -209,7 +209,7 @@ export struct FormEditor {
             Select(new Array<SelectOption>({ value: '不指定版本' })
               .concat(this.state.variants.filter((v: CharacterVariant) => v.characterId === this.draft.characterId)
               .map((v: CharacterVariant): SelectOption => { return { value: v.name }; })))
-              .value(this.state.variants.find((v: CharacterVariant) => v.id === this.draft.variantId)?.name || '不指定版本')
+              .value(this.draft.variantId ? this.state.variants.find((v: CharacterVariant) => v.id === this.draft.variantId && v.characterId === this.draft.characterId)?.name || '版本已不存在，请重新选择' : '不指定版本')
               .onSelect((index: number) => { vibration.dotVibration(); this.draft.variantId = index === 0 ? '' : this.state.variants.filter((v: CharacterVariant) => v.characterId === this.draft.characterId)[index - 1].id; })
                 .accessibilityText('角色版本')
                 .visualEffect(this.feedback.effect('select-4'))

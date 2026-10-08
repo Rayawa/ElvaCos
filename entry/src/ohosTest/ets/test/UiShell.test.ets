@@ -75,10 +75,15 @@ export default function uiShellTest(): void {
       const characters = await driver.findComponents(ON.description('双击打开角色详情').inWindow(bundle));
       if (characters.length > 0) {
         await characters[0].click(); await driver.delayMs(500); await present('添加版本');
-        await detailActions();
+        expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
+        await present('用这个角色新建计划'); await present('character-detail-segment');
+        await tap('履历'); await present('角色履历'); await tap('参考图'); await present('参考图片'); await tap('资料');
+        await tap('用这个角色新建计划'); await present('新建计划'); await tap('sheet-close');
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-character-detail.png');
         await tap('添加版本'); await present('添加角色版本'); await tap('sheet-close'); await present('添加版本');
-        await detailActions();
+        const characterScroll = await driver.findComponent(ON.id('character-detail-scroll').inWindow(bundle)); await characterScroll.scrollToBottom(1000); await driver.delayMs(350);
+        await tap('character-entry-link'); await present('角色收录'); await tap('sheet-close');
+        expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
         await back(); await driver.delayMs(350);
       }
       await tap('计划'); await present('新建计划');

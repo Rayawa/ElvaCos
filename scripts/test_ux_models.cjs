@@ -15,7 +15,14 @@ let backupFileControl = {};
 let metadataExportTime = 0;
 let failExportTime = false;
 let mediaControl = {};
+let shareControl = {};
+
 Module._load = function (id, parent, isMain) {
+  if (parent?.filename.endsWith('/common/ShareService.ets')) {
+    if (id === './SystemCapability') return { SystemCapability: { share: () => shareControl.available !== false } };
+    if (id === '@kit.ArkData') return { uniformTypeDescriptor: { UniformDataType: { PLAIN_TEXT: 'text/plain' } } };
+    if (id === '@kit.ShareKit') return { systemShare: { SharedData: class { constructor(value) { Object.assign(this, value); } }, ShareController: class { constructor(value) { this.value = value; } async show() { if (shareControl.fail) throw new Error('share rejected'); shareControl.data = this.value; } }, SharePreviewMode: { DETAIL: 'detail' } } };
+  }
   if (parent?.filename.endsWith('/data/media/MediaRepository.ets')) {
     if (id === '@kit.MediaLibraryKit') return { photoAccessHelper: { PhotoViewPicker: class { async select(options) { mediaControl.pickerOptions = options; return { photoUris: mediaControl.selection || [] }; } }, PhotoViewMIMETypes: { IMAGE_TYPE: 'image' } } };
     if (id === '@kit.CoreFileKit') return { fileUri: { getUriFromPath: path => 'file://' + path }, fileIo: {
@@ -41,7 +48,7 @@ Module._load = function (id, parent, isMain) {
   if (parent?.filename.endsWith('/model/ApplicationState.ets')) {
     if (id === '../common/storage') return { setLastMetadataExport: async value => { if (failExportTime) throw new Error('preferences unavailable'); metadataExportTime = value; }, getLastMetadataExport: async () => metadataExportTime };
     if (id === '../common/formDrafts') return { formDraftStore: { clear: async () => {} } };
-    const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'ShareService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
+    const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
     if (nativeService === 'BackupService') return { BackupService: class { async prepareRestore() { return backupControl.prepare?.(); } async restoreMetadata(input) { return backupControl.restore(input); } async export() { return backupControl.export?.() || false; } } };
     if (nativeService) return { [nativeService]: class { static async confirm() {} } };
   }
@@ -557,6 +564,77 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(route.queue.planId, project.id); assert.equal(route.queue.filter, 3); assert.equal(route.queue.offset, 300);
     route.reconcile([project], photos, project.id); assert.equal(route.queue.planId, ''); assert.equal(route.queue.filter, 3);
   });
+  function workFixture() {
+    const state = new AppState();
+    state.characters = [Object.assign(new entities.Character(), { id: 'role', name: '角色', workName: '作品', cover: '/local/role-thumb', favorite: true }), Object.assign(new entities.Character(), { id: 'other', name: '同名角色', favorite: false, status: 'Wishlist' })];
+    state.variants = [Object.assign(new entities.CharacterVariant(), { id: 'version', characterId: 'role', name: '冬装' })];
+    state.events = [Object.assign(new CosEvent(), { id: 'scene', name: '漫展', date: '2026-10-01' })];
+    state.projects = [Object.assign(new CosProject(), { id: 'finished', characterId: 'role', variantId: 'version', eventId: 'scene', name: '登场', status: ProjectStatus.COMPLETED, updatedAt: 9 }), Object.assign(new CosProject(), { id: 'future', characterId: 'role', targetDate: '2026-12-01', updatedAt: 9999999 })];
+    state.photos = [
+      Object.assign(new PhotoAsset(), { id: 'final', projectId: 'finished', status: PhotoStatus.FINAL, thumbnailPath: '/local/final', createdAt: 10 }),
+      Object.assign(new PhotoAsset(), { id: 'published', projectId: 'finished', status: PhotoStatus.PUBLISHED, thumbnailPath: '/local/published', createdAt: 20 }),
+      Object.assign(new PhotoAsset(), { id: 'archive', projectId: 'finished', status: PhotoStatus.ARCHIVED, thumbnailPath: '/local/archive', createdAt: 900 }),
+      Object.assign(new PhotoAsset(), { id: 'raw', projectId: 'finished', status: PhotoStatus.RAW, thumbnailPath: '/local/raw', createdAt: 999 }),
+      Object.assign(new PhotoAsset(), { id: 'future-final', projectId: 'future', status: PhotoStatus.FINAL, thumbnailPath: '/local/future', createdAt: 9999 })];
+    state.references = [Object.assign(new (require(root + '/model/Planning.ets').ReferenceImage)(), { id: 'ref', characterId: 'role', projectId: 'finished', thumbnailPath: '/local/reference' })];
+    state.expenses = [Object.assign(new Expense(), { projectId: 'finished', amountCents: 12345 }), Object.assign(new Expense(), { projectId: 'future', amountCents: 1000 })];
+    state.assets = [Object.assign(new Asset(), { id: 'wig', priceCents: 50000, status: AssetStatus.REPAIR })]; state.links = [Object.assign(new ProjectAsset(), { assetId: 'wig', projectId: 'finished' })];
+    const { TeamMember } = require(root + '/model/Planning.ets');
+    state.team = [Object.assign(new TeamMember(), { id: 'credit', projectId: 'finished', name: '伙伴', role: '摄影' }), Object.assign(new TeamMember(), { id: 'hidden', projectId: 'future', name: '他人', role: '摄影' })];
+    return state;
+  }
+  await test('work cards use shared final, money and equipment counts with real scoped credits and covers', () => {
+    const state = workFixture(), card = state.projectWork('finished'), summary = state.readiness('finished');
+    assert.equal(card.value.schemaVersion, 2); assert.equal(card.value.finalCount, summary.photos.byStage[4]); assert.equal(card.value.finalCount, 2);
+    assert.equal(card.value.spentCents, summary.money.spentCents); assert.equal(card.value.spentCents, 12345);
+    assert.equal(card.value.reusedEquipmentCount, summary.equipment.total); assert.equal(card.value.equipmentValueCents, 50000);
+    assert.equal(card.value.variant, '冬装'); assert.equal(card.value.event, '漫展'); assert.equal(card.value.date, '2026-10-01'); assert.equal(card.value.dateFromEvent, true);
+    assert.deepEqual(card.value.credits, ['摄影 · 伙伴']); assert.equal(card.value.coverPhotoId, 'published'); assert.equal(card.coverPath, '/local/published');
+    assert.equal(card.value.characterId, 'role'); assert.equal(state.references.length, 1); assert.equal(state.photos.length, 5);
+    state.projects[0].targetDate = '2026-09-30'; assert.equal(state.projectWork('finished').value.date, '2026-09-30'); assert.equal(state.projectWork('finished').value.dateFromEvent, false);
+    state.photos = state.photos.filter(photo => !['final', 'published'].includes(photo.id)); const empty = state.projectWork('finished');
+    assert.equal(empty.value.finalCount, 0); assert.equal(empty.value.coverPhotoId, ''); assert.equal(empty.coverPath, '/local/role-thumb'); assert.match(empty.coverLabel, /非本场成片/);
+    state.characters[0].cover = ''; assert.equal(state.projectWork('finished').coverPath, '');
+  });
+  await test('history and recent work use actual plan dates and completed status, never import or update time', () => {
+    const { workHistory, recentWork } = require(root + '/model/ProjectWork.ets'), state = workFixture();
+    state.projects.push(Object.assign(new CosProject(), { id: 'undated', characterId: 'role', status: ProjectStatus.ARCHIVED, updatedAt: 999999999 }));
+    assert.deepEqual(workHistory(state.workCards).map(work => work.value.projectId), ['future', 'finished', 'undated']);
+    assert.equal(recentWork(state.workCards, '2026-10-08').value.projectId, 'finished');
+    state.projects[1].targetDate = '2026-10-07'; assert.equal(recentWork(state.workCards, '2026-10-08').value.projectId, 'future');
+    state.projects[1].targetDate = ''; const unknown = state.projectWork('future'); assert.equal(unknown.value.date, '');
+    state.projects = state.projects.filter(project => project.id === 'future'); state.photos = []; assert.equal(recentWork(state.workCards, '2026-10-08'), undefined);
+    state.projects[0].status = ProjectStatus.COMPLETED; assert.equal(recentWork(state.workCards, '2026-10-08').value.projectId, 'future'); assert.equal(state.projectWork('missing'), undefined);
+  });
+  await test('character library searches and favorites use one flag and scoped versions and all plan history', () => {
+    const { filterCharacters } = require(root + '/model/CharacterLibrary.ets'), state = workFixture(), route = new PlanListRoute();
+    const summary = state.characterSummary('role'); assert.deepEqual(summary.variants, ['冬装']); assert.equal(summary.planCount, 2); assert.equal(state.characterSummary('other').planCount, 0);
+    route.favoriteOnly = true; assert.deepEqual(filterCharacters(state.characters, route).map(character => character.id), ['role']);
+    route.query = '作品'; assert.deepEqual(filterCharacters(state.characters, route).map(character => character.id), ['role']);
+    route.query = '同名'; assert.deepEqual(filterCharacters(state.characters, route), []); route.favoriteOnly = false; assert.equal(filterCharacters(state.characters, route)[0].id, 'other');
+    assert.equal(state.characters[1].status, 'Wishlist'); assert.equal(state.characters[1].favorite, false);
+  });
+  await test('character route preserves sections, offsets and version context; drafts reject foreign or deleted versions', () => {
+    const { CharacterRoute } = require(root + '/model/CharacterRoute.ets'), state = workFixture(), route = new CharacterRoute('role', 'version');
+    route.section = 1; route.offsets[1] = 600; route.restoreVersion++; route.library = new PlanListRoute(); route.library.query = '作品'; route.library.favoriteOnly = true; route.library.anchorId = 'role'; route.library.offsets[0] = 900; route.project = new (require(root + '/model/ProjectRoute.ets').ProjectRoute)('p', 0); route.project.offsets[0] = 700; route.restoreSource(); assert.equal(route.library.restoreVersion, 1); assert.equal(route.project.restoreVersion, 1); assert.equal(route.library.query, '作品'); assert.equal(route.library.favoriteOnly, true); assert.equal(route.library.offsets[0], 900); assert.equal(route.project.offsets[0], 700); route.restoreSource(true); assert.equal(route.library.anchorId, ''); assert.equal(route.variantId, 'version'); assert.equal(route.section, 1); assert.equal(route.offsets[1], 600);
+    const draft = EditDraft.make(state, 'project', '', route.id, route.variantId); assert.equal(draft.characterId, 'role'); assert.equal(draft.variantId, 'version'); assert.equal(draft.advanced, true); assert.deepEqual(draft.issues(state), []);
+    const restored = EditDraft.fromJSON(draft.serialize()); assert.equal(restored.variantId, 'version');
+    state.variants[0].characterId = 'other'; assert.ok(draft.issues(state).some(issue => issue.field === 'variantId'));
+    state.variants = []; assert.ok(draft.issues(state).some(issue => issue.field === 'variantId'));
+    const invalid = EditDraft.make(state, 'project', '', 'role', 'gone'); assert.equal(invalid.variantId, 'gone'); assert.ok(invalid.issues(state).some(issue => issue.field === 'variantId'));
+  });
+  await test('structured sharing reuses the work card payload, excludes local paths and reports missing context or rejected native share', async () => {
+    const { ShareService } = require(root + '/common/ShareService.ets'), { projectShareText } = require(root + '/model/ProjectWork.ets'), state = workFixture();
+    const card = state.projectWork('finished'); assert.equal(ShareService.object(card), card.value); const text = projectShareText(card.value);
+    assert.match(text, /冬装/); assert.match(text, /摄影 · 伙伴/); assert.match(text, /123.45/); assert.match(text, /未计入支出/);
+    state.context = {}; shareControl = {}; assert.equal(await state.shareProject('finished'), true);
+    assert.deepEqual(JSON.parse(shareControl.data.extraData.payload), card.value); assert.equal(shareControl.data.content, text); assert.equal(shareControl.data.extraData.schemaVersion, 2);
+    assert.equal(shareControl.data.extraData.payload.includes('/local/'), false); assert.equal(shareControl.data.content.includes('/local/'), false);
+    shareControl.fail = true; assert.equal(await state.shareProject('finished'), false); assert.match(state.error, /share rejected/); assert.equal(state.staleScopes.length, 0);
+    shareControl.available = false; assert.equal(await state.shareProject('finished'), false); assert.match(state.error, /不支持系统分享/);
+    shareControl = {}; state.context = undefined; assert.equal(await state.shareProject('finished'), false); assert.match(state.error, /尚未就绪/);
+    state.context = {}; assert.equal(await state.shareProject('gone'), false); assert.match(state.error, /已不存在/);
+  });
   await test('wardrobe composes search, type, status and exact location without inventing an empty location', () => {
     const { WardrobeRoute, wardrobeAssets, wardrobeLocations } = require(root + '/model/Wardrobe.ets');
     const route = new WardrobeRoute(); const data = [
@@ -614,6 +692,32 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.projects = ['p1', 'p2', 'p3'].map(id => Object.assign(new CosProject(), { id, characterId: 'role', status: id === 'p2' ? ProjectStatus.COMPLETED : ProjectStatus.PREPARING }));
     state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
   }
+  await test('role-scoped plan creation persists the selected version atomically and retains the draft after a failed write', async () => {
+    const { CosProjectRepository, CharacterRepository, CharacterVariantRepository, DiaryEntryRepository } = require(root + '/data/repository/Repositories.ets');
+    const { PreparationRepository } = require(root + '/data/repository/PreparationRepository.ets');
+    const { db, state } = await wardrobeFixture();
+    try {
+      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.variantRepo = new CharacterVariantRepository(db);
+      state.preparationRepo = new PreparationRepository(db); state.diaryRepo = new DiaryEntryRepository(db);
+      await state.variantRepo.save(Object.assign(new entities.CharacterVariant(), { id: 'winter', characterId: 'role', name: '冬装' }));
+      state.refresh = async () => { state.characters = await state.characterRepo.list(); state.variants = await state.variantRepo.list(); state.projects = await state.projectRepo.list(); state.diary = await state.diaryRepo.list(); state.preparationCategories = await state.preparationRepo.categories(); state.preparationTasks = await state.preparationRepo.tasks(); };
+      await state.refresh(); const source = state.variants[0], draft = EditDraft.make(state, 'project', '', 'role', 'winter');
+      db.failSql = 'INSERT INTO projects'; assert.equal(await draft.save(state), false); assert.equal(draft.id, ''); assert.equal(draft.variantId, 'winter'); assert.equal(draft.name, '角色 · 计划'); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 3);
+      db.failSql = ''; assert.equal(await draft.save(state), true); const saved = (await db.sql('SELECT character_id,variant_id FROM projects WHERE id=?', [draft.creationId])).rows[0]; assert.deepEqual(saved, ['role', 'winter']);
+      assert.equal(source.name, '冬装'); assert.equal(state.projects.find(project => project.id === draft.creationId).variantId, 'winter'); assert.equal(state.projectWork(draft.creationId).value.variant, '冬装');
+      assert.equal((await db.sql('SELECT count(*) FROM characters')).rows[0][0], 1); assert.equal((await db.sql('SELECT count(*) FROM variants')).rows[0][0], 1);
+    } finally { db.close(); }
+  });
+  await test('role favorite writes preserve legacy fields and failure leaves the original flag and work history intact', async () => {
+    const { CharacterRepository } = require(root + '/data/repository/Repositories.ets'), { db, state } = await wardrobeFixture();
+    try {
+      state.characterRepo = new CharacterRepository(db); state.characters = await state.characterRepo.list(); state.refresh = async () => { state.characters = await state.characterRepo.list(); };
+      const original = state.characters[0], favorite = Object.assign(new entities.Character(), original, { favorite: true });
+      db.failSql = 'INSERT INTO characters'; assert.equal(await state.saveCharacter(favorite), false); assert.equal(state.characters[0].favorite, false); assert.equal((await db.sql('SELECT favorite FROM characters')).rows[0][0], 0);
+      db.failSql = ''; assert.equal(await state.saveCharacter(favorite), true); assert.equal(state.characters[0].favorite, true); assert.equal(state.characters[0].status, 'Wishlist'); assert.equal(state.characterSummary('role').planCount, 3);
+      assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 3); assert.equal((await db.sql('SELECT status FROM characters')).rows[0][0], 'Wishlist'); assert.equal(original.favorite, false);
+    } finally { db.close(); }
+  });
   await test('actual asset links are atomic, idempotent and use the current name; unlink only removes one plan packing context', async () => {
     const fixture = await wardrobeFixture(), { db, relations, item } = fixture;
     try {

@@ -159,7 +159,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 |---|---|---|---|
 | 计划详情 | `ProjectRoute { id, section, focusTaskId?, outing, sheetKind }`，`section` = 0 概览 / 1 准备 / 2 打包 / 3 照片 | 从列表进 → 概览；从待办/打包/照片入口进 → 对应 section | 保留 section、Tab、筛选、滚动位置 |
 | 活动详情 | `EventRoute { id, dayMode }` | 从日程进 → 详情模式；从底条/首页卡片进 → 今天模式 | 保留来源；今天模式返回后底条仍在 |
-| 角色详情 | `CharacterRoute { id, section }` = 0 资料 / 1 履历 / 2 参考图 | 资料 | 保留 section |
+| 角色详情 | `CharacterRoute { id, section, variantId?, entriesOpen }` = 0 资料 / 1 履历 / 2 参考图；运行时保留来源角色库 / 计划路由引用 | 资料；从计划进入带版本 | 保留分段、版本、各段偏移与来源筛选 / 原行 |
 | 装备详情 | `AssetRoute { id, from: 'wardrobe'\|'project'\|'day'\|'tasks'\|'home'\|'collection', projectId?, sourceTab, section }`（运行时保留来源路由引用与恢复代次） | 资料 | 返回来源页对应位置 |
 | 照片查看 | `PhotoViewerRoute { id, from, filterContext }` | 原图 | **回到原缩略图位置**（新增要求） |
 | 相册 | `AlbumRoute { mode: 'byPlan'\|'queue', planId?, status? }` | byPlan | 保留 mode 与筛选 |
@@ -324,6 +324,8 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 - 数据侧已就绪：`common/ShareService.ets` 的 `ProjectShareObject` 已是带 `schemaVersion` 的结构化对象。
 - 应用内渲染为 UI 卡片（便宜）；导出为图片属后续增强，单独估算。
 - 出现在：计划详情的完成状态、角色履历、首页"最近"。
+- 卡片是当前元数据的回顾视图，不是冻结的历史快照：数量 / 花费来自 `PlanReadiness`；衣柜复用数指当前关联的既有装备数，原值为当前资料价格，既不证明实际携带，也不计入支出。封面优先本计划成片缩略图；使用角色封面时明确说明。缺失场次 / 日期 / 署名保持未记录，不拿导入或更新时间补造。
+- 首页最近按计划 / 活动日期倒序，从已完成 / 归档计划或已有成片且日期不在未来（含日期待定）的计划中选一份；日期待定排在有日期记录之后。不展示完成时间趋势。分享仍为现有系统文本分享，结构化 `ProjectShareObject` 升为 v2，保留原字段并增加版本、署名、成片、花费与衣柜复用信息；不导出本机路径。
 
 ### 4.12 设置与数据
 
@@ -614,7 +616,7 @@ PlanReadiness {
 | 花费 | 实际现金支出 | 不含衣柜价格 |
 | 资料库 | **废弃词**（旧导航名） | 不再使用 |
 
-补充：角色的 `favorite`（★）与 `status: 'Wishlist'` 目前都在表达"想做"，统一词表时一并定夺。
+角色收藏以 `favorite`（★）为唯一可见的“想做”标记；旧 `status: 'Wishlist'` 保留存储与备份兼容，不再用于角色筛选或显示另一套状态。活动的 Wishlist / 想去语义保持独立。
 
 ## 11. 复杂度守则与账本
 
