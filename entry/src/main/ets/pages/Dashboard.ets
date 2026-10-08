@@ -583,7 +583,7 @@ import { EmptyState } from '../component/Surfaces';
           if (kind === 'character') { (param as CharacterRoute).restoreVersion++; }
           if (kind === 'asset') { (param as AssetRoute).restoreVersion++; }
           if (kind === 'tasks') { (param as TaskRoute).restoreVersion++; }
-          if (kind === 'project') { (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).resumeShots) { (param as ProjectRoute).resumeShots = false; (param as ProjectRoute).shotsOpen = true; } if ((param as ProjectRoute).outing) { this.state.resume(); } }
+          if (kind === 'project') { (param as ProjectRoute).restoreVersion++; (param as ProjectRoute).photos.restoreVersion++; if ((param as ProjectRoute).resumeShots) { (param as ProjectRoute).resumeShots = false; (param as ProjectRoute).shotsOpen = true; } if ((param as ProjectRoute).outing) { this.state.resume(); } }
           if (kind === 'album') { (param as AlbumRoute).restoreVersion++; (param as AlbumRoute).collection.restoreVersion++; }
         },
         hidden: (): void => {

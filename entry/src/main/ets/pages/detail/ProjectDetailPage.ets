@@ -41,28 +41,46 @@ export struct ProjectDetail {
   private scroller: Scroller = new Scroller();
   private displayedSection: number = 0;
   private viewportTop: number = 0;
+  private measured: boolean = false;
+  private focusY: number | undefined = undefined;
   private scrollTimer: number = -1;
-  private restoring: boolean = false;
+  private restoring: boolean = true;
+  @Local focusFeedback: string = '';
   aboutToAppear(): void {
     this.displayedSection = this.route.section;
     const target = this.state.preparationTasks.find((task: PreparationTask) => task.id === this.route.focusTaskId && task.projectId === this.project.id);
     if (target && !this.route.expandedCategories.includes(target.categoryId)) { this.route.expandedCategories = this.route.expandedCategories.concat(target.categoryId); }
     if (target?.done) { this.route.showCompleted = true; }
-    if (!this.route.focusTaskId && !this.route.focusPackingId || this.route.focusHandled) { this.restoreOffset(); }
+    const packing = this.state.checklist.some((item: ChecklistItem) => item.id === this.route.focusPackingId && item.projectId === this.project.id);
+    if (!this.route.focusHandled && (this.route.focusTaskId && !target || this.route.focusPackingId && !packing)) {
+      this.route.focusHandled = true; this.focusFeedback = '原事项已不存在，保留当前计划与附近位置。';
+    }
+    this.restoreOffset();
     if (!this.entrance.managed) { this.entrance.play(this.getUIContext()); } }
   aboutToDisappear(): void { if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } if (!this.entrance.managed) { this.entrance.reset(); } }
   @Monitor('route.section', 'route.restoreVersion')
   private sectionChanged(): void { this.displayedSection = this.route.section; this.restoreOffset(); }
+  private pendingFocus(): boolean {
+    return !this.route.focusHandled && Boolean(this.route.section === 1 ? this.route.focusTaskId : this.route.section === 2 ? this.route.focusPackingId : '');
+  }
   private restoreOffset(): void {
+    if (!this.measured || this.pendingFocus()) { return; }
     if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } this.restoring = true;
     this.scrollTimer = setTimeout((): void => { this.scrollTimer = -1; this.scroller.scrollTo({ xOffset: 0, yOffset: this.route.offsets[this.displayedSection], animation: false }); this.restoring = false; }, 0);
   }
   private focusItem(id: string, area: Area): void {
-    if (this.route.focusHandled || id !== (this.route.section === 2 ? this.route.focusPackingId : this.route.focusTaskId)) { return; }
-    this.route.focusHandled = true; this.restoring = true;
+    if (!this.pendingFocus() || id !== (this.route.section === 2 ? this.route.focusPackingId : this.route.focusTaskId)) { return; }
+    this.focusY = Number(area.globalPosition.y); this.focusAfterMeasure();
+  }
+  private focusAfterMeasure(): void {
+    if (!this.measured || this.focusY === undefined || !this.pendingFocus()) { return; }
+    if (this.scrollTimer >= 0) { clearTimeout(this.scrollTimer); } this.restoring = true;
     this.scrollTimer = setTimeout((): void => {
-      this.scrollTimer = -1; const offset = Math.max(0, this.scroller.currentOffset().yOffset + Number(area.globalPosition.y) - this.viewportTop - this.topInset - 12);
-      this.scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false }); this.route.offsets[this.displayedSection] = offset; this.restoring = false;
+      this.scrollTimer = -1;
+      if (!this.pendingFocus() || this.focusY === undefined) { this.restoreOffset(); return; }
+      const offset = Math.max(0, this.scroller.currentOffset().yOffset + this.focusY - this.viewportTop - this.topInset - 12);
+      this.scroller.scrollTo({ xOffset: 0, yOffset: offset, animation: false }); this.route.offsets[this.displayedSection] = offset;
+      this.route.focusHandled = true; this.focusY = undefined; this.restoring = false;
     }, 0);
   }
 
@@ -550,6 +568,7 @@ export struct ProjectDetail {
         Blank().height(this.topInset).width('100%')
         Column({ space: 10 }) {
           this.header()
+          if (this.focusFeedback) { Text(this.focusFeedback).fontSize(14).fontColor(Theme.muted) }
           if (this.state.error) { Text(this.state.error).fontSize(14).fontColor(Theme.danger) }
           if (this.route.section === 1) { this.preparation() }
         }.width('100%').alignItems(HorizontalAlign.Start)
@@ -565,8 +584,11 @@ export struct ProjectDetail {
       .width('100%')
       .height('100%')
       .scrollBar(BarState.Off)
-      .onAreaChange((_, area: Area): void => { this.viewportTop = Number(area.globalPosition.y); })
-      .onDidScroll((): void => { if (!this.restoring) { this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset; } })
+      .onAreaChange((_, area: Area): void => {
+        this.viewportTop = Number(area.globalPosition.y);
+        if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); this.focusAfterMeasure(); }
+      })
+      .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset; } })
       .align(Alignment.Top)
       .transition(pageTransition())
       .bindSheet(this.route.preparing || this.route.linking || Boolean(this.route.contextSheet), this.activeSheet(), appSheetOptions((): void => { this.route.preparing = false; this.route.linking = false; this.route.contextSheet = ''; }, this.sheetEntrance, this.getUIContext()))
