@@ -450,11 +450,13 @@ import { EmptyState } from '../component/Surfaces';
         }
       }
       else if (kind === 'reference') {
-        ReferenceDetail({
-          entrance: entrance,
-          state: this.state,
-          reference: this.state.references.find((r: ReferenceImage) => r.id === (param as string)) || new ReferenceImage()
-        })
+        if (this.state.references.some((reference: ReferenceImage) => reference.id === (param as string))) {
+          ReferenceDetail({
+            entrance: entrance,
+            state: this.state,
+            reference: this.state.references.find((reference: ReferenceImage) => reference.id === (param as string)) as ReferenceImage
+          })
+        } else { EmptyState({ title: '参考图已不存在', message: '可以返回所属计划或角色继续查看。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop }) }
       }
       else if (kind === 'expenseStats') {
         ExpenseSummary({
