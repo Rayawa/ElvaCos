@@ -1,3 +1,4 @@
+import { PhotoImportJob, PhotoImportPorts } from './PhotoImport';
 import { AlbumSummary, buildAlbumSummary } from './AlbumSummary';
 import { MetadataBackupPreview } from './MetadataBackupPreview';
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
@@ -53,7 +54,7 @@ import {
   PhotoStatus,
 } from './Entities';
 import { requiredName, safeUrl, validDate, checkProjectDate } from './Rules';
-import { MediaRepository } from '../data/media/MediaRepository';
+import { MediaRepository, MediaAvailability } from '../data/media/MediaRepository';
 import { SettingsService } from '../common/SettingsService';
 import { AccountService, AccountResult } from '../common/AccountService';
 import { HapticService } from '../common/HapticService';
@@ -97,6 +98,7 @@ export class AppState {
   @Trace dayModules: DayModulePreferences = {};
   @Trace dayDismissals: Record<string, string> = {};
   @Trace pendingEventId: string = '';
+  @Trace photoImport: PhotoImportJob = new PhotoImportJob();
   @Trace lastMetadataExport: number = 0;
   @Trace restorePreview?: MetadataBackupPreview;
   private restoreInput: string = '';
@@ -148,6 +150,7 @@ export class AppState {
   private media?: MediaRepository;
   private startTask?: Promise<void>;
   private operationPartial: boolean = false;
+  private operationRefreshNeeded: boolean = true;
   private reloadTask?: Promise<boolean>;
   private operationTask?: Promise<OperationResult>;
   private disposeTask?: Promise<void>;
@@ -196,7 +199,7 @@ export class AppState {
   async maintain(): Promise<void> {
     if (!this.ready || this.busy) { return; }
     await this.perform(async () => {
-      await this.media?.collect(this.photos, this.references, this.entries);
+      await this.media?.collect(this.photos, this.references, this.entries, (await this.photoRepo.renderedPaths()).concat(this.characters.map((character: Character) => character.cover)));
       try { await this.reminder.reconcile(this.events); }
       catch (error) { this.reportNotice('系统提醒暂未核对，可重新打开应用后重试'); }
     }, false);
@@ -385,7 +388,7 @@ export class AppState {
     return this.operationTask;
   }
   private async runOperation(action: () => Promise<void>, refresh: boolean, scopes: string[]): Promise<OperationResult> {
-    this.busy = true; this.operationScope = scopes.join(','); this.error = ''; this.notice = ''; this.operationPartial = false;
+    this.busy = true; this.operationScope = scopes.join(','); this.error = ''; this.notice = ''; this.operationPartial = false; this.operationRefreshNeeded = true;
     try {
       const result = await executeOperation(async (): Promise<void> => {
         try { await action(); }
@@ -393,7 +396,7 @@ export class AppState {
           const code = (error as BusinessError).code;
           throw new Error(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error).message || '操作失败，请重试');
         }
-      }, async (): Promise<void> => { if (refresh) { await this.refresh(scopes); } });
+      }, async (): Promise<void> => { if (refresh && this.operationRefreshNeeded) { await this.refresh(scopes); } });
       if (result.status === 'ok' && this.operationPartial) { result.status = 'partial'; result.detail = this.notice; }
       this.lastOperation = result;
       if (result.status === 'savedNotRefreshed') { this.staleScopes = scopes; this.reportError(result.detail || '记录已保存，请重新加载'); }
@@ -672,40 +675,64 @@ export class AppState {
       }
     });
   }
+  private async runPhotoImport(uris: string[]): Promise<void> {
+    if (!this.media) { throw new Error('照片选择暂不可用'); }
+    const media = this.media;
+    const ports: PhotoImportPorts = {
+      find: (id: string, uri: string): Promise<PhotoAsset | undefined> => this.photoRepo.findSource(id, uri),
+      exists: (photo: PhotoAsset): Promise<boolean> => media.exists(photo),
+      import: (uri: string, id: string): Promise<PhotoAsset> => media.import(uri, id),
+      add: (photo: PhotoAsset): Promise<void> => this.relations.addPhoto(photo),
+      replace: (old: PhotoAsset, photo: PhotoAsset): Promise<void> => this.photoRepo.replaceMedia(old.id, old.projectId, photo),
+      remove: (photo: PhotoAsset): Promise<void> => media.remove(photo)
+    };
+    await this.photoImport.run(uris, ports);
+    this.operationRefreshNeeded = this.photoImport.succeeded > 0;
+    this.operationPartial = this.photoImport.failures.length > 0 || this.photoImport.cancelled > 0;
+    if (this.photoImport.failures.length && !this.photoImport.succeeded) { throw new Error('本次没有照片导入成功。' + this.photoImport.summary()); }
+    this.reportNotice(this.photoImport.summary());
+  }
   async importPhotos(projectId: string): Promise<boolean> {
-    return this.perform(async () => {
+    let selected = false;
+    const success = await this.perform(async () => {
       if (!this.media || !this.projects.some((p: CosProject) => p.id === projectId)) { throw new Error('请先选择照片所属计划'); }
-      const uris = await this.media.select(); let count = 0; let failed = 0; let skipped = 0;
-      if (uris.length === 0) { return; }
-      const seen: string[] = [];
-      for (const uri of uris) {
-        if (seen.includes(uri)) { skipped++; continue; }
-        seen.push(uri);
-        const existing = this.photos.find((p: PhotoAsset) => p.projectId === projectId && p.sourceUri === uri);
-        if (existing && await this.media.exists(existing)) { skipped++; continue; }
-        let imported: PhotoAsset | undefined;
-        try {
-          imported = await this.media.import(uri, projectId);
-          if (existing) {
-            imported.id = existing.id;
-            imported.status = existing.status;
-            imported.caption = existing.caption;
-            await this.photoRepo.save(imported);
-          }
-          else { await this.relations.addPhoto(imported); }
-          count++;
-        } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
-      }
-      if (failed > 0 && count === 0) { throw new Error('照片未导入，' + failed + ' 张失败，跳过重复 ' + skipped + ' 张。请检查格式或空间后重试。'); }
-      this.operationPartial = failed > 0;
-      this.reportNotice((count ? '已导入 ' + count + ' 张，' : '') + '跳过重复 ' + skipped + ' 张，失败 ' + failed + ' 张' + (failed ? '。可重试失败项。' : ''));
-    }, true, ['photos']);
+      // Keep the last result until selection succeeds; cancellation is quiet.
+      const uris = await this.media.select(500); if (!uris.length) { this.operationRefreshNeeded = false; return; }
+      selected = true; this.photoImport.begin(projectId, 'importing'); await this.runPhotoImport(uris);
+    }, true, ['photos', 'characters']);
+    return success && selected;
+  }
+  async retryPhotoImport(): Promise<boolean> {
+    return this.perform(async () => {
+      const id = this.photoImport.projectId;
+      const uris = this.photoImport.failures.map((item) => item.uri);
+      if (!uris.length || !this.projects.some((p: CosProject) => p.id === id)) { throw new Error('失败项或所属计划已不存在，请重新选择'); }
+      this.photoImport.begin(id, 'importing'); await this.runPhotoImport(uris);
+    }, true, ['photos', 'characters']);
+  }
+  async inspectPhoto(photo: PhotoAsset): Promise<MediaAvailability> {
+    return this.media ? this.media.inspect(photo) : { original: 'unreadable', thumbnail: 'unreadable' };
+  }
+  async repairPhoto(id: string, thumbnailOnly: boolean = false): Promise<boolean> {
+    let repaired = false;
+    const success = await this.perform(async () => {
+      const photo = this.photos.find((item: PhotoAsset) => item.id === id);
+      if (!photo || !this.media) { throw new Error('照片记录已不存在或媒体尚未就绪'); }
+      const uris = thumbnailOnly ? [] : await this.media.select(1); if (!thumbnailOnly && !uris.length) { this.operationRefreshNeeded = false; return; }
+      const staged = thumbnailOnly ? await this.media.rebuildThumbnail(photo) : await this.media.import(uris[0], photo.projectId);
+      try { await this.photoRepo.replaceMedia(photo.id, photo.projectId, staged); }
+      catch (error) { await this.media.remove({ localPath: thumbnailOnly ? '' : staged.localPath, thumbnailPath: staged.thumbnailPath }); throw error as Error; }
+      repaired = true; this.reportNotice(thumbnailOnly ? '缩略图已重建，原图与照片记录保留' : '已补回这张照片的媒体，状态、说明与导入时间保留');
+      // Old files are collected later, after all photos/versions/covers are checked.
+    }, true, ['photos', 'characters']);
+    return success && repaired;
+  }
+  async setPhotoCaption(id: string, caption: string): Promise<boolean> {
+    return this.perform(async () => { await this.photoRepo.setCaption(id, caption); }, true, ['photos']);
   }
   async setPhotoStatus(photo: PhotoAsset, status: PhotoStatus): Promise<boolean> {
     return this.perform(async () => {
-      const copy = JSON.parse(JSON.stringify(photo)) as PhotoAsset;
-      copy.status = status;
-      await this.photoRepo.save(copy);
+      await this.photoRepo.setStatuses([photo.id], status);
       if (status === PhotoStatus.SELECTED) {
         void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
@@ -719,10 +746,15 @@ export class AppState {
     }, true, ['photos']);
   }
   async setCover(photo: PhotoAsset): Promise<boolean> {
-    const project = this.projects.find((p: CosProject) => p.id === photo.projectId);
-    const character = this.characters.find((c: Character) => c.id === project?.characterId);
-    if (!character || !photo.thumbnailPath) { return false; }
-    const copy = JSON.parse(JSON.stringify(character)) as Character; copy.cover = photo.thumbnailPath; return this.saveCharacter(copy);
+    return this.perform(async () => {
+      const current = this.photos.find((item: PhotoAsset) => item.id === photo.id);
+      if (!current || !this.media || (await this.media.inspect(current)).thumbnail !== 'available') { throw new Error('封面缩略图不可用，请先重建缩略图或补回媒体'); }
+      const project = this.projects.find((p: CosProject) => p.id === current.projectId);
+      const character = this.characters.find((c: Character) => c.id === project?.characterId);
+      if (!character) { throw new Error('所属角色已不存在'); }
+      const copy = JSON.parse(JSON.stringify(character)) as Character; copy.cover = current.thumbnailPath; await this.characterRepo.save(copy);
+      this.reportNotice('已设为 ' + character.name + ' 的角色封面');
+    }, true, ['characters']);
   }
   async reloadSettings(): Promise<void> {
     if (!this.context) { return; }
@@ -820,6 +852,7 @@ export class AppState {
       // Invalidate the staged input as soon as the transaction commits; refresh
       // retries must never repeat replacement.
       this.cancelRestoreData(); this.preparationUndos = [];
+      this.photoImport.clear();
       const draftsCleared = await this.clearFormDrafts('元数据已恢复');
       const canceled = await this.cancelEventReminders();
       this.reportNotice('已替换恢复 ' + preview.incomingCount + ' 条记录。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。') + (draftsCleared ? '' : '本地草稿清理未完成，请勿恢复旧草稿。'));
@@ -839,7 +872,7 @@ export class AppState {
     return canceled;
   }
   async clearData(): Promise<boolean> {
-    return this.perform(async () => { await this.relations.clear(); this.preparationUndos = []; await this.clearFormDrafts('正式记录已清空'); await this.cancelEventReminders(); await this.media?.collect([]); });
+    return this.perform(async () => { await this.relations.clear(); this.photoImport.clear(); this.preparationUndos = []; await this.clearFormDrafts('正式记录已清空'); await this.cancelEventReminders(); await this.media?.collect([]); });
   }
   private async clearFormDrafts(message: string): Promise<boolean> {
     try { await formDraftStore.clear(); return true; }

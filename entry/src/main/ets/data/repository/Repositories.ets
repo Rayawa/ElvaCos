@@ -281,6 +281,42 @@ export class ChecklistItemRepository {
 export class PhotoAssetRepository {
   private db: Database;
   constructor(db: Database) { this.db = db; }
+  private read(rows: relationalStore.ResultSet): PhotoAsset {
+    const item = new PhotoAsset();
+    item.id = str(rows, 'id'); item.projectId = str(rows, 'project_id'); item.sourceUri = str(rows, 'source_uri');
+    item.localPath = str(rows, 'local_path'); item.thumbnailPath = str(rows, 'thumbnail_path');
+    item.status = str(rows, 'status') as PhotoStatus; item.caption = str(rows, 'caption'); item.createdAt = num(rows, 'created_at');
+    return item;
+  }
+  async findSource(projectId: string, uri: string): Promise<PhotoAsset | undefined> {
+    const rows = await this.db.getStore().querySql('SELECT * FROM photos WHERE project_id=? AND source_uri=?', [projectId, uri]);
+    try { return rows.goToNextRow() ? this.read(rows) : undefined; } finally { rows.close(); }
+  }
+  async renderedPaths(): Promise<string[]> {
+    const paths: string[] = []; const rows = await this.db.getStore().querySql("SELECT rendered_path FROM photo_versions WHERE rendered_path<>''");
+    try { while (rows.goToNextRow()) { paths.push(str(rows, 'rendered_path')); } } finally { rows.close(); }
+    return paths;
+  }
+  async replaceMedia(id: string, projectId: string, imported: PhotoAsset): Promise<void> {
+    if (!imported.localPath || !imported.thumbnailPath) { throw new Error('照片文件未完整建立'); }
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      const rows = await this.db.getStore().querySql('SELECT * FROM photos WHERE id=? AND project_id=?', [id, projectId]);
+      let old: PhotoAsset;
+      try { if (!rows.goToNextRow()) { throw new Error('照片记录已变化，请返回重新打开'); } old = this.read(rows); } finally { rows.close(); }
+      // Preserve identity, caption, workflow and original import time; never upsert a deleted photo.
+      await tx.execute('UPDATE photos SET source_uri=?,local_path=?,thumbnail_path=? WHERE id=?', [imported.sourceUri, imported.localPath, imported.thumbnailPath, id]);
+      if (old.thumbnailPath) { await tx.execute('UPDATE characters SET cover=? WHERE cover=?', [imported.thumbnailPath, old.thumbnailPath]); }
+      await tx.execute("UPDATE photo_versions SET rendered_path=? WHERE photo_id=? AND (rendered_path=? AND rendered_path<>'' OR name='Original' AND rendered_path='')", [imported.localPath, id, old.localPath]);
+    });
+  }
+  async setCaption(id: string, caption: string): Promise<void> {
+    if (caption.length > 20000) { throw new Error('照片说明最多 20000 字'); }
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      const rows = await this.db.getStore().querySql('SELECT id FROM photos WHERE id=?', [id]);
+      try { if (rows.rowCount !== 1) { throw new Error('照片记录已不存在'); } } finally { rows.close(); }
+      await tx.execute('UPDATE photos SET caption=? WHERE id=?', [caption, id]);
+    });
+  }
   async list(): Promise<PhotoAsset[]> {
     const result: PhotoAsset[] = [];
     let offset = 0;
@@ -290,16 +326,7 @@ export class PhotoAssetRepository {
       try {
         while (rows.goToNextRow()) {
           count++;
-          const item = new PhotoAsset();
-          item.id = str(rows, 'id');
-          item.projectId = str(rows, 'project_id');
-          item.sourceUri = str(rows, 'source_uri');
-          item.localPath = str(rows, 'local_path');
-          item.thumbnailPath = str(rows, 'thumbnail_path');
-          item.status = str(rows, 'status') as PhotoStatus;
-          item.caption = str(rows, 'caption');
-          item.createdAt = num(rows, 'created_at');
-          result.push(item);
+          result.push(this.read(rows));
         }
       } finally { rows.close(); }
       if (count < 500) { break; }

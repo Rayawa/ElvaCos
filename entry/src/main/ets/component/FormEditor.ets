@@ -33,6 +33,7 @@ import { PreparationTemplatePicker } from './PreparationTemplatePicker';
 
 @ComponentV2
 export struct FormEditor {
+  @Param creationAction: string = '创建计划并开始准备';
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param entrance: StaggerEntrance = new StaggerEntrance();
   @Require @Param state: AppState;
@@ -141,7 +142,7 @@ export struct FormEditor {
         Column({ space: 18 }) {
           this.draftStatus()
           Column({ space: 18 }) {
-          if (this.draft.kind !== 'project' && this.draft.kind !== 'reference') { Field({ componentId: 'form-input:name', error: this.issue('name'), area: (area: Area): void => { this.fieldArea('name', area); }, focused: (): void => { this.focus('name'); },
+          if (this.draft.kind !== 'project' && this.draft.kind !== 'reference' && this.draft.kind !== 'photo') { Field({ componentId: 'form-input:name', error: this.issue('name'), area: (area: Area): void => { this.fieldArea('name', area); }, focused: (): void => { this.focus('name'); },
               label: this.draft.kind === 'team' ? '姓名 / 称呼 *' : this.draft.kind === 'expense' ? '花费用途 *' : '名称 *',
               value: this.draft.name,
               placeholder: this.nameHint(),
@@ -422,7 +423,7 @@ export struct FormEditor {
             Text('填写任一等待字段后，未完成任务会归入「在途」，不计入逾期。清空两项可回到待办。').fontSize(13).fontColor(Theme.muted)
           }
           if (this.draft.kind !== 'category' && this.draft.kind !== 'checklist' && (this.draft.kind !== 'project' || this.draft.advanced)) { Field({ componentId: 'form-input:notes', error: this.issue('notes'), area: (area: Area): void => { this.fieldArea('notes', area); }, focused: (): void => { this.focus('notes'); },
-              label: this.draft.kind === 'reference' ? '图片说明' : '备注',
+              multilineLimit: this.draft.kind === 'photo' ? 20000 : 2000, label: this.draft.kind === 'photo' ? '照片说明' : this.draft.kind === 'reference' ? '图片说明' : '备注',
               value: this.draft.notes,
               multiline: true,
               change: (v: string) => { this.draft.notes = v; }
@@ -439,8 +440,8 @@ export struct FormEditor {
         Text(this.formError || this.issues[0].message).id('form-error').fontSize(14).fontColor(Theme.danger)
           .accessibilityText(this.formError || this.issues[0].message)
       }
-      Button(this.state.busy || this.session.submitting ? '保存中…' : this.draft.kind === 'project' && !this.draft.id ? '创建计划并开始准备' : '保存')
-        .accessibilityText(this.state.busy || this.session.submitting ? '正在保存' : this.draft.kind === 'project' && !this.draft.id ? '创建计划并开始准备' : '保存表单')
+      Button(this.state.busy || this.session.submitting ? '保存中…' : this.draft.kind === 'project' && !this.draft.id ? this.creationAction : '保存')
+        .accessibilityText(this.state.busy || this.session.submitting ? '正在保存' : this.draft.kind === 'project' && !this.draft.id ? this.creationAction : '保存表单')
         .width('100%')
         .constraintSize({ minHeight: 52 })
         .backgroundColor(Theme.brand)

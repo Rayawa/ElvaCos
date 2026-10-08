@@ -100,6 +100,7 @@ export default function uiShellTest(): void {
       const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
       if (photos.length > 0) {
         await photos[0].click(); await driver.delayMs(500); await present('照片工作流');
+        await present('编辑照片说明'); await tap('编辑照片说明'); await present('编辑照片说明'); await present('照片说明'); await tap('sheet-close'); await present('照片工作流');
         expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
         expect((await driver.findComponents(ON.description('照片已加载').inWindow(bundle))).length > 0).assertTrue();
         await driver.screenCap('/data/storage/el2/base/cache/elvacos-photo-detail.png');
@@ -222,7 +223,8 @@ export default function uiShellTest(): void {
       await tap('衣柜'); await tap('照片'); await tap('打开相册'); await tap('导入照片');
       const form = await driver.findComponents(ON.text('新建计划').inWindow(bundle));
       if (form && form.length > 0) { await tap('sheet-close'); } else {
-        await present('选择照片所属计划'); await tap('sheet-close'); await present('导入照片');
+        await present('选择照片所属计划'); await present('新建计划后继续导入');
+        await tap('新建计划后继续导入'); await present('新建计划'); await present('创建计划并导入照片'); await tap('sheet-close'); await present('导入照片');
       }
       await back(); await tap('首页');
     });

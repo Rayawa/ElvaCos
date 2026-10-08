@@ -1,3 +1,4 @@
+import { PhotoImportStatus } from './PhotoImportStatus';
 import { PHOTO_FILTER_LABELS, photoStatusLabel, PHOTO_EDIT_STATUSES } from '../model/PhotoStages';
 import { PhotoCollectionRoute, PhotoViewerRoute, selectPhotoCollection } from '../model/PhotoCollection';
 import { StaggerEntrance } from '../common/motion';
@@ -131,7 +132,7 @@ export struct PhotoGrid {
       ListItem() {
         Column() {
           Blank().height(this.topInset > 0 ? this.topInset + Theme.sectionSpacing : 0).width('100%')
-          Column({ space: 12 }) { this.header(); this.controls() }.width('100%').opacity(this.step() >= 1 ? 1 : 0)
+          Column({ space: 12 }) { this.header(); PhotoImportStatus({ state: this.state, projectId: this.route.planId }); this.controls() }.width('100%').opacity(this.step() >= 1 ? 1 : 0)
         }.width('100%')
       }
       if (!this.visible().length) {

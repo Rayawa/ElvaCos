@@ -81,6 +81,8 @@ import { EmptyState } from '../component/Surfaces';
   @Local meSection: number = 0;
   @Local libraryPhotos: boolean = false;
   @Local rootSheetKind: string = 'form';
+  @Local creatingForImport: boolean = false;
+  @Local pendingImportPlanId: string = '';
   @Local importOpen: boolean = false;
   @Local formOpen: boolean = false;
   @Local restoreOpen: boolean = false;
@@ -234,6 +236,7 @@ import { EmptyState } from '../component/Surfaces';
   private edit(kind: string, id: string = '', parent: string = ''): void {
     HapticService.confirm(this.state.settings.haptic);
     if (!this.state.staleScopes.length) { this.state.error = ''; }
+    this.creatingForImport = false; this.pendingImportPlanId = '';
     this.rootSheetKind = 'form';
     this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent), formDraftStore);
     void this.formSession.initialize(this.state);
@@ -321,7 +324,7 @@ import { EmptyState } from '../component/Surfaces';
     } finally { this.checkingFormClose = false; }
   }
   private rootSheetOptions(): SheetOptions {
-    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; this.restoreOpen = false; if (this.rootSheetKind === 'restore') { this.state.cancelRestoreData(); } }, this.sheetEntrance, this.getUIContext());
+    const options = appSheetOptions((): void => { this.importOpen = false; this.formOpen = false; this.restoreOpen = false; this.creatingForImport = false; if (this.pendingImportPlanId && !this.state.staleScopes.length) { void this.continueImport(); } if (this.rootSheetKind === 'restore') { this.state.cancelRestoreData(); } }, this.sheetEntrance, this.getUIContext());
     if (this.rootSheetKind === 'form') {
       options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
       options.onWillDismiss = (action: DismissSheetAction): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { action.dismiss(); } }); };
@@ -340,9 +343,15 @@ import { EmptyState } from '../component/Surfaces';
     FormEditor({
       entrance: this.sheetEntrance,
       state: this.state, draft: this.formSession.draft, session: this.formSession,
+      creationAction: this.creatingForImport ? '创建计划并导入照片' : '创建计划并开始准备',
       close: (): void => { this.allowFormClose().then((allowed: boolean): void => { if (allowed) { this.formOpen = false; } }); },
       done: (): void => { this.formOpen = false; },
-      saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('projectPreparation', id); } },
+      saved: (kind: string, id: string, created: boolean): void => {
+        if (kind === 'project' && created) {
+          if (this.creatingForImport) { this.pendingImportPlanId = id; this.open('projectPhotos', id); }
+          else { this.open('projectPreparation', id); }
+        }
+      },
     })
   }
 
@@ -418,7 +427,7 @@ import { EmptyState } from '../component/Surfaces';
         if (this.state.photos.some((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id)) {
           PhotoDetail({ entrance: entrance, state: this.state,
             photo: this.state.photos.find((photo: PhotoAsset) => photo.id === (param as PhotoViewerRoute).id) as PhotoAsset,
-            open: (k: string, id: string): void => { this.open(k, id); }, remove: (k: string, id: string): void => { this.remove(k, id); } })
+            open: (k: string, id: string): void => { this.open(k, id); }, edit: (k: string, id: string, parent: string): void => { this.edit(k, id, parent); }, remove: (k: string, id: string): void => { this.remove(k, id); } })
         } else { EmptyState({ title: '照片记录已不存在', message: '可以返回原来的照片范围。', button: '返回', action: (): void => { this.closeDetail(); } }).margin({ top: Theme.detailTop }) }
       }
     }.width('100%').height('100%')
@@ -514,8 +523,17 @@ import { EmptyState } from '../component/Surfaces';
   }
   private chooseImport(planId: string = ''): void {
     if (planId && this.state.projects.some((project: CosProject) => project.id === planId)) { this.state.importPhotos(planId); return; }
-    if (this.state.projects.length === 0) { this.edit('project'); this.state.reportNotice('先建立计划，再导入照片。'); }
+    if (this.state.projects.length === 0) { this.createForImport(); }
     else { this.rootSheetKind = 'import'; this.importOpen = true; }
+  }
+  private createForImport(): void {
+    this.edit('project'); this.creatingForImport = true; this.importOpen = false;
+  }
+  private async continueImport(): Promise<void> {
+    const id = this.pendingImportPlanId;
+    if (!id || this.state.busy || this.state.staleScopes.length) { return; }
+    this.pendingImportPlanId = '';
+    if (this.state.projects.some((project: CosProject) => project.id === id)) { await this.state.importPhotos(id); }
   }
   private async referenceCover(id: string): Promise<void> {
     const r = this.state.references.find((r: ReferenceImage) => r.id === id); if (!r) { return; }
@@ -542,6 +560,7 @@ import { EmptyState } from '../component/Surfaces';
         haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
         close: (): void => { this.importOpen = false; },
       }).opacity(this.sheetEntrance.step >= 1 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 1 ? 0 : 20 })
+      Button('新建计划后继续导入').constraintSize({ minHeight: 48 }).width('100%').onClick((): void => { this.createForImport(); })
       List({ space: 10 }) {
         ForEach(this.state.projects, (p: CosProject) => {
           ListItem() {
@@ -551,7 +570,7 @@ import { EmptyState } from '../component/Surfaces';
             .constraintSize({ minHeight: 56 })
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)
-            .onClick(() => { HapticService.confirm(this.state.settings.haptic); this.importOpen = false; this.state.importPhotos(p.id); })
+            .onClick(() => { HapticService.confirm(this.state.settings.haptic); this.pendingImportPlanId = p.id; this.importOpen = false; })
             .visualEffect(this.feedback.effect('import-project:' + p.id, true))
             .compositingFilter(this.feedback.filter('import-project:' + p.id, true))
             .attributeModifier(this.feedback.control('import-project:' + p.id, true))
@@ -732,7 +751,30 @@ import { EmptyState } from '../component/Surfaces';
   @Builder loadingOverlay() {
     Stack({ alignContent: Alignment.Center }) {
       if (this.state.busy) {
-        LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中')
+        if (this.state.photoImport.phase === 'importing') {
+          Column({ space: 14 }) {
+            LoadingProgress().width(40).height(40).color(Theme.brand)
+            Text('正在导入 · ' + this.state.projectName(this.state.photoImport.projectId)).fontSize(16).fontColor(Theme.ink)
+            Text('已处理 ' + this.state.photoImport.processed + ' / ' + this.state.photoImport.total + ' 张').fontSize(16).fontColor(Theme.ink)
+            Button(this.state.photoImport.stopRequested ? '正在停止…' : '停止剩余导入').constraintSize({ minHeight: 48 }).enabled(!this.state.photoImport.stopRequested)
+              .onClick((): void => { this.state.photoImport.cancel(); })
+            Text('已提交的照片保留；当前文件处理结束后停止。').fontSize(14).fontColor(Theme.muted)
+          }.padding(24).width('90%').constraintSize({ maxWidth: 460 }).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+        } else { LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中') }
+      }
+      if (this.pendingImportPlanId && !this.state.busy && !this.state.staleScopes.length) {
+        Column({ space: 10 }) {
+          Text('计划已保存，可继续导入照片。').fontSize(14).fontColor(Theme.ink)
+          Button('继续导入照片').constraintSize({ minHeight: 48 }).onClick((): void => { void this.continueImport(); })
+          Button('稍后导入').constraintSize({ minHeight: 48 }).onClick((): void => { this.pendingImportPlanId = ''; })
+        }.padding(24).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+      }
+      if (this.state.photoImport.phase === 'completed' && !this.state.staleScopes.length && !this.state.busy) {
+        Row({ space: 12 }) {
+          Text(this.state.photoImport.summary()).fontSize(14).fontColor(Theme.ink).layoutWeight(1)
+          Button('查看导入结果').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('album', this.state.photoImport.projectId); })
+          Button('关闭').constraintSize({ minHeight: 48 }).onClick((): void => { this.state.photoImport.clear(); })
+        }.width('100%').padding(16).backgroundColor(Theme.surface).margin({ bottom: Theme.contentBottom }).align(Alignment.Bottom).accessibilityGroup(true)
       }
       this.recoveryBanner()
     }.width('100%').height('100%').hitTestBehavior(HitTestMode.Transparent)

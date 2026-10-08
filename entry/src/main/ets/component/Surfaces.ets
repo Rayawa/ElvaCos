@@ -129,6 +129,7 @@ export struct FactRow {
 
 @ComponentV2
 export struct Field {
+  @Param multilineLimit: number = 2000;
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Param label: string = '';
   @Param componentId: string = '';
@@ -145,7 +146,7 @@ export struct Field {
       if (this.multiline) {
         TextArea({ text: this.value, placeholder: this.placeholder })
           .height(100)
-          .maxLength(2000)
+          .maxLength(this.multilineLimit)
           .backgroundColor(Theme.bg)
           .fontColor(Theme.ink)
           .id(this.componentId).onFocus((): void => { this.focused(); })

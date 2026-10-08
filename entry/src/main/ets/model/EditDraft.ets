@@ -2,7 +2,7 @@ import { today } from '../common/format';
 import { TeamMember, Expense, ReferenceImage } from './Planning';
 import { PreparationCategory, PreparationTask, makePreparation, preparationKeys } from './Preparation';
 import { AppState } from './ApplicationState';
-import { Asset, Character, CharacterVariant, CosEvent, CosProject, AssetType, AssetStatus, ProjectStatus, ChecklistItem, newId } from './Entities';
+import { Asset, Character, CharacterVariant, CosEvent, CosProject, AssetType, AssetStatus, ProjectStatus, ChecklistItem, PhotoAsset, newId } from './Entities';
 import { moneyToCents, validDate, requiredName, safeUrl } from './Rules';
 import { checkSchedule, ScheduleError } from './Schedule';
 
@@ -54,6 +54,7 @@ export class EditDraft {
   @Trace preparationKeys: string[] = preparationKeys(1);
   static make(state: AppState, kind: string, id: string = '', parent: string = ''): EditDraft {
     const d = new EditDraft(); d.kind = kind; d.id = id; d.parentId = parent;
+    if (kind === 'photo') { const photo = state.photos.find((item: PhotoAsset) => item.id === id); if (photo) { d.notes = photo.caption; d.parentId = photo.projectId; } }
     if (kind === 'character') {
       const c = state.characters.find((item: Character) => item.id === id);
       if (c) {
@@ -254,6 +255,7 @@ export class EditDraft {
     value.preparationKeys = source.preparationKeys.slice(); return value;
   }
   exists(state: AppState, id: string = this.id): boolean {
+    if (this.kind === 'photo') { return !!id && state.photos.some((item: PhotoAsset) => item.id === id); }
     if (!id) { return true; }
     if (this.kind === 'character') { return state.characters.some((item: Character) => item.id === id); }
     if (this.kind === 'variant') { return state.variants.some((item: CharacterVariant) => item.id === id); }
@@ -278,7 +280,7 @@ export class EditDraft {
       if (this.newCharacter && !this.id) { check('characterName', (): void => { requiredName(this.characterName); }); }
       else if (!state.characters.some((item: Character) => item.id === this.characterId)) { errors.push(new FormIssue('characterId', '请选择现有角色')); }
     }
-    if (this.kind !== 'reference') { check('name', (): void => { requiredName(this.name); }); }
+    if (this.kind !== 'reference' && this.kind !== 'photo') { check('name', (): void => { requiredName(this.name); }); }
     if (this.kind === 'project' && this.date || this.kind === 'preparation' && this.date || this.kind === 'expense') {
       if (!validDate(this.date)) { errors.push(new FormIssue('date', '请选择有效日期')); }
     }
@@ -301,11 +303,13 @@ export class EditDraft {
       event.timeMode = this.timeMode; event.startTime = this.startTime; event.endTime = this.endTime; event.reminderMinutes = this.reminderMinutes;
       try { checkSchedule(event); } catch (error) { errors.push(new FormIssue((error as ScheduleError).field || 'date', (error as Error).message)); }
     }
+    if (this.kind === 'photo' && this.notes.length > 20000) { errors.push(new FormIssue('notes', '照片说明最多 20000 字')); }
     return errors;
   }
   async save(state: AppState): Promise<boolean> {
     const issues = this.issues(state);
     if (issues.length) { state.reportError(issues[0].message); return false; }
+    if (this.kind === 'photo') { return state.setPhotoCaption(this.id, this.notes); }
 
     if (this.kind === 'character') {
       const old = state.characters.find((c: Character) => c.id === this.id);
@@ -432,7 +436,7 @@ export class EditDraft {
     return false;
   }
   title(): string {
-    const labels = new Map<string, string>([['character', '角色'], ['variant', '角色版本'], ['project', '计划'], ['asset', '装备'], ['event', '活动'], ['checklist', '清单项'], ['preparation', '准备任务'], ['category', '准备分类'], ['team', '团队成员'], ['expense', '花费'], ['reference', '参考图说明']]);
+    const labels = new Map<string, string>([['character', '角色'], ['variant', '角色版本'], ['project', '计划'], ['asset', '装备'], ['event', '活动'], ['checklist', '清单项'], ['preparation', '准备任务'], ['category', '准备分类'], ['team', '团队成员'], ['expense', '花费'], ['reference', '参考图说明'], ['photo', '照片说明']]);
     return (this.id ? '编辑' : this.kind === 'project' ? '新建' : '添加') + labels.get(this.kind);
   }
 }

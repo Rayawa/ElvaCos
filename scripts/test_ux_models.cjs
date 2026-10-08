@@ -14,7 +14,23 @@ let backupControl = {};
 let backupFileControl = {};
 let metadataExportTime = 0;
 let failExportTime = false;
+let mediaControl = {};
 Module._load = function (id, parent, isMain) {
+  if (parent?.filename.endsWith('/data/media/MediaRepository.ets')) {
+    if (id === '@kit.MediaLibraryKit') return { photoAccessHelper: { PhotoViewPicker: class { async select(options) { mediaControl.pickerOptions = options; return { photoUris: mediaControl.selection || [] }; } }, PhotoViewMIMETypes: { IMAGE_TYPE: 'image' } } };
+    if (id === '@kit.CoreFileKit') return { fileUri: { getUriFromPath: path => 'file://' + path }, fileIo: {
+      OpenMode: { READ_ONLY: 1, CREATE: 2, WRITE_ONLY: 4, TRUNC: 8 },
+      access: async path => { if (mediaControl.denied?.includes(path)) throw new Error('access denied'); return mediaControl.files.has(path); },
+      mkdir: async path => mediaControl.files.add(path), open: async (path, mode) => { if (mode === 1 && !mediaControl.files.has(path)) throw new Error('file missing'); mediaControl.files.add(path); return { fd: path }; },
+      close: async () => {}, stat: async () => ({ size: 10 }), copyFile: async (fd, path) => mediaControl.files.add(path),
+      write: async (fd, packed) => mediaControl.shortWrite ? packed.byteLength - 1 : packed.byteLength,
+      unlink: async path => { mediaControl.removed.push(path); mediaControl.files.delete(path); }, listFile: async dir => [...mediaControl.files].filter(path => path.startsWith(dir + '/')).map(path => path.slice(dir.length + 1))
+    } };
+    if (id === '@kit.ImageKit') return { image: {
+      createImageSource: () => ({ getImageInfo: async () => ({ size: { width: 1000, height: 2000 } }), createPixelMap: async options => { mediaControl.desired = options.desiredSize; return { release: () => {} }; }, release: () => {} }),
+      createImagePacker: () => ({ packToData: async () => new ArrayBuffer(10), release: () => {} })
+    } };
+  }
   if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID(), TextEncoder: { create: () => ({ encodeInto: value => new Uint8Array(Buffer.from(value, 'utf8')) }) }, TextDecoder: class { decodeToString(bytes) { return Buffer.from(bytes).toString('utf8'); } } } };
   if (id === '@kit.CoreFileKit' && parent?.filename.endsWith('/common/BackupService.ets')) return { fileIo: { OpenMode: { READ_ONLY: 1, WRITE_ONLY: 2, TRUNC: 4 }, open: async () => ({ fd: 1 }), close: async fd => backupFileControl.close?.(fd), write: async (fd, buffer) => backupFileControl.write(fd, buffer), read: async (fd, buffer, options) => backupFileControl.read(fd, buffer, options), stat: async () => ({ size: backupFileControl.bytes?.length || 0 }) }, picker: { DocumentViewPicker: class { async save() { return backupFileControl.save?.() || []; } async select() { return backupFileControl.select?.() || []; } } } };
   if (id === '@kit.ArkData') return { relationalStore: { RdbPredicates: class {
@@ -540,6 +556,130 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(route.byPlan.planId, ''); assert.equal(route.byPlan.filter, 5); assert.deepEqual(route.byPlan.selectedIds, []); assert.match(route.byPlan.feedback, /已不存在/);
     assert.equal(route.queue.planId, project.id); assert.equal(route.queue.filter, 3); assert.equal(route.queue.offset, 300);
     route.reconcile([project], photos, project.id); assert.equal(route.queue.planId, ''); assert.equal(route.queue.filter, 3);
+  });
+  await test('photo import tracks progress, preserves successes and retries only failed sources', async () => {
+    const { PhotoImportJob } = require(root + '/model/PhotoImport.ets');
+    const job = new PhotoImportJob(), committed = new Map(); let unavailable = true, readFailure = true; const calls = [], removed = [];
+    const ports = {
+      find: async (id, uri) => { if (uri === 'read' && readFailure) throw new Error('database read unavailable'); return committed.get(uri); },
+      exists: async () => true,
+      import: async (uri, projectId) => { calls.push(uri); assert.equal(job.processed < job.total, true); if (uri === 'bad' && unavailable) throw new Error('grant unavailable'); return Object.assign(new PhotoAsset(), { sourceUri: uri, projectId }); },
+      add: async photo => { if (photo.sourceUri === 'write' && unavailable) throw new Error('database write unavailable'); committed.set(photo.sourceUri, photo); },
+      replace: async () => { throw new Error('unexpected replacement'); }, remove: async photo => removed.push(photo.sourceUri)
+    };
+    job.begin('plan'); await job.run(['ok', 'ok', 'bad', 'write', 'read'], ports);
+    assert.equal(job.phase, 'completed'); assert.equal(job.processed, 5); assert.equal(job.succeeded, 1); assert.equal(job.skipped, 1);
+    assert.deepEqual(job.failures.map(item => item.uri), ['bad', 'write', 'read']); assert.deepEqual(removed, ['write']); assert.equal(committed.size, 1);
+    const retry = job.failures.map(item => item.uri); unavailable = false; readFailure = false; job.begin('plan'); await job.run(retry, ports);
+    assert.equal(job.succeeded, 3); assert.equal(job.failures.length, 0); assert.equal(committed.size, 4); assert.equal(calls.filter(uri => uri === 'ok').length, 1);
+  });
+  await test('photo import processes a 300-source batch sequentially with exact progress and no duplicate records', async () => {
+    const { PhotoImportJob } = require(root + '/model/PhotoImport.ets'), job = new PhotoImportJob(); const records = new Set(); let active = 0, maximum = 0;
+    job.begin('plan'); const uris = Array.from({ length: 300 }, (_, index) => 'uri-' + index);
+    await job.run(uris.concat(uris[0]), { find: async () => undefined, exists: async () => false,
+      import: async uri => { maximum = Math.max(maximum, ++active); await Promise.resolve(); active--; return Object.assign(new PhotoAsset(), { sourceUri: uri }); },
+      add: async photo => records.add(photo.sourceUri), replace: async () => {}, remove: async () => {} });
+    assert.equal(job.total, 301); assert.equal(job.processed, 301); assert.equal(job.succeeded, 300); assert.equal(job.skipped, 1); assert.equal(records.size, 300); assert.equal(maximum, 1);
+  });
+  await test('photo import cancellation keeps committed items and removes only the uncommitted staged item', async () => {
+    const { PhotoImportJob } = require(root + '/model/PhotoImport.ets'); const job = new PhotoImportJob(); const committed = [], removed = [];
+    const ports = { find: async () => undefined, exists: async () => false,
+      import: async uri => { if (uri === 'second') job.cancel(); return Object.assign(new PhotoAsset(), { sourceUri: uri }); },
+      add: async photo => committed.push(photo.sourceUri), replace: async () => {}, remove: async photo => removed.push(photo.sourceUri) };
+    job.begin('plan'); await job.run(['first', 'second', 'third'], ports);
+    assert.deepEqual(committed, ['first']); assert.deepEqual(removed, ['second']); assert.equal(job.succeeded, 1); assert.equal(job.cancelled, 2); assert.equal(job.processed, 1); assert.equal(job.failures.length, 0);
+  });
+  await test('actual media inspection separates absent paths, missing files and access failure; thumbnail writes are complete', async () => {
+    const { MediaRepository } = require(root + '/data/media/MediaRepository.ets');
+    const repo = new MediaRepository({ filesDir: '/sandbox', cacheDir: '/cache' });
+    mediaControl = { files: new Set(['/sandbox/media/original', 'test://source']), removed: [], denied: ['/denied'] };
+    assert.deepEqual(await repo.inspect({ localPath: '', thumbnailPath: '/missing' }), { original: 'unlinked', thumbnail: 'missing' });
+    assert.deepEqual(await repo.inspect({ localPath: '/sandbox/media/original', thumbnailPath: '/denied' }), { original: 'available', thumbnail: 'unreadable' });
+    const photo = Object.assign(new PhotoAsset(), { projectId: 'plan', sourceUri: 'test://old', localPath: '/sandbox/media/original', thumbnailPath: '/sandbox/media/oldthumb' });
+    mediaControl.shortWrite = true; await assert.rejects(repo.rebuildThumbnail(photo), /未完整写入/);
+    assert.equal(mediaControl.files.has(photo.localPath), true); assert.equal(mediaControl.removed.includes(photo.localPath), false);
+    await assert.rejects(repo.import('test://source', 'plan'), /未完整写入/); assert.equal(mediaControl.files.has('test://source'), true);
+    mediaControl.shortWrite = false; const rebuilt = await repo.rebuildThumbnail(photo);
+    assert.equal(rebuilt.localPath, photo.localPath); assert.notEqual(rebuilt.thumbnailPath, photo.thumbnailPath); assert.deepEqual(mediaControl.desired, { width: 240, height: 480 });
+    assert.equal(await repo.exists(rebuilt), true);
+    await repo.select(500); assert.equal(mediaControl.pickerOptions.maxSelectNumber, 500);
+    mediaControl.files.add('/sandbox/media/version.jpg'); mediaControl.files.add('/sandbox/media/orphan.jpg');
+    await repo.collect([rebuilt], [], [], ['/sandbox/media/version.jpg']); assert.equal(mediaControl.files.has('/sandbox/media/version.jpg'), true); assert.equal(mediaControl.files.has('/sandbox/media/orphan.jpg'), false);
+  });
+  await test('media replacement is atomic and preserves photo identity, workflow, caption, time, covers and edited versions', async () => {
+    const { PhotoAssetRepository, RelationRepository } = require(root + '/data/repository/Repositories.ets'); const repairDb = new SqliteAdapter();
+    try {
+      for (const match of fs.readFileSync(root + '/data/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await repairDb.sql(match[1]);
+      await repairDb.sql("INSERT INTO characters(id,name,cover,created_at,updated_at) VALUES('role','角色','/old-thumb',1,1)");
+      await repairDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
+      await repairDb.sql("INSERT INTO photos VALUES('photo','plan','old-uri','/old','/old-thumb','Final','保留说明',123)");
+      await repairDb.sql("INSERT INTO photo_versions VALUES('original','photo','Original','{}','/old',1)");
+      await repairDb.sql("INSERT INTO photo_versions VALUES('edited','photo','Edited','edited-recipe','/edited',2)");
+      const repo = new PhotoAssetRepository(repairDb), staged = Object.assign(new PhotoAsset(), { projectId: 'plan', sourceUri: 'new-uri', localPath: '/new', thumbnailPath: '/new-thumb' });
+      repairDb.failSql = 'UPDATE characters'; await assert.rejects(repo.replaceMedia('photo', 'plan', staged), /injected/); repairDb.failSql = '';
+      assert.deepEqual((await repairDb.sql('SELECT source_uri,local_path,thumbnail_path FROM photos')).rows[0], ['old-uri', '/old', '/old-thumb']);
+      await repo.replaceMedia('photo', 'plan', staged);
+      assert.deepEqual((await repairDb.sql('SELECT id,project_id,status,caption,created_at,source_uri,local_path FROM photos')).rows[0], ['photo', 'plan', 'Final', '保留说明', 123, 'new-uri', '/new']);
+      assert.equal((await repairDb.sql('SELECT cover FROM characters')).rows[0][0], '/new-thumb');
+      assert.deepEqual((await repairDb.sql('SELECT name,recipe,rendered_path FROM photo_versions ORDER BY id')).rows, [['Edited', 'edited-recipe', '/edited'], ['Original', '{}', '/new']]);
+      assert.deepEqual((await repo.renderedPaths()).sort(), ['/edited', '/new']);
+      await assert.rejects(repo.replaceMedia('photo', 'wrong-plan', staged), /已变化/);
+      await repairDb.sql("UPDATE photo_versions SET rendered_path=''"); await repo.replaceMedia('photo', 'plan', staged);
+      assert.equal((await repairDb.sql("SELECT rendered_path FROM photo_versions WHERE name='Original'")).rows[0][0], '/new');
+      assert.equal((await repairDb.sql("SELECT rendered_path FROM photo_versions WHERE name='Edited'")).rows[0][0], '');
+      await repairDb.sql("UPDATE photo_versions SET rendered_path='/edited' WHERE name='Edited'");
+      await repairDb.sql("INSERT INTO photos VALUES('collision','plan','collision-uri','/collision','/collision-thumb','Raw','',1)");
+      await assert.rejects(repo.replaceMedia('photo', 'plan', Object.assign(new PhotoAsset(), staged, { sourceUri: 'collision-uri' })));
+      assert.equal((await repo.list()).find(photo => photo.id === 'photo').sourceUri, 'new-uri'); await repo.remove('collision');
+      const state = new AppState(); state.photoRepo = repo; state.relations = new RelationRepository(repairDb); state.projects = [Object.assign(new CosProject(), { id: 'plan' })]; state.photos = await repo.list();
+      let imports = 0, refreshes = 0; const removed = [];
+      state.media = { select: async () => [], import: async uri => { imports++; return Object.assign(new PhotoAsset(), staged, { id: entities.newId(), sourceUri: uri }); }, remove: async media => removed.push(media), rebuildThumbnail: async photo => Object.assign(new PhotoAsset(), staged, { sourceUri: photo.sourceUri, localPath: photo.localPath }) };
+      state.refresh = async () => { refreshes++; if (refreshes === 1) throw new Error('read unavailable'); state.photos = await repo.list(); };
+      assert.equal(await state.repairPhoto('photo'), false); assert.equal(imports, 0); // Picker cancellation
+      refreshes = 0; state.media.select = async () => ['repaired-uri'];
+      assert.equal(await state.repairPhoto('photo'), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed'); assert.equal(imports, 1); assert.equal(removed.length, 0);
+      repairDb.failSql = 'UPDATE photos'; assert.equal(await state.reloadRecords(), true); repairDb.failSql = ''; assert.equal(imports, 1);
+      repairDb.failSql = 'UPDATE photos'; assert.equal(await state.repairPhoto('photo', true), false); repairDb.failSql = '';
+      assert.equal(removed.length, 1); assert.equal(removed[0].localPath, ''); assert.equal((await repo.list())[0].localPath, '/new');
+      const { CharacterRepository } = require(root + '/data/repository/Repositories.ets'); state.characterRepo = new CharacterRepository(repairDb); state.projects[0].characterId = 'role'; state.characters = await state.characterRepo.list();
+      state.refresh = async () => { state.photos = await repo.list(); state.characters = await state.characterRepo.list(); };
+      state.media.inspect = async () => ({ original: 'available', thumbnail: 'missing' });
+      assert.equal(await state.setCover(state.photos[0]), false); assert.match(state.error, /缩略图不可用/);
+      state.media.inspect = async () => ({ original: 'available', thumbnail: 'available' }); assert.equal(await state.setCover(state.photos[0]), true); assert.match(state.notice, /角色封面/);
+      const draft = EditDraft.make(state, 'photo', 'photo'); assert.equal(draft.notes, '保留说明'); assert.equal(draft.title(), '编辑照片说明'); assert.deepEqual(draft.issues(state), []);
+      let raw = ''; const store = new FormDraftStore({ read: async () => raw, write: async value => { raw = value; } }); const session = new FormSession(draft, store);
+      await session.initialize(state); draft.notes = '新的说明'; assert.equal(session.dirty, true); await session.flush();
+      const reopened = new FormSession(EditDraft.make(state, 'photo', 'photo'), store); await reopened.initialize(state); reopened.restore(); assert.equal(reopened.draft.notes, '新的说明'); assert.equal(await reopened.draft.save(state), true); await reopened.finish(true, true);
+      assert.equal((await repo.list())[0].caption, '新的说明'); assert.equal((await repo.list())[0].status, PhotoStatus.FINAL); assert.equal((await repo.list())[0].createdAt, 123);
+      draft.notes = 'x'.repeat(20001); assert.equal(draft.issues(state)[0].field, 'notes');
+      await repo.remove('photo'); state.photos = []; assert.equal(await draft.save(state), false); await assert.rejects(repo.setCaption('photo', ''), /不存在/); await assert.rejects(repo.setStatuses(['photo'], PhotoStatus.RAW), /已变化/);
+      assert.equal((await repairDb.sql('SELECT count(*) FROM photos')).rows[0][0], 0);
+    } finally { repairDb.close(); }
+  });
+  await test('AppState import partial results, source deduplication and retry stay committed across refresh failure', async () => {
+    const { PhotoAssetRepository, RelationRepository } = require(root + '/data/repository/Repositories.ets'); const importDb = new SqliteAdapter();
+    try {
+      for (const match of fs.readFileSync(root + '/data/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await importDb.sql(match[1]);
+      await importDb.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
+      await importDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
+      const repo = new PhotoAssetRepository(importDb), state = new AppState(); state.photoRepo = repo; state.relations = new RelationRepository(importDb); state.projects = [Object.assign(new CosProject(), { id: 'plan' })];
+      let bad = true; const imported = []; state.media = { select: async () => ['ok', 'ok', 'bad'], exists: async () => true, import: async uri => { imported.push(uri); if (uri === 'bad' && bad) throw new Error('grant unavailable'); return Object.assign(new PhotoAsset(), { projectId: 'plan', sourceUri: uri, localPath: '/local/' + uri, thumbnailPath: '/thumb/' + uri }); }, remove: async () => {} };
+      state.refresh = async () => { state.photos = await repo.list(); };
+      assert.equal(await state.importPhotos('plan'), true); assert.equal(state.lastOperation.status, 'partial'); assert.equal(state.photoImport.succeeded, 1); assert.equal(state.photoImport.skipped, 1); assert.equal(state.photoImport.failures.length, 1);
+      assert.equal((await importDb.sql('SELECT count(*) FROM photos')).rows[0][0], 1);
+      const before = state.photos[0]; await repo.setCaption(before.id, '保留'); await repo.setStatuses([before.id], PhotoStatus.FINAL);
+      state.media.select = async () => ['ok']; state.media.exists = async () => false;
+      assert.equal(await state.importPhotos('plan'), true); assert.equal((await repo.list())[0].id, before.id); assert.equal((await repo.list())[0].createdAt, before.createdAt); assert.equal((await repo.list())[0].caption, '保留'); assert.equal((await repo.list())[0].status, PhotoStatus.FINAL);
+      assert.equal((await importDb.sql('SELECT count(*) FROM photo_versions')).rows[0][0], 1);
+      state.media.select = async () => ['bad']; state.media.exists = async () => true; assert.equal(await state.importPhotos('plan'), false);
+      bad = false; let reads = 0; state.refresh = async () => { reads++; if (reads === 1) throw new Error('refresh failed'); state.photos = await repo.list(); };
+      assert.equal(await state.retryPhotoImport(), true); assert.equal(state.lastOperation.status, 'savedNotRefreshed'); assert.equal(state.photoImport.failures.length, 0); assert.equal(imported.filter(uri => uri === 'ok').length, 2);
+      assert.equal(await state.retryPhotoImport(), false); assert.equal((await importDb.sql('SELECT count(*) FROM photos')).rows[0][0], 2);
+      importDb.failSql = 'INSERT INTO photos'; assert.equal(await state.reloadRecords(), true); importDb.failSql = ''; assert.equal((await importDb.sql('SELECT count(*) FROM photos')).rows[0][0], 2);
+      state.media.select = async () => []; assert.equal(await state.importPhotos('plan'), false); assert.equal(state.notice, '');
+      state.media.select = async () => ['never']; state.media.import = async () => { throw new Error('format not supported'); };
+      assert.equal(await state.importPhotos('plan'), false); assert.equal(state.lastOperation.status, 'failed'); assert.equal(state.photoImport.failures.length, 1); assert.match(state.error, /没有照片导入成功/);
+    } finally { importDb.close(); }
   });
   await test('actual photo batch repository rolls back invalid IDs and AppState refresh failure does not reapply the batch', async () => {
     const { PhotoAssetRepository } = require(root + '/data/repository/Repositories.ets');

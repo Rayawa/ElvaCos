@@ -1,3 +1,4 @@
+import { PhotoImportStatus } from '../../component/PhotoImportStatus';
 import { AppState } from '../../model/ApplicationState';
 import { AlbumRoute } from '../../model/AlbumRoute';
 import { AlbumPlan } from '../../model/AlbumSummary';
@@ -84,6 +85,7 @@ export struct AlbumPage {
         Column({ space: Theme.sectionSpacing }) {
           Blank().height(this.topInset).width('100%')
           this.scope()
+          PhotoImportStatus({ state: this.state })
           Select((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS).map((label: string): SelectOption => { return { value: label }; }))
             .value((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS)[this.route.byPlan.portfolio ? [0, 7].indexOf(this.route.byPlan.filter) : this.route.byPlan.filter]).constraintSize({ minHeight: 48 })
             .enabled(!this.state.busy).onSelect((filter: number): void => { this.route.byPlan.setFilter(this.route.byPlan.portfolio ? [0, 7][filter] : filter); this.route.groupOffset = 0; this.restoreOffset(); }).accessibilityText('场次照片状态筛选')

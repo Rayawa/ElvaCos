@@ -1,6 +1,6 @@
 import { EditDraft } from './EditDraft';
 
-export const FORM_KINDS: string[] = ['character', 'variant', 'project', 'asset', 'event', 'category', 'preparation', 'team', 'expense', 'reference', 'checklist'];
+export const FORM_KINDS: string[] = ['character', 'variant', 'project', 'asset', 'event', 'category', 'preparation', 'team', 'expense', 'reference', 'checklist', 'photo'];
 export interface FormDraftIO { read: () => Promise<string>; write: (value: string) => Promise<void>; }
 export class StoredFormDraft {
   key: string = '';
