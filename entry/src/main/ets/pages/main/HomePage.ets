@@ -1,3 +1,4 @@
+import { dayTitle } from '../../model/DayMode';
 import { PlanReadiness } from '../../model/PlanReadiness';
 import { MIN_SPLIT_HEIGHT } from '../../common/constants';
 import { daysUntil, today } from '../../common/format';
@@ -103,6 +104,11 @@ export struct HomePage {
   @Builder overview() {
     Column({ space: 16 }) {
       this.greetingHeader()
+      if (this.state.todayEvents.length > 0) {
+        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
+          .id('home-day-entry').width('100%').constraintSize({ minHeight: 64 }).fontSize(18).backgroundColor(Theme.tint).fontColor(Theme.accent)
+          .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); })
+      }
       Button('收录一条').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })
       if (this.state.untriagedEntries.length > 0) {
         Button('收录箱 · 未归位 ' + this.state.untriagedEntries.length + ' 条').id('home-inbox').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'global'); })

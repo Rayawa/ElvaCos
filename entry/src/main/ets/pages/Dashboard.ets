@@ -1,3 +1,5 @@
+import { EventRoute, EventReturnPath } from '../model/EventRoute';
+import { dayTitle } from '../model/DayMode';
 import { InboxPage } from './more/InboxPage';
 import { InboxRoute } from '../model/CollectedEntry';
 import { AppLogPage } from './more/AppLogPage';
@@ -72,6 +74,7 @@ import { EmptyState } from '../component/Surfaces';
   @Local formOpen: boolean = false;
   @Local draft: EditDraft = new EditDraft();
   @Local viewportWidth: number = 360;
+  private clockTimer: number = -1;
   private startupTimer: number = -1;
   private maintenanceTimer: number = -1;
   private visible: boolean = false;
@@ -79,6 +82,8 @@ import { EmptyState } from '../component/Surfaces';
 
   onPageShow(): void {
     this.visible = true;
+    this.state.tickClock();
+    if (this.clockTimer < 0) { this.clockTimer = setInterval((): void => { this.state.tickClock(); }, 1000); }
     if (this.startupTimer >= 0) { return; }
     this.startupTimer = setTimeout(async (): Promise<void> => {
       this.startupTimer = -1;
@@ -94,6 +99,7 @@ import { EmptyState } from '../component/Surfaces';
 
   private cancelTasks(): void {
     this.visible = false;
+    if (this.clockTimer >= 0) { clearInterval(this.clockTimer); this.clockTimer = -1; }
     if (this.startupTimer >= 0) { clearTimeout(this.startupTimer); this.startupTimer = -1; }
     if (this.maintenanceTimer >= 0) { clearTimeout(this.maintenanceTimer); this.maintenanceTimer = -1; }
     this.state.suspend();
@@ -117,13 +123,66 @@ import { EmptyState } from '../component/Surfaces';
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.suspend();
+    if (kind === 'event' || kind === 'dayEvent') { this.openEvent(id, kind === 'dayEvent'); return; }
+    if (kind === 'inbox' && id.startsWith('event|')) { this.openEvent(id.slice(6), false, 2); return; }
     if (kind === 'inbox') {
       const parts = id.split('|'); this.detailStack.pushPathByName('inbox', new InboxRoute(parts[0] || 'global', parts[1] || ''));
-    } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos') {
-      const section = kind === 'packing' ? 1 : kind === 'projectPhotos' ? 2 : 0;
-      this.detailStack.pushPathByName('project', new ProjectRoute(id, section));
+    } else if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos' || kind === 'outing') {
+      const section = kind === 'packing' || kind === 'outing' ? 1 : kind === 'projectPhotos' ? 2 : 0;
+      const route = new ProjectRoute(id, section); route.outing = kind === 'outing';
+      this.detailStack.pushPathByName('project', route);
     } else {
       this.detailStack.pushPathByName(kind, id);
+    }
+  }
+
+  private openEvent(id: string, dayMode: boolean, section: number = 0): void {
+    const current = this.stacks[2].size() > 0 ? this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute : undefined;
+    if (this.detailStack.size() === 0 && current && current.id === id) {
+      if (current.dayMode !== dayMode) { current.section = section; current.dayMode = dayMode; }
+      else if (!dayMode && section !== 0) { current.section = section; }
+      if (!current.returnPaths.length) { current.sourceTab = this.tab === 2 ? current.sourceTab : this.tab; }
+      this.tab = 2; this.tabsController.changeIndex(2); return;
+    }
+    const route = new EventRoute(id, dayMode, section); route.sourceTab = this.tab;
+    const names = this.detailStack.getAllPathName();
+    names.forEach((name: string, index: number): void => { route.returnPaths.push(new EventReturnPath(name, this.detailStack.getParamByIndex(index) as Object)); });
+    if (names.length) { this.detailStack.clear(false); }
+    this.tab = 2; this.tabsController.changeIndex(2);
+    this.stacks[2].pushPathByName('event', route);
+  }
+  private closeEvent(route: EventRoute): void {
+    if (this.stacks[2].size() === 0 || this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) !== route) { return; }
+    this.stacks[2].pop(); this.tab = route.sourceTab; this.tabsController.changeIndex(route.sourceTab);
+    for (const path of route.returnPaths) { this.detailStack.pushPathByName(path.name, path.param, false); }
+    route.returnPaths = [];
+  }
+  private eventMenus(route: EventRoute): HdsNavigationMenuItemOptions[] {
+    if (route.dayMode || !this.state.events.some((event: CosEvent) => event.id === route.id)) { return []; }
+    return [{ content: { label: '编辑活动', icon: Icons.edit, isEnabled: !this.state.busy, action: (): void => { this.edit('event', route.id); } } },
+      { content: { label: '删除活动', icon: Icons.remove, isEnabled: !this.state.busy, action: (): void => { this.remove('event', route.id); } } }];
+  }
+  @Builder eventSegment(route: EventRoute) {
+    HdsTitleBarSegment({ componentId: 'event-detail-segment', items: this.buildSegmentItems(['概览', '本场计划', '收录', '提醒']), selectedIndexes: [route.section],
+      minimumTargetHeight: 48, segmentHeight: 56, experimentalHeight: 60,
+      experimentalWidth: Math.max(240, Math.min(460, this.viewportWidth - 100)),
+      onSelectedIndexChanged: (section: number): void => { route.section = section; },
+      onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); } })
+  }
+  @Builder eventContent(route: EventRoute, entrance: StaggerEntrance) {
+    if (this.state.events.some((event: CosEvent) => event.id === route.id)) {
+      EventDetail({ state: this.state, event: this.state.events.find((event: CosEvent) => event.id === route.id) as CosEvent, route: route, entrance: entrance,
+        open: (kind: string, id: string): void => { this.open(kind, id); },
+        edit: (kind: string, id: string, parent: string): void => { this.edit(kind, id, parent); }, back: (): void => { this.closeEvent(route); } })
+    } else {
+      EmptyState({ title: '活动已不存在', message: '关联计划仍保留，可以返回继续查看。', button: '返回', action: (): void => { this.closeEvent(route); } }).margin({ top: Theme.detailTop, left: Theme.pagePadding, right: Theme.pagePadding })
+    }
+  }
+  @Builder scheduleDestination(kind: string, param: Object) {
+    if (kind === 'event') {
+      DetailDestination({ customTitle: (param as EventRoute).dayMode, titleOptions: SystemCapability.titleBar((param as EventRoute).dayMode ? '今天模式' : '', this.state.settings.effects, this.state.settings.materialLevel,
+        (param as EventRoute).dayMode ? undefined : (): void => { this.eventSegment(param as EventRoute); }, this.eventMenus(param as EventRoute), false, (): void => { this.closeEvent(param as EventRoute); }),
+        back: (): void => { this.closeEvent(param as EventRoute); }, content: this.eventContent.bind(this, param as EventRoute) })
     }
   }
 
@@ -158,6 +217,9 @@ import { EmptyState } from '../component/Surfaces';
     if (accepted && await this.state.remove(kind, id)) {
       if (kind === 'project' || kind === 'character') {
         this.detailStack.clear();
+      } else if (kind === 'event') {
+        const route = this.stacks[2].getParamByIndex(this.stacks[2].size() - 1) as EventRoute;
+        if (route && route.id === id) { this.closeEvent(route); }
       } else if (!['variant', 'checklist', 'preparation', 'category', 'team', 'expense'].includes(kind)) {
         this.detailStack.pop();
       }
@@ -247,16 +309,6 @@ import { EmptyState } from '../component/Surfaces';
           entrance: entrance,
           state: this.state,
           asset: this.state.assets.find((a: Asset) => a.id === (param as string)) || new Asset(),
-          open: (k: string, id: string) => this.open(k, id),
-          edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
-          remove: (k: string, id: string) => this.remove(k, id)
-        })
-      }
-      else if (kind === 'event') {
-        EventDetail({
-          entrance: entrance,
-          state: this.state,
-          event: this.state.events.find((e: CosEvent) => e.id === (param as string)) || new CosEvent(),
           open: (k: string, id: string) => this.open(k, id),
           edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
           remove: (k: string, id: string) => this.remove(k, id)
@@ -480,16 +532,6 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'character') {
       return [{ value: '新建计划', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('project', '', id) }, { value: '添加版本', symbolIcon: Icons.toolbarAdd(), action: () => this.edit('variant', '', id) }, { value: '编辑角色', icon: Icons.edit, action: () => this.edit('character', id) }, { value: '删除角色', icon: Icons.remove, action: () => this.remove('character', id) }];
     }
-    if (kind === 'event') {
-      return [{
-        value: '设备日历', icon: Icons.event, action: () => {
-          const event = this.state.events.find((event: CosEvent) => event.id === id);
-          if (event) {
-            this.state.addEventToCalendar(event);
-          }
-        }
-      }, { value: '新建计划', icon: Icons.add, action: () => this.edit('eventProject', '', id) }, { value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }];
-    }
     if (kind === 'asset') {
       return [{ value: '编辑', icon: Icons.edit, action: () => this.edit(kind, id) }, { value: '删除', icon: Icons.remove, action: () => this.remove(kind, id) }];
     }
@@ -662,6 +704,7 @@ import { EmptyState } from '../component/Surfaces';
         }
       }.width('100%').height('100%')
     }.mode(NavigationMode.Stack)
+      .navDestination(this.scheduleDestination)
       .customNavContentTransition((_from: NavContentInfo, _to: NavContentInfo, operation: NavigationOperation) => {
         if (operation === NavigationOperation.POP) { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); }
         return undefined;
@@ -712,17 +755,32 @@ import { EmptyState } from '../component/Surfaces';
         this.state.suspend();
         HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
       })
-      .height(LayoutPolicy.matchParent).width('100%')
+      .layoutWeight(1).width('100%')
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .backgroundColor(Theme.bg)
       .accessibilityText('首页、角色和计划、活动、衣柜、我的五个标签页')
       .onAreaChange((_, area: Area): void => { this.viewportWidth = Number(area.width); })
   }
 
+  @Builder dayEntryBar() {
+    if (this.state.ready && this.state.todayEvents.length > 0) {
+      Row({ space: 8 }) {
+        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
+          .layoutWeight(1).constraintSize({ minHeight: 64 }).fontSize(17).fontColor(Theme.accent).backgroundColor(Theme.tint)
+          .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); }).id('day-entry-bar')
+        Button('关闭').constraintSize({ minHeight: 64, minWidth: 64 }).fontColor(Theme.muted).backgroundColor(Theme.surface).enabled(!this.state.settingsBusy)
+          .onClick((): void => { const id = this.state.todayEvents[0]?.id; if (id) { this.state.dismissDayEntry(id); } }).accessibilityText('今天不再显示这场活动的入口')
+      }.padding({ left: 16, right: 16, bottom: 28 }).width('100%').backgroundColor(Theme.bg)
+    }
+  }
+
   build() {
     WithTheme({ theme: Theme.nativeTheme }) {
     HdsNavigation(this.detailStack) {
-      this.mainTabs()
+      Column() {
+        this.mainTabs()
+        this.dayEntryBar()
+      }.width('100%').height('100%')
     }.mode(NavigationMode.Stack).hideTitleBar(true).hideToolBar(true)
       .navDestination(this.destination)
       .customNavContentTransition((_from: NavContentInfo, _to: NavContentInfo, operation: NavigationOperation) => {

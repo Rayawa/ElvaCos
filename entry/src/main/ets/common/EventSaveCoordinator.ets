@@ -17,7 +17,7 @@ export class EventSaveCoordinator {
       item.reminderId = -1;
       if (item.reminderMinutes >= 0) {
         try { newId = await this.publish(item); item.reminderId = newId; }
-        catch (error) { warning = EventReminderService.failure(error as Error); item.reminderMinutes = -1; }
+        catch (error) { warning = EventReminderService.failure(error as Error); }
       }
     }
     try { await this.persist(item); }

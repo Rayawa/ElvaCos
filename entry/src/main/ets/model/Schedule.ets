@@ -39,6 +39,20 @@ export function eventsOnDate(events: CosEvent[], date: string): CosEvent[] {
   return events.filter((event: CosEvent) => event.dateMode !== 'pending' && event.date <= date && eventEnd(event) >= date)
     .sort((a: CosEvent, b: CosEvent) => a.startTime.localeCompare(b.startTime) || a.name.localeCompare(b.name));
 }
+export class ScheduleGroup {
+  label: string; events: CosEvent[];
+  constructor(label: string, events: CosEvent[]) { this.label = label; this.events = events; }
+}
+export function scheduleGroups(events: CosEvent[], date: string): ScheduleGroup[] {
+  const active = events.filter((event: CosEvent) => event.dateMode !== 'pending' && eventEnd(event) >= date && event.status !== 'Attended');
+  const sort = (a: CosEvent, b: CosEvent): number => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime) || a.name.localeCompare(b.name);
+  return [
+    new ScheduleGroup('今天', active.filter((event: CosEvent) => event.date <= date).sort(sort)),
+    new ScheduleGroup('即将到来', active.filter((event: CosEvent) => event.date > date).sort(sort)),
+    new ScheduleGroup('日期待定', events.filter((event: CosEvent) => event.dateMode === 'pending').sort((a: CosEvent, b: CosEvent) => a.name.localeCompare(b.name))),
+    new ScheduleGroup('已结束', events.filter((event: CosEvent) => event.dateMode !== 'pending' && (eventEnd(event) < date || event.status === 'Attended')).sort((a: CosEvent, b: CosEvent) => -sort(a, b)))
+  ];
+}
 export function reminderTime(event: CosEvent): number {
   checkSchedule(event);
   if (event.reminderMinutes < 0 || event.dateMode === 'pending') { return 0; }

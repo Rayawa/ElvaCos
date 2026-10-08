@@ -11,6 +11,7 @@ const ts = require(path.join(studio, 'tools/ohpm/node_modules/typescript'));
 const originalLoad = Module._load;
 Module._load = function (id, parent, isMain) {
   if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID() } };
+  if (['@kit.AbilityKit', '@kit.BackgroundTasksKit', '@kit.NotificationKit'].includes(id)) return {};
   if (id === '@kit.BasicServicesKit') return { deviceInfo: { sdkApiVersion: 26, distributionOSApiVersion: 60100 } };
   return originalLoad.call(this, id, parent, isMain);
 };
@@ -20,9 +21,13 @@ require.extensions['.ets'] = function (module, filename) {
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText;
   module._compile(output, filename);
 };
+global.canIUse = () => true;
 const root = path.resolve(__dirname, '../entry/src/main/ets');
 const entities = require(root + '/model/Entities.ets');
 const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistItem, PhotoAsset, PhotoStatus, CosEvent } = entities;
+const day = require(root + '/model/DayMode.ets');
+const { scheduleGroups } = require(root + '/model/Schedule.ets');
+const { EventSaveCoordinator } = require(root + '/common/EventSaveCoordinator.ets');
 const { PreparationTask } = require(root + '/model/Preparation.ets');
 const { Expense } = require(root + '/model/Planning.ets');
 const { buildPlanReadiness, budgetLabel } = require(root + '/model/PlanReadiness.ets');
@@ -89,6 +94,76 @@ const expenses = [Object.assign(new Expense(), { projectId: 'p', amountCents: 12
 const photos = Object.values(PhotoStatus).map(status => Object.assign(new PhotoAsset(), { projectId: 'p', status }));
 const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], photos, expenses, [event], '2026-12-31');
 (async () => {
+  const dayEvent = Object.assign(new CosEvent(), { id: 'day', date: '2026-10-08', dateMode: 'multiple', endDate: '2026-10-10' });
+  const time = value => new Date(value).getTime();
+  await test('day entry opens at local eve 20:00 and ends after the entire last day', () => {
+    assert.equal(day.dayWindow(dayEvent, time('2026-10-07T19:59:59')), false);
+    assert.equal(day.dayWindow(dayEvent, time('2026-10-07T20:00:00')), true);
+    assert.equal(day.dayWindow(dayEvent, time('2026-10-10T23:59:59')), true);
+    assert.equal(day.dayWindow(dayEvent, time('2026-10-11T00:00:00')), false);
+    assert.equal(day.dayWindow(Object.assign(new CosEvent(), { dateMode: 'pending' }), time('2026-10-08T12:00:00')), false);
+    assert.equal(day.dayTitle(dayEvent, time('2026-10-07T20:00:00')), '明天 · ' + dayEvent.name);
+    assert.equal(day.dayNumber(dayEvent, time('2026-10-09T12:00:00')), '第 2 天');
+    const newYear = Object.assign(new CosEvent(), { date: '2027-01-01' });
+    assert.equal(day.dayWindow(newYear, time('2026-12-31T20:00:00')), true);
+  });
+  await test('dismissal is per event and local day; a multi-day entry returns tomorrow', () => {
+    const another = Object.assign(new CosEvent(), { id: 'another', date: '2026-10-08' });
+    const tomorrow = Object.assign(new CosEvent(), { id: 'tomorrow', date: '2026-10-09' });
+    assert.deepEqual(day.dayEntries([dayEvent, another], { day: '2026-10-08' }, time('2026-10-08T12:00:00')).map(e => e.id), ['another']);
+    assert.deepEqual(day.dayEntries([dayEvent, another], { day: '2026-10-08' }, time('2026-10-09T12:00:00')).map(e => e.id), ['day']);
+    assert.equal(day.dayEntries([tomorrow, dayEvent], {}, time('2026-10-08T21:00:00'))[0].id, 'day');
+    assert.deepEqual(day.dayEntries([dayEvent], {}, time('2026-10-11T00:00:00')), []);
+    assert.equal(day.dayTitle(dayEvent, time('2026-10-11T00:00:00')), '2026-10-08 · ' + dayEvent.name);
+  });
+  await test('multi-event strip prioritizes the next start before elapsed starts and tomorrow', () => {
+    const make = (id, date, startTime) => Object.assign(new CosEvent(), { id, date, timeMode: 'start', startTime });
+    const events = [make('elapsed', '2026-10-08', '09:00'), make('next', '2026-10-08', '22:00'), make('tomorrow', '2026-10-09', '08:00')];
+    assert.deepEqual(day.dayEntries(events, {}, time('2026-10-08T21:00:00')).map(e => e.id), ['next', 'elapsed', 'tomorrow']);
+  });
+  await test('empty, typical and full module assembly keeps the fixed two sections', () => {
+    const now = time('2026-10-08T19:00:00');
+    const emptyEvent = Object.assign(new CosEvent(), { id: 'empty', dateMode: 'pending' });
+    assert.deepEqual(day.availableDayModules(emptyEvent, [], [], [], now), []);
+    for (const section of [0, 1]) assert.deepEqual(day.assembledDayModules([], {}, section), []);
+    const projects = [Object.assign(new CosProject(), { id: 'p', eventId: 'day' })];
+    const typical = day.availableDayModules(dayEvent, projects, [], [], time('2026-10-08T12:00:00'));
+    assert.deepEqual(day.assembledDayModules(typical, {}, 0).map(m => m.id), ['packing']);
+    assert.deepEqual(day.assembledDayModules(typical, {}, 1).map(m => m.id), ['plans']);
+    const entries = [{ scopeKind: 'event', scopeId: 'day', kind: 'ticket' }], team = [{ projectId: 'p' }];
+    const fullEvent = Object.assign(new CosEvent(), dayEvent, { timeMode: 'start', startTime: '09:00' });
+    const full = day.availableDayModules(fullEvent, projects, entries, team, now, true);
+    assert.deepEqual(day.assembledDayModules(full, {}, 0).map(m => m.id), ['packing', 'credentials', 'people']);
+    assert.deepEqual(day.assembledDayModules(full, {}, 1).map(m => m.id), ['plans', 'shots', 'timeline', 'wrapup']);
+    assert.equal(day.availableDayModules(dayEvent, [], [], [], time('2026-10-07T21:00:00')).includes('wrapup'), false);
+    assert.equal(day.availableDayModules(dayEvent, [], [], [], time('2026-10-08T17:59:59')).includes('wrapup'), false);
+  });
+  await test('module preferences validate input and preserve disabled modules and order', () => {
+    assert.deepEqual(day.parseDayModules('broken'), {}); assert.deepEqual(day.parseDayModules('null'), {});
+    const preferences = day.parseDayModules(JSON.stringify({ packing: { enabled: false, order: 2 }, people: { enabled: true, order: 0 }, credentials: { enabled: true, order: 1 }, extra: { enabled: true, order: 0 } }));
+    assert.equal(preferences.extra, undefined);
+    assert.deepEqual(day.orderedDayModules(preferences, 0).map(m => m.id), ['people', 'credentials', 'packing']);
+    assert.deepEqual(day.assembledDayModules(['packing', 'people', 'credentials'], preferences, 0).map(m => m.id), ['people', 'credentials']);
+    assert.deepEqual(day.parseDayModules('{"packing":{"enabled":"false","order":0}}'), {});
+  });
+  await test('schedule groups keep ongoing multi-day activities visible and isolate pending dates', () => {
+    const pending = Object.assign(new CosEvent(), { id: 'pending', dateMode: 'pending' });
+    const future = Object.assign(new CosEvent(), { id: 'future', date: '2026-10-12' });
+    const ended = Object.assign(new CosEvent(), { id: 'ended', date: '2026-10-01' });
+    assert.deepEqual(scheduleGroups([future, ended, pending, dayEvent], '2026-10-09').map(g => g.events.map(e => e.id)), [['day'], ['future'], ['pending'], ['ended']]);
+  });
+  await test('notification publishing failure preserves reminder intent and can be retried', async () => {
+    const event = Object.assign(new CosEvent(), { date: '2027-01-01', reminderMinutes: 30 });
+    let persisted, published = 0;
+    const coordinator = new EventSaveCoordinator(async event => { persisted = { ...event }; }, async () => { if (++published === 1) throw new Error('通知未授权'); return 42; }, async () => {});
+    assert.match(await coordinator.save(event), /通知未授权/);
+    assert.equal(persisted.reminderMinutes, 30); assert.equal(persisted.reminderId, -1);
+    assert.match(day.reminderState(event, time('2026-10-08T12:00:00')), /未建立/);
+    await coordinator.save(event, persisted); assert.equal(persisted.reminderId, 42); assert.equal(published, 2);
+    assert.equal(day.reminderState(event, time('2026-10-08T12:00:00')), '系统提醒已建立');
+    assert.equal(day.reminderState(event, time('2027-01-01T12:00:00')), '提醒时间已过');
+    event.reminderMinutes = -1; assert.equal(day.reminderState(event, time('2027-01-01T12:00:00')), '未选择提醒');
+  });
   await test('readiness keeps preparation, packing and equipment independent', () => {
     const r = read(); assert.equal(r.prep.done, 1); assert.equal(r.prep.total, 8); assert.equal(r.prep.waiting, 2);
     assert.equal(r.pack.packed, 1); assert.equal(r.equipment.available, 0); assert.equal(r.equipment.total, 1);

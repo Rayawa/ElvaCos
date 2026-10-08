@@ -1,4 +1,5 @@
 import { STORAGE_KEY_VISUAL_EFFECTS } from './constants';
+import { DayModulePreferences, parseDayModules } from '../model/DayMode';
 // 统一存储入口：全 app 唯一的偏好数据通道
 // - 磁盘：单一 preferences 文件 app_storage（引擎仍是 DiskStorage）
 // - 兼容：首次访问时一次性迁移旧文件（profile / settings / myAppSettings），用户名等旧数据全部保留
@@ -198,6 +199,24 @@ export async function getUsername(): Promise<string> {
     const deviceName = getDeviceName();
     await s.set(KEY_USERNAME, deviceName);
     return deviceName;
+}
+
+export async function getDayModules(): Promise<DayModulePreferences> {
+    const s = await ensureReady(); return parseDayModules(await s.get('day_mode_modules', '{}') as string);
+}
+export async function setDayModules(value: DayModulePreferences): Promise<void> {
+    const s = await ensureReady(); await s.set('day_mode_modules', JSON.stringify(value));
+}
+export async function getDayDismissals(): Promise<Record<string, string>> {
+    const s = await ensureReady(); const result: Record<string, string> = {};
+    try {
+        const stored = JSON.parse(await s.get('day_mode_dismissals', '{}') as string) as Record<string, string>;
+        for (const id of Object.keys(stored)) { if (typeof stored[id] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(stored[id])) { result[id] = stored[id]; } }
+    } catch (error) { }
+    return result;
+}
+export async function setDayDismissals(value: Record<string, string>): Promise<void> {
+    const s = await ensureReady(); await s.set('day_mode_dismissals', JSON.stringify(value));
 }
 
 export async function setUsername(username?: string): Promise<void> {

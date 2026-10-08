@@ -12,6 +12,7 @@ export struct HdsTitleBarSegment {
   @Param segmentHeight: number = 48;
   @Param experimentalWidth: Length = '100%';
   @Param experimentalHeight: number = 52;
+  @Param minimumTargetHeight: number = 32;
   @Event onSelectedIndexChanged: (index: number) => void = () => {};
   @Event onItemClicked: (index: number) => void = () => {};
   @Local private measuredWidth: number = 0;
@@ -42,11 +43,11 @@ export struct HdsTitleBarSegment {
         onItemClicked: this.onItemClicked,
         itemMaxFontScale: this.maxFontScale,
         itemSelectedBackgroundColor: this.materialSelectedBackgroundColor(),
-        itemMinHeight: LengthMetrics.vp(32),
+        itemMinHeight: LengthMetrics.vp(this.minimumTargetHeight),
         buttonBackgroundColor: ColorMetrics.resourceColor(Theme.transparent),
         // 材质统一由外层迷你栏提供，与参考项目的透明背景分支保持一致。
         buttonBackgroundBlurStyle: BlurStyle.NONE,
-        buttonMinHeight: LengthMetrics.vp(40),
+        buttonMinHeight: LengthMetrics.vp(this.minimumTargetHeight + 8),
         buttonPadding: LengthMetrics.vp(4),
         enableStateAnimation: true,
       })

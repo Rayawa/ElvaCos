@@ -3,7 +3,7 @@ import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
 import { EventCalendar } from '../../component/EventCalendar';
-import { eventEnd, eventDateLabel, eventTimeLabel } from '../../model/Schedule';
+import { eventEnd, eventDateLabel, eventTimeLabel, scheduleGroups, ScheduleGroup } from '../../model/Schedule';
 import { vibration } from '../../common/vibration';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
@@ -25,6 +25,7 @@ export struct EventsPage {
   @Param entranceSession: MainEntranceSession = new MainEntranceSession();
   @Param active: boolean = false;
   @Param calendar: boolean = false;
+  @Local typeFilter: string = '';
   @Local animStep: number = 0;
   private enterPlayed: boolean = false;
   private enterTimers: number[] = [];
@@ -38,8 +39,17 @@ export struct EventsPage {
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private events(): CosEvent[] { return this.state.events.filter((e: CosEvent) => this.filter === 2 ? e.dateMode === 'pending' : this.filter === 1 ? e.dateMode !== 'pending' && (e.status === 'Attended' || eventEnd(e) < today()) : e.dateMode !== 'pending' && e.status !== 'Attended' && eventEnd(e) >= today())
-    .sort((a: CosEvent, b: CosEvent) => this.filter === 1 ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)); }
+  private groups(): ScheduleGroup[] {
+    const groups = scheduleGroups(this.state.events.filter((event: CosEvent) => !this.typeFilter || event.eventType === this.typeFilter), this.state.localDate);
+    if (this.filter === 1) { return [groups[3]]; }
+    if (this.filter === 2) { return [groups[2]]; }
+    if (this.filter === 3) { return [groups[0]]; }
+    if (this.filter === 4) { return [groups[1]]; }
+    return groups;
+  }
+  private events(): CosEvent[] { return this.groups().reduce((events: CosEvent[], group: ScheduleGroup) => events.concat(group.events), []); }
+  private typeOptions(): SelectOption[] { const options: SelectOption[] = [{ value: '全部类型' }]; return options.concat(this.types().map((type: string): SelectOption => { return { value: type }; })); }
+  private types(): string[] { return Array.from(new Set(this.state.events.map((event: CosEvent) => event.eventType))); }
   @Builder content(e: CosEvent) {
     Row({ space: 18 }) {
       Column({ space: 4 }) { Text(e.dateMode === 'pending' ? '日期' : e.date.slice(5, 7) + '月')
@@ -67,8 +77,8 @@ export struct EventsPage {
             Row({ space: 8 }) {
               SectionHeading({ title: '活动安排', trailing: this.calendar ? '' : this.events().length + ' 场' }).layoutWeight(1)
               if (!this.calendar) {
-                Select([{ value: '即将到来' }, { value: '已结束' }, { value: '日期待定' }])
-                  .value(['即将到来', '已结束', '日期待定'][this.filter])
+                Select([{ value: '全部日期' }, { value: '已结束' }, { value: '日期待定' }, { value: '今天' }, { value: '即将到来' }])
+                  .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.filter])
                   .onSelect((index: number): void => { vibration.dotVibration(); this.filterChanged(index); })
                   .id('event-list-filter')
                   .accessibilityText('活动日期筛选')
@@ -77,25 +87,30 @@ export struct EventsPage {
                   .attributeModifier(this.feedback.control('select-1'))
               }
             }.width('100%')
+            Select(this.typeOptions())
+              .value(this.typeFilter || '全部类型').onSelect((index: number): void => { this.typeFilter = index === 0 ? '' : this.types()[index - 1]; }).accessibilityText('活动类型筛选')
           }.
         width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 14 }) {
             if (this.calendar) { EventCalendar({
-                state: this.state,
+                state: this.state, eventType: this.typeFilter,
                 open: (kind: string, id: string): void => this.open(kind, id),
                 add: (kind: string, parent: string): void => this.add(kind, parent)
               }) } else {
-            ForEach(this.events(), (e: CosEvent) => { InteractiveCard({
+            ForEach(this.groups(), (group: ScheduleGroup) => {
+              if (group.events.length > 0) { SectionHeading({ title: group.label, trailing: group.events.length + ' 场' }) }
+              ForEach(group.events, (e: CosEvent) => { InteractiveCard({
                 label: e.name,
                 effects: this.state.settings.effects,
                 action: () => this.open('event', e.id),
                 content: (): void => this.content(e)
               }) }, (e: CosEvent) => e.id)
+            }, (group: ScheduleGroup) => group.label)
             if (this.events().length === 0) { EmptyState({
-                title: '下一场见面，值得期待',
-                message: '记录活动日期，关联准备中的计划。',
-                button: '＋ 添加活动',
-                action: (): void => this.add('event', '')
+                title: this.state.events.length ? '没有匹配的活动' : '下一场见面，值得期待',
+                message: this.state.events.length ? '可以清除日期和类型筛选，查看全部活动。' : '记录活动日期，关联准备中的计划。',
+                button: this.state.events.length ? '清除筛选' : '＋ 添加活动',
+                action: (): void => { if (this.state.events.length) { this.typeFilter = ''; this.filterChanged(0); } else { this.add('event', ''); } }
               }) }
             }
           }.

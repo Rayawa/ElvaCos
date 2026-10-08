@@ -1,6 +1,8 @@
 import { CollectedEntry, entryFromText } from './CollectedEntry';
 import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
+import { DayModulePreferences, dayEntries, localDay, DAY_MODULES, orderedDayModules } from './DayMode';
+import { getDayModules, setDayModules, getDayDismissals, setDayDismissals } from '../common/storage';
 import { PlanReadiness, buildPlanReadiness } from './PlanReadiness';
 import { OperationResult, executeOperation, operationCommitted } from './OperationResult';
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../common/constants';
@@ -84,6 +86,9 @@ export class AppState {
   @Trace lastOperation: OperationResult = { status: 'ok' };
   @Trace staleScopes: string[] = [];
   @Trace localDate: string = today();
+  @Trace clockTime: number = Date.now();
+  @Trace dayModules: DayModulePreferences = {};
+  @Trace dayDismissals: Record<string, string> = {};
   @Trace pendingEventId: string = '';
   @Trace ready: boolean = false;
   @Trace busy: boolean = false;
@@ -140,8 +145,9 @@ export class AppState {
   loadPreferences(context: common.UIAbilityContext): Promise<void> {
     this.context = context;
     if (!this.preferencesTask) {
-      this.preferencesTask = this.preference.load(context).then((settings: AppSettings): void => {
+      this.preferencesTask = this.preference.load(context).then(async (settings: AppSettings): Promise<void> => {
         this.settings = settings;
+        this.dayModules = await getDayModules(); this.dayDismissals = await getDayDismissals(); this.tickClock();
       }).catch((error: Error): void => {
         this.preferencesTask = undefined;
         throw error;
@@ -303,6 +309,28 @@ export class AppState {
   readiness(id: string): PlanReadiness { return this.readinessPlans.find((item: PlanReadiness) => item.id === id) || new PlanReadiness(); }
   @Computed
   get actionablePlans(): PlanReadiness[] { return this.readinessPlans.filter((item: PlanReadiness) => item.active); }
+  @Computed
+  get todayEvents(): CosEvent[] { return dayEntries(this.events, this.dayDismissals, this.clockTime); }
+  tickClock(): void { this.clockTime = Date.now(); this.localDate = localDay(this.clockTime); }
+  dismissDayEntry(id: string): Promise<boolean> {
+    return this.enqueueSettings(async (): Promise<void> => {
+      const dismissals: Record<string, string> = {}; const date = localDay(Date.now());
+      for (const key of Object.keys(this.dayDismissals)) { if (this.dayDismissals[key] === date) { dismissals[key] = date; } }
+      dismissals[id] = date; await setDayDismissals(dismissals); this.dayDismissals = dismissals;
+    });
+  }
+  configureDayModule(id: string, enabled?: boolean, move: number = 0): Promise<boolean> {
+    return this.enqueueSettings(async (): Promise<void> => {
+      const module = DAY_MODULES.find((item) => item.id === id); if (!module) { return; }
+      const preferences = JSON.parse(JSON.stringify(this.dayModules)) as DayModulePreferences;
+      const modules = orderedDayModules(preferences, module.section); const index = modules.findIndex((item) => item.id === id);
+      if (move !== 0 && index + move >= 0 && index + move < modules.length) {
+        const other = modules[index + move]; modules[index + move] = modules[index]; modules[index] = other;
+      }
+      modules.forEach((item, order: number): void => { preferences[item.id] = { enabled: item.id === id && enabled !== undefined ? enabled : preferences[item.id]?.enabled !== false, order: order }; });
+      await setDayModules(preferences); this.dayModules = preferences;
+    });
+  }
   reloadRecords(): Promise<boolean> {
     if (this.reloadTask) { return this.reloadTask; }
     if (this.busy || this.disposeTask) { return Promise.resolve(false); }
@@ -681,7 +709,7 @@ export class AppState {
   }
   suspend(): void { this.grip.stop(); this.sensedHand = 'auto'; }
   async resume(): Promise<void> {
-    this.localDate = today();
+    this.tickClock();
     if (this.settings.grip && this.context) {
       try {
         await this.grip.start(this.context, (hand: string) => {

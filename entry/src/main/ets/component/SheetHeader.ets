@@ -10,6 +10,7 @@ export struct SheetHeader {
   @Param hint: string = '';
   @Param haptic: boolean = true;
   @Param hapticLevel: number = 1;
+  @Param closeSize: number = 36;
   @Event close: () => void = () => {};
 
   build() {
@@ -32,10 +33,10 @@ export struct SheetHeader {
           .fontSize(18)
           .fontColor([Theme.muted])
       }
-      .width(36)
-      .height(36)
+      .width(this.closeSize)
+      .height(this.closeSize)
       .id('sheet-close')
-      .borderRadius(18)
+      .borderRadius(this.closeSize / 2)
       .backgroundColor(Theme.tint)
       .onClick((): void => {
         HapticService.confirm(this.haptic, this.hapticLevel);

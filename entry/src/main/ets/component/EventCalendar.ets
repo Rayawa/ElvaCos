@@ -11,6 +11,8 @@ import { SectionHeading, EmptyState } from './Surfaces';
 export struct EventCalendar {
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Require @Param state: AppState;
+  @Param eventType: string = '';
+  private events(): CosEvent[] { return this.state.events.filter((event: CosEvent) => !this.eventType || event.eventType === this.eventType); }
   @Event open: (kind: string, id: string) => void = () => {};
   @Event add: (kind: string, parent: string) => void = () => {};
   @Local year: number = new Date().getFullYear();
@@ -63,7 +65,7 @@ export struct EventCalendar {
             Button() {
               Column({ space: 2 }) {
                 Text(String(day.day)).fontSize(15).fontColor(this.selected === day.date ? Theme.onAccent : day.currentMonth ? Theme.ink : Theme.muted)
-                Text(eventsOnDate(this.state.events, day.date)
+                Text(eventsOnDate(this.events(), day.date)
                   .length > 0 ? '●' : ' ')
                   .fontSize(8)
                   .fontColor(this.selected === day.date ? Theme.onAccent : Theme.accent)
@@ -73,10 +75,10 @@ export struct EventCalendar {
               .width('100%')
               .height(48)
               .borderRadius(14)
-              .backgroundColor(this.selected === day.date ? Theme.brand : day.date === today() ? Theme.tint : Theme.surface)
+              .backgroundColor(this.selected === day.date ? Theme.brand : day.date === this.state.localDate ? Theme.tint : Theme.surface)
               .onClick((): void => { vibration.dotVibration(); this.selected = day.date; })
               .accessibilitySelected(this.selected === day.date)
-                .accessibilityText(day.date + '，' + eventsOnDate(this.state.events, day.date)
+                .accessibilityText(day.date + '，' + eventsOnDate(this.events(), day.date)
                 .length + ' 场活动')
                 .visualEffect(this.feedback.effect('button-4' + ":" + day.date))
                 .compositingFilter(this.feedback.filter('button-4' + ":" + day.date))
@@ -85,8 +87,8 @@ export struct EventCalendar {
         }, (day: CalendarDay) => day.date)
       }.
     columnsTemplate('1fr 1fr 1fr 1fr 1fr 1fr 1fr').rowsTemplate('1fr 1fr 1fr 1fr 1fr 1fr').columnsGap(4).rowsGap(4).height(308).width('100%')
-      SectionHeading({ title: this.selected, trailing: eventsOnDate(this.state.events, this.selected).length + ' 场活动' })
-      ForEach(eventsOnDate(this.state.events, this.selected), (event: CosEvent) => {
+      SectionHeading({ title: this.selected, trailing: eventsOnDate(this.events(), this.selected).length + ' 场活动' })
+      ForEach(eventsOnDate(this.events(), this.selected), (event: CosEvent) => {
         Button() {
           Column({ space: 6 }) {
             Text(event.name).fontSize(17).fontColor(Theme.ink)
@@ -103,7 +105,7 @@ export struct EventCalendar {
           .compositingFilter(this.feedback.filter('button-5' + ":" + event.id, true))
           .attributeModifier(this.feedback.control('button-5' + ":" + event.id, true))
       }, (event: CosEvent) => event.id)
-      if (eventsOnDate(this.state.events, this.selected).length === 0) { EmptyState({
+      if (eventsOnDate(this.events(), this.selected).length === 0) { EmptyState({
           title: '这天还没有安排',
           message: '多天活动会显示在覆盖的每一天。',
           button: '＋ 添加当天活动',

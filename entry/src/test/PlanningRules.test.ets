@@ -59,11 +59,11 @@ export default function planningRulesTest(): void {
       event.timeMode = 'start'; event.startTime = '00:15'; event.reminderMinutes = 30;
       expect(reminderTime(event)).assertEqual(new Date('2026-10-07T23:45:00').getTime());
     });
-    it('permissionFailureSavesActivityWithReminderDisabled', 0, async () => {
+    it('permissionFailureSavesActivityAndPreservesReminderChoice', 0, async () => {
       let persisted: CosEvent = new CosEvent();
       const event = new CosEvent(); event.date = '2027-01-01'; event.reminderMinutes = 30;
       const save = new EventSaveCoordinator(async (e: CosEvent): Promise<void> => { persisted = e; }, async (): Promise<number> => { throw new Error('通知未授权'); }, async (): Promise<void> => {});
-      expect((await save.save(event)).length > 0).assertTrue(); expect(persisted.reminderId).assertEqual(-1); expect(persisted.reminderMinutes).assertEqual(-1);
+      expect((await save.save(event)).length > 0).assertTrue(); expect(persisted.reminderId).assertEqual(-1); expect(persisted.reminderMinutes).assertEqual(30);
     });
     it('failedPersistenceCancelsNewReminderAndKeepsOldReminder', 0, async () => {
       const old = new CosEvent(); old.date = '2027-01-01'; old.reminderId = 12; old.reminderMinutes = 30;
