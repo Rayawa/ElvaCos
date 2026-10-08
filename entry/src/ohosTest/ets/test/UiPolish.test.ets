@@ -54,12 +54,15 @@ export default function uiPolishTest(): void {
       expect(portfolioStage(photos, 2)[0].status).assertEqual(PhotoStatus.PUBLISHED);
       expect(portfolioStage([], 0).length).assertEqual(0);
     });
-    it('countdownAndCaptionShareHorizontalCenter', 0, async () => {
-      const countdown = await driver.findComponent(ON.id('home-event-countdown').inWindow(bundle));
-      if (!countdown) { return; }
-      const number = await countdown.getBounds();
-      const caption = await (await driver.findComponent(ON.id('home-event-caption').inWindow(bundle))).getBounds();
-      expect(Math.abs((number.left + number.right) / 2 - (caption.left + caption.right) / 2) < 3).assertTrue();
+    it('homeShowsOneNextPlanAndItsEffectiveDate', 0, async () => {
+      const home = await driver.findComponent(ON.id('home-scroll').inWindow(bundle));
+      expect(!!home).assertTrue(); await home.scrollToTop(1000); await driver.delayMs(400);
+      const plans = await driver.findComponents(ON.id('home-next-plan').inWindow(bundle));
+      expect(plans.length).assertEqual(1);
+      const date = await driver.findComponent(ON.id('home-plan-date').inWindow(bundle));
+      expect(!!date).assertTrue(); expect((await date.getText()).length > 0).assertTrue();
+      const planBounds = await plans[0].getBounds(); const viewport = await home.getBounds();
+      expect(planBounds.left >= viewport.left && planBounds.right <= viewport.right).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-home.png');
     });
     it('portfolioSelectorRefreshesVisiblePhotos', 0, async () => {

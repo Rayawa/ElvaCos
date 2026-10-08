@@ -1,5 +1,6 @@
 import { LedgerSummary, buildLedgerSummary } from './LedgerSummary';
 import { LedgerRoute } from './LedgerRoute';
+import { PreparationUndo, usablePreparationUndo } from './HomeSummary';
 import { CollectedEntry, entryFromText } from './CollectedEntry';
 import { EntryRepository } from '../data/repository/EntryRepository';
 import { today } from '../common/format';
@@ -107,6 +108,7 @@ export class AppState {
   @Trace events: CosEvent[] = [];
   @Trace preparationCategories: PreparationCategory[] = [];
   @Trace preparationTasks: PreparationTask[] = [];
+  @Trace preparationUndos: PreparationUndo[] = [];
   @Trace checklist: ChecklistItem[] = [];
   @Trace photos: PhotoAsset[] = [];
   @Trace team: TeamMember[] = [];
@@ -542,10 +544,36 @@ export class AppState {
   async togglePreparation(item: PreparationTask): Promise<boolean> {
     return this.perform(async () => {
       await this.preparationRepo.setDone(item.id, !item.done);
+      this.preparationUndos = this.preparationUndos.filter((token: PreparationUndo) => token.taskId !== item.id);
       if (!item.done) {
         void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
       }
     }, true, ['preparationTasks']);
+  }
+  completeHomePreparation(taskId: string, projectId: string): Promise<OperationResult> {
+    return this.performResult(async (): Promise<void> => {
+      const task = this.preparationTasks.find((item: PreparationTask) => item.id === taskId && item.projectId === projectId);
+      if (!task || task.done || !this.readiness(projectId).active || !this.projects.some((project: CosProject) => project.id === projectId)) { throw new Error('任务已变更或不存在，请重新加载后继续'); }
+      await this.preparationRepo.setDone(task.id, true, projectId, false);
+      const now = Date.now();
+      this.preparationUndos = this.preparationUndos.filter((token: PreparationUndo) => token.taskId !== taskId && token.expiresAt > now).concat(new PreparationUndo(task, now));
+      this.reportNotice('准备任务已完成，可在首页短时撤销');
+      void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {});
+    }, true, ['preparationTasks']);
+  }
+  async undoHomePreparation(id: string): Promise<OperationResult> {
+    const result = await this.performResult(async (): Promise<void> => {
+      const token = this.preparationUndos.find((item: PreparationUndo) => item.id === id);
+      if (!token || !usablePreparationUndo(token, this.preparationTasks, this.projects, Date.now())) {
+        this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id);
+        throw new Error('撤销时间已过，或任务已变更；可进入计划调整完成状态');
+      }
+      await this.preparationRepo.setDone(token.taskId, token.previousDone, token.projectId, token.expectedDone);
+      this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id);
+      this.reportNotice('已撤销完成');
+    }, true, ['preparationTasks']);
+    if (result.status === 'failed' && result.detail === '任务已变更或不存在，请重新加载后继续') { this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id); }
+    return result;
   }
   async addPreparationTemplate(projectId: string, keys: string[]): Promise<boolean> {
     return this.perform(async () => {
@@ -759,6 +787,7 @@ export class AppState {
     const success = await this.perform(async () => {
       if (this.context) { restored = await new BackupService(this.db, this.context).restore(); }
       if (restored) {
+        this.preparationUndos = [];
         const canceled = await this.cancelEventReminders();
         this.reportNotice('元数据已恢复。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。'));
       }
@@ -778,7 +807,7 @@ export class AppState {
     return canceled;
   }
   async clearData(): Promise<boolean> {
-    return this.perform(async () => { await this.relations.clear(); await this.cancelEventReminders(); await this.media?.collect([]); });
+    return this.perform(async () => { await this.relations.clear(); this.preparationUndos = []; await this.cancelEventReminders(); await this.media?.collect([]); });
   }
   projectAssets(id: string): Asset[] {
     const ids = this.links.filter((p: ProjectAsset) => p.projectId === id)

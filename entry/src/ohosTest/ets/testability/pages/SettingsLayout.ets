@@ -23,11 +23,12 @@ function homeFixture(): AppState {
   const project = new CosProject(); project.characterId = character.id; project.name = '布局验证计划';
   const event = new CosEvent(); event.name = '布局验证活动'; event.date = '2099-10-07'; event.city = '测试城市';
   const category = new PreparationCategory(); category.projectId = project.id; category.name = '服装';
+  project.eventId = event.id;
   state.characters = [character]; state.projects = [project]; state.events = [event];
   state.preparationCategories = [category];
   for (let index = 0; index < 3; index++) {
     const task = new PreparationTask(); task.projectId = project.id; task.categoryId = category.id;
-    task.label = '准备任务 ' + index; task.sortOrder = index;
+    task.id = 'layout-task-' + index; task.label = '准备任务 ' + index; task.sortOrder = index; task.dueDate = today();
     state.preparationTasks.push(task);
     const item = new ChecklistItem(); item.projectId = project.id; item.label = '打包物品 ' + index; item.sortOrder = index;
     state.checklist.push(item);
@@ -101,6 +102,7 @@ struct SettingsLayout {
             HomePage({
               state: this.homeState, active: true, bottomInset: Theme.homeContentBottom,
               open: (kind: string, id: string): void => { this.routeResult = kind + ':' + id; },
+              openTask: (item): void => { this.routeResult = 'task:' + item.projectId + ':' + item.section + ':' + item.focusId; },
             })
           } else {
             SettingsPage({ state: this.state })

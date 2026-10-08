@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Execute the actual pure ArkTS models on the host. Native APIs are covered by
-// the Harmony build and optional device suites; this runner stubs identity only.
+// the Harmony build and optional device suites; native services and observation
+// are stubbed here. Repository writes use isolated SQLite.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,7 +12,16 @@ const ts = require(path.join(studio, 'tools/ohpm/node_modules/typescript'));
 const originalLoad = Module._load;
 Module._load = function (id, parent, isMain) {
   if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID() } };
-  if (id === '@kit.ArkData') return { relationalStore: {} };
+  if (id === '@kit.ArkData') return { relationalStore: { RdbPredicates: class {
+    constructor(table) { this.table = table; this.terms = []; }
+    equalTo(key, value) { this.terms.push([key, value]); return this; }
+  } } };
+  if (id === 'BuildProfile') return { DEBUG: false };
+  if (parent?.filename.endsWith('/model/ApplicationState.ets')) {
+    if (id === '../common/storage') return {};
+    const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'ShareService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
+    if (nativeService) return { [nativeService]: class { static async confirm() {} } };
+  }
   if (['@kit.AbilityKit', '@kit.BackgroundTasksKit', '@kit.NotificationKit'].includes(id)) return {};
   if (id === '@kit.BasicServicesKit') return { deviceInfo: { sdkApiVersion: 26, distributionOSApiVersion: 60100 } };
   return originalLoad.call(this, id, parent, isMain);
@@ -26,10 +36,13 @@ global.canIUse = () => true;
 // Host execution intentionally does not model native observation or UI lifecycle.
 global.Trace = () => undefined;
 global.ObservedV2 = value => value;
+global.Computed = () => undefined;
 const root = path.resolve(__dirname, '../entry/src/main/ets');
 const entities = require(root + '/model/Entities.ets');
 const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistItem, PhotoAsset, PhotoStatus, CosEvent } = entities;
 const day = require(root + '/model/DayMode.ets');
+const { PreparationUndo, PREPARATION_UNDO_MS, usablePreparationUndo, visiblePreparationUndos, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, homeTaskCapacity } = require(root + '/model/HomeSummary.ets');
+const { AppState } = require(root + '/model/ApplicationState.ets');
 const { ScheduleRoute } = require(root + '/model/ScheduleRoute.ets');
 const { deadlineTasksOnDate, buildScheduleView, scheduleTaskRoute } = require(root + '/model/ScheduleView.ets');
 const { scheduleGroups } = require(root + '/model/Schedule.ets');
@@ -73,6 +86,10 @@ connection.close()
   sql(sql, args = []) { if (this.failSql && sql.startsWith(this.failSql)) return Promise.reject(new Error('injected write failure')); return new Promise((resolve, reject) => { this.pending.push({ resolve, reject }); this.worker.stdin.write(JSON.stringify({ sql, args }) + '\n'); }); }
   getStore() { return this; }
   async executeSql(sql, args) { await this.sql(sql, args); }
+  async update(values, predicate) {
+    await this.sql('UPDATE ' + predicate.table + ' SET ' + Object.keys(values).map(key => key + '=?').join(',') + ' WHERE ' + predicate.terms.map(([key]) => key + '=?').join(' AND '), [...Object.values(values), ...predicate.terms.map(([, value]) => value)]);
+    return (await this.sql('SELECT changes()')).rows[0][0];
+  }
   async querySql(sql, args) {
     const data = await this.sql(sql, args); let index = -1;
     return {
@@ -284,6 +301,66 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.category = 'preparation'; route.range = 'undated'; assert.deepEqual(filterTaskQueue(queue, route, '2026-12-31').map(item => item.focusId), ['undated']);
     route.range = 'all'; route.projectId = 'missing'; assert.equal(filterTaskQueue(queue, route, '2026-12-31').length, 0);
   });
+  await test('home summary keeps waiting first and stable rows through completion, undo and retirement', () => {
+    const queue = buildTaskQueue([read()], [project], '2026-12-31');
+    const snapshot = homeCandidates(queue);
+    assert.equal(snapshot.length, 5); assert.equal(snapshot[0].kind, 'waiting');
+    assert.equal(snapshot.some(item => ['undated', 'later'].includes(item.group)), false);
+    const target = snapshot.find(item => item.source === 'preparation');
+    const original = tasks.find(item => item.id === target.focusId);
+    const token = new PreparationUndo(original, 1000);
+    const remaining = queue.filter(item => item.focusId !== target.focusId).reverse();
+    let rows = reconcileHomeRows(snapshot, remaining, [token], 1001);
+    assert.deepEqual(rows.map(row => row.key), snapshot.map(item => item.id));
+    assert.equal(rows.find(row => row.key === target.id).undo.id, token.id);
+    assert.equal(rows.find(row => row.key === target.id).retired, false);
+    rows = reconcileHomeRows(snapshot, remaining, [token], token.expiresAt);
+    assert.equal(rows.find(row => row.key === target.id).retired, true);
+    rows = reconcileHomeRows(snapshot, queue.slice().reverse(), [], 1002);
+    assert.deepEqual(rows.map(row => row.key), snapshot.map(item => item.id));
+    assert.equal(rows.find(row => row.key === target.id).retired, false);
+    const moved = Object.assign({}, target, { id: 'preparation:' + target.projectId + ':' + target.focusId, kind: 'preparation', group: 'today' });
+    rows = reconcileHomeRows(snapshot, [moved], [], 1002);
+    assert.equal(rows.find(row => row.key === target.id).item.kind, 'preparation');
+    assert.equal(rows.find(row => row.key === target.id).key, target.id);
+  });
+  await test('home refills new work at the end without reordering pending rows or interrupting undo', () => {
+    const queue = buildTaskQueue([read()], [project], '2026-12-31');
+    const snapshot = homeCandidates(queue); const target = snapshot[0];
+    const token = new PreparationUndo(tasks.find(task => task.id === target.focusId), 1000);
+    const remaining = queue.filter(item => item.focusId !== target.focusId);
+    assert.deepEqual(advanceHomeSnapshot(snapshot, remaining, [token], token.expiresAt - 1).map(item => item.id), snapshot.map(item => item.id));
+    let updated = advanceHomeSnapshot(snapshot, remaining, [token], token.expiresAt);
+    assert.equal(updated[0].id, target.id); // the retired row can animate to zero before removal
+    updated = advanceHomeSnapshot(updated, remaining, [token], token.expiresAt + 1000);
+    assert.deepEqual(updated.slice(0, 4).map(item => item.id), snapshot.slice(1).map(item => item.id));
+    assert.equal(updated.length, 5); assert.equal(updated.some(item => item.id === target.id), false);
+    const added = Object.assign({}, queue[0], { id: 'new-task', focusId: 'new-task' });
+    const short = snapshot.slice(0, 2);
+    const next = advanceHomeSnapshot(short, [added, ...queue], [], 1001);
+    assert.deepEqual(next.slice(0, 2).map(item => item.id), short.map(item => item.id));
+    assert.equal(next[2].id, added.id);
+  });
+  await test('undo eligibility rejects elapsed windows, changed values, missing tasks and finished plans', () => {
+    const original = task('undo', '2026-12-31'); const token = new PreparationUndo(original, 1000);
+    const completed = Object.assign(new PreparationTask(), original, { done: true });
+    assert.equal(token.previousDone, false); assert.equal(token.expectedDone, true); assert.equal(token.expiresAt, 1000 + PREPARATION_UNDO_MS);
+    assert.equal(usablePreparationUndo(token, [completed], [project], token.expiresAt - 1), true);
+    assert.equal(usablePreparationUndo(token, [completed], [project], token.expiresAt), false);
+    assert.equal(usablePreparationUndo(token, [original], [project], 1001), false);
+    assert.equal(usablePreparationUndo(token, [], [project], 1001), false);
+    assert.equal(usablePreparationUndo(token, [completed], [Object.assign(new CosProject(), project, { status: ProjectStatus.ARCHIVED })], 1001), false);
+    assert.equal(visiblePreparationUndos([token], [original], [project], 1001, true).length, 1);
+    assert.equal(visiblePreparationUndos([token], [original], [project], 1001, false).length, 0);
+    assert.equal(visiblePreparationUndos([token], [], [project], 1001, true).length, 0);
+  });
+  await test('home capacity accounts for a day entry, window height and larger rows without shrinking text', () => {
+    assert.equal(homeTaskCapacity(800, 100, 96, 140, 150, 64), 3);
+    assert.equal(homeTaskCapacity(708, 100, 96, 212, 150, 64), 1);
+    assert.equal(homeTaskCapacity(1200, 100, 96, 140, 150, 64), 5);
+    assert.equal(homeTaskCapacity(400, 100, 96, 212, 150, 128), 1);
+    assert.equal(homeTaskCapacity(800, 100, 96, 140, 150, 100), 2);
+  });
   await test('all photo surfaces share six disjoint stages and final includes published', () => {
     const distribution = photoDistribution(photos); assert.deepEqual(distribution.map(g => g.value), read().photos.byStage);
     assert.equal(distribution.reduce((sum, g) => sum + g.value, 0), 8); assert.equal(photoStage(photos, 4).length, 2);
@@ -376,6 +453,52 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal(updated.waitingOn, '毛娘'); assert.equal(updated.waitingUntil, '2026-10-11'); assert.equal(updated.done, true);
       updated.waitingUntil = 'bad date'; await assert.rejects(preparations.saveTask(updated), /等待日期/);
       assert.equal((await preparations.tasks()).find(task => task.id === 'persist-wait').waitingUntil, '2026-10-11');
+    });
+    await test('conditional preparation completion and undo update only the expected task value', async () => {
+      const item = Object.assign(new PreparationTask(), { id: 'cas', projectId: 'positive', categoryId: 'waiting-category', label: '等道具', notes: '保留备注', dueDate: '2026-10-08', waitingOn: '快递', sortOrder: 8 });
+      await preparations.saveTask(item);
+      await preparations.setDone(item.id, true, item.projectId, false);
+      const saved = (await preparations.tasks()).find(task => task.id === item.id);
+      assert.equal(saved.done, true); assert.equal(saved.notes, item.notes); assert.equal(saved.waitingOn, item.waitingOn); assert.equal(saved.dueDate, item.dueDate); assert.equal(saved.sortOrder, 8);
+      await assert.rejects(preparations.setDone(item.id, true, item.projectId, false), /已变更或不存在/);
+      await assert.rejects(preparations.setDone(item.id, false, 'zero', true), /已变更或不存在/);
+      db.failSql = 'UPDATE preparation_tasks';
+      await assert.rejects(preparations.setDone(item.id, false, item.projectId, true), /injected/);
+      db.failSql = ''; assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, true);
+      await preparations.setDone(item.id, false, item.projectId, true);
+      assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, false);
+      await db.sql('DELETE FROM preparation_tasks WHERE id=?', [item.id]);
+      await assert.rejects(preparations.setDone(item.id, false, item.projectId, true), /已变更或不存在/);
+    });
+    await test('actual home completion and undo preserve failed writes and distinguish saved-but-not-refreshed snapshots', async () => {
+      const state = new AppState(); state.settings.haptic = false;
+      state.projects = [Object.assign(new CosProject(), { id: 'positive' })]; state.preparationRepo = preparations;
+      const item = Object.assign(new PreparationTask(), { id: 'home-write', projectId: 'positive', categoryId: 'waiting-category', label: '带道具' });
+      await preparations.saveTask(item); await state.refresh(['preparationTasks']);
+      db.failSql = 'UPDATE preparation_tasks';
+      assert.equal((await state.completeHomePreparation(item.id, item.projectId)).status, 'failed');
+      assert.equal(state.preparationUndos.length, 0); assert.equal(state.preparationTasks.find(task => task.id === item.id).done, false);
+      db.failSql = '';
+      const refresh = state.refresh.bind(state); state.refresh = async () => { throw new Error('read failure'); };
+      assert.equal((await state.completeHomePreparation(item.id, item.projectId)).status, 'savedNotRefreshed');
+      assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, true);
+      assert.equal(state.preparationTasks.find(task => task.id === item.id).done, false);
+      const token = state.preparationUndos[0]; assert.equal(token.taskId, item.id);
+      assert.equal((await state.undoHomePreparation(token.id)).status, 'failed'); assert.equal(state.preparationUndos.length, 1);
+      state.refresh = refresh; assert.equal(await state.reloadRecords(), true);
+      state.busy = true; assert.equal((await state.undoHomePreparation(token.id)).status, 'failed'); assert.equal(state.preparationUndos.length, 1); state.busy = false;
+      db.failSql = 'UPDATE preparation_tasks';
+      assert.equal((await state.undoHomePreparation(token.id)).status, 'failed'); assert.equal(state.preparationUndos.length, 1);
+      db.failSql = ''; assert.equal((await state.undoHomePreparation(token.id)).status, 'ok');
+      assert.equal(state.preparationUndos.length, 0); assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, false);
+      assert.equal((await state.completeHomePreparation(item.id, item.projectId)).status, 'ok');
+      const changedToken = state.preparationUndos[0]; await preparations.setDone(item.id, false);
+      assert.equal((await state.undoHomePreparation(changedToken.id)).status, 'failed'); assert.equal(state.preparationUndos.length, 0);
+      await state.refresh(['preparationTasks']); await state.completeHomePreparation(item.id, item.projectId);
+      state.preparationUndos[0].expiresAt = Date.now() - 1;
+      assert.equal((await state.undoHomePreparation(state.preparationUndos[0].id)).status, 'failed');
+      assert.equal((await preparations.tasks()).find(task => task.id === item.id).done, true);
+      await db.sql('DELETE FROM preparation_tasks WHERE id=?', [item.id]);
     });
     const { MetadataBackupRepository } = require(root + '/data/repository/MetadataBackupRepository.ets');
     const backup = new MetadataBackupRepository(db);

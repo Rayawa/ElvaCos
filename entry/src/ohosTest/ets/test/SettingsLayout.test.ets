@@ -1,4 +1,4 @@
-import { Component, Driver, On, ON, Point, Rect } from '@kit.TestKit';
+import { Component, Driver, On, ON, Rect } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { fileIo } from '@kit.CoreFileKit';
 
@@ -116,92 +116,48 @@ export default function settingsLayoutTest(): void {
       expect(helpBounds.left >= viewport.left && helpBounds.bottom <= viewport.bottom).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-wide-layout.png');
     });
-    it('homeResizesToFixedOverviewAndKeepsTheLastPhotosReachable', 0, async () => {
+    it('homeKeepsThreeCompactGroupsAndReachableActionsAcrossWidths', 0, async () => {
       await (await required(ON.id('layout-page-home'), 'home fixture')).click();
-      await selectWidth('phone');
-      expect(((await driver.findComponents(ON.id('home-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
-      const phoneScroll = await required(ON.id('home-phone-scroll'), 'phone home scroll');
-      await phoneScroll.scrollToBottom(1000); await driver.delayMs(500);
-      let photos = await driver.findComponents(ON.text('照片待恢复').inWindow(bundle));
-      expect(photos.length).assertEqual(3);
-      expect((await photos[2].getBounds()).bottom <= (await phoneScroll.getBounds()).bottom).assertTrue();
-
-      await selectWidth('wide');
-      const fixed = await required(ON.id('home-fixed-overview'), 'fixed home overview');
-      const fixedBefore = await fixed.getBounds();
-      const action = await required(ON.id('home-expenses'), 'fixed home action');
-      const actionBefore = await action.getBounds();
-      const plan = await required(ON.text('布局验证计划'), 'current plan');
-      const planBefore = await plan.getBounds();
-      const scroll = await required(ON.id('home-wide-scroll'), 'wide home scroll');
-      const viewport = await scroll.getBounds();
-      expect(fixedBefore.right < viewport.left).assertTrue();
-      expect(planBefore.top >= fixedBefore.top && planBefore.bottom <= fixedBefore.bottom).assertTrue();
-      const startCanvas = await (await required(ON.id('settings-layout-canvas'), 'wide canvas')).getBounds();
-      const countdown = await (await required(ON.id('home-event-countdown'), 'long activity countdown')).getBounds();
-      // The far-future fixture exposes the former two-line numeric overflow.
-      expect(countdown.bottom - countdown.top <= 38 * (startCanvas.right - startCanvas.left) / 920 + 2).assertTrue();
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-home-wide-start.png');
-      await scroll.scrollToBottom(1000); await driver.delayMs(500);
-      sameRect(fixedBefore, await fixed.getBounds());
-      sameRect(actionBefore, await action.getBounds());
-      sameRect(planBefore, await plan.getBounds());
-      photos = await driver.findComponents(ON.text('照片待恢复').inWindow(bundle));
-      expect(photos.length).assertEqual(3);
-      const last = await photos[2].getBounds();
-      const canvas = await (await required(ON.id('settings-layout-canvas'), 'wide canvas')).getBounds();
-      const pixelsPerVp = (canvas.right - canvas.left) / 920;
-      expect(last.left >= viewport.left && last.right <= viewport.right).assertTrue();
-      expect(viewport.bottom - last.bottom >= 96 * pixelsPerVp - 2).assertTrue();
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-home-wide-bottom.png');
-
-      await selectWidth('phone');
-      expect(((await driver.findComponents(ON.id('home-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
-      const restored = await (await required(ON.id('home-phone-scroll'), 'restored single column')).getBounds();
-      const phoneCanvas = await (await required(ON.id('settings-layout-canvas'), 'phone canvas')).getBounds();
-      expect(Math.abs((restored.right - restored.left) - (phoneCanvas.right - phoneCanvas.left)) <= 2).assertTrue();
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-home-phone-restored.png');
+      for (const width of ['phone', 'narrow', 'wide']) {
+        await selectWidth(width);
+        const scroll = await required(ON.id('home-scroll'), 'single column home');
+        await scroll.scrollToTop(1000); await driver.delayMs(500);
+        const viewport = await scroll.getBounds();
+        const plan = await (await required(ON.id('home-next-plan'), 'next plan')).getBounds();
+        expect(plan.left >= viewport.left && plan.right <= viewport.right).assertTrue();
+        const date = await required(ON.id('home-plan-date'), 'effective date');
+        expect((await date.getText()).includes('来自活动')).assertTrue();
+        expect(((await driver.findComponents(ON.id('home-next-plan').inWindow(bundle)))?.length || 0)).assertEqual(1);
+        await scroll.scrollToBottom(1000); await driver.delayMs(500);
+        for (const id of ['home-expenses', 'home-inbox']) {
+          const bounds = await (await required(ON.id(id), id)).getBounds();
+          expect(bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.bottom <= viewport.bottom).assertTrue();
+        }
+        await scroll.scrollToTop(1000); await driver.delayMs(500);
+        await scroll.scrollSearch(ON.id('home-all-tasks').inWindow(bundle));
+        expect((await (await required(ON.id('home-all-tasks'), 'all tasks')).getText()).includes('7 项')).assertTrue();
+        await driver.screenCap('/data/storage/el2/base/cache/elvacos-home-' + width + '-compact.png');
+      }
     });
-    it('mouseWheelForwardsFromOverviewAndTaskCardsKeepTheirContext', 0, async () => {
-      await selectWidth('wide');
-      const scroll = await required(ON.id('home-wide-scroll'), 'wide home scroll');
+    it('homeTaskRowsOpenTheExactTaskAndKeepTheirContextAfterResizing', 0, async () => {
+      await selectWidth('phone');
+      const scroll = await required(ON.id('home-scroll'), 'home scroll');
       await scroll.scrollToTop(1000); await driver.delayMs(500);
-      const fixed = await required(ON.id('home-fixed-overview'), 'fixed home overview');
-      const overviewBefore = await fixed.getBounds();
-      const task = await required(ON.text('服装 · 准备任务 0'), 'first preparation task');
-      const before = await task.getBounds();
-      const point: Point = {
-        x: Math.round((overviewBefore.left + overviewBefore.right) / 2),
-        y: Math.round(overviewBefore.top + 20),
-      };
-      await driver.mouseScroll(point, true, 1); await driver.delayMs(500);
-      const moved = await task.getBounds();
-      expect(moved.top < before.top).assertTrue();
-      sameRect(overviewBefore, await fixed.getBounds());
-      // TestKit defines key 2072 as Ctrl; Dashboard leaves modified wheel events alone.
-      await driver.mouseScroll(point, true, 1, 2072); await driver.delayMs(500);
-      sameRect(moved, await task.getBounds());
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-home-wheel.png');
-
-      await scroll.scrollToTop(1000); await driver.delayMs(500);
-      const preparation = await required(ON.description('双击继续准备'), 'preparation card');
-      await preparation.click(); await driver.delayMs(500);
+      await scroll.scrollSearch(ON.id('home-task-open:layout-task-0').inWindow(bundle));
+      await (await required(ON.id('home-task-open:layout-task-0'), 'preparation task')).click();
+      await driver.delayMs(500);
       const result = await required(ON.id('layout-route-result'), 'task route result');
-      const preparationRoute = await result.getText();
-      expect(preparationRoute.startsWith('project:')).assertTrue();
-      const projectId = preparationRoute.slice('project:'.length);
-      expect(projectId.length > 0).assertTrue();
-      const packing = await required(ON.description('双击继续打包'), 'packing card');
-      await packing.click(); await driver.delayMs(500);
-      expect(await result.getText()).assertEqual('packing:' + projectId);
-      const selection = await scroll.scrollSearch(ON.description('双击继续选片').inWindow(bundle));
-      expect(selection !== undefined).assertTrue();
-      await (await required(ON.description('双击继续选片'), 'photo selection card')).click(); await driver.delayMs(500);
-      expect(await result.getText()).assertEqual('projectPhotos:' + projectId);
-      await scroll.scrollToBottom(1000); await driver.delayMs(500);
-      const recent = await required(ON.description('双击打开最近照片'), 'recent photo card');
-      await recent.click(); await driver.delayMs(500);
-      expect(await result.getText()).assertEqual('photo:layout-photo-0');
+      const route = await result.getText();
+      expect(route.startsWith('task:')).assertTrue();
+      expect(route.endsWith(':1:layout-task-0')).assertTrue();
+      await selectWidth('wide');
+      await scroll.scrollToTop(1000); await driver.delayMs(500);
+      await scroll.scrollSearch(ON.id('home-task-open:layout-task-0').inWindow(bundle));
+      await (await required(ON.id('home-task-open:layout-task-0'), 'same task after resizing')).click();
+      await driver.delayMs(500); expect(await result.getText()).assertEqual(route);
+      await scroll.scrollSearch(ON.id('home-all-tasks').inWindow(bundle));
+      await (await required(ON.id('home-all-tasks'), 'all tasks')).click();
+      await driver.delayMs(500); expect(await result.getText()).assertEqual('tasks:all');
     });
     it('largeFontActuallyScalesAndSettingsRemainInsideTheirCards', 0, async () => {
       await (await required(ON.id('layout-page-settings'), 'settings fixture')).click();
@@ -298,11 +254,10 @@ export default function settingsLayoutTest(): void {
       await (await required(ON.id('layout-page-home'), 'home fixture')).click();
       await driver.delayMs(800);
       expect(((await driver.findComponents(ON.id('home-wide-layout').inWindow(bundle)))?.length || 0)).assertEqual(0);
-      const home = await required(ON.id('home-phone-scroll'), 'short window home');
+      const home = await required(ON.id('home-scroll'), 'short window home');
       await home.scrollToBottom(1000); await driver.delayMs(500);
-      const photos = await driver.findComponents(ON.text('照片待恢复').inWindow(bundle));
-      expect(photos.length).assertEqual(3);
-      expect((await photos[2].getBounds()).bottom <= (await home.getBounds()).bottom).assertTrue();
+      const capture = await required(ON.id('home-inbox'), 'short window capture');
+      expect((await capture.getBounds()).bottom <= (await home.getBounds()).bottom).assertTrue();
     });
     it('expenseChartShowsCorrectRatiosAndFiltersRecordsAtEveryWidth', 0, async () => {
       for (const width of ['narrow', 'phone', 'wide']) {

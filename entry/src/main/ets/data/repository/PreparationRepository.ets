@@ -75,9 +75,12 @@ export class PreparationRepository {
     checkWaiting(item);
     await this.db.getStore().executeSql('INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,notes,sort_order,waiting_on,waiting_until) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,label=excluded.label,done=excluded.done,due_date=excluded.due_date,notes=excluded.notes,sort_order=excluded.sort_order,waiting_on=excluded.waiting_on,waiting_until=excluded.waiting_until', [item.id, item.projectId, item.categoryId, requiredName(item.label), item.done ? 1 : 0, item.dueDate, item.notes, item.sortOrder, item.waitingOn, item.waitingUntil]);
   }
-  async setDone(id: string, done: boolean): Promise<void> {
-    const changed = await this.db.getStore().update({ done: done ? 1 : 0 }, new relationalStore.RdbPredicates('preparation_tasks').equalTo('id', id));
-    if (changed !== 1) { throw new Error('任务已不存在，请刷新后重试'); }
+  async setDone(id: string, done: boolean, projectId: string = '', expected?: boolean): Promise<void> {
+    const predicate = new relationalStore.RdbPredicates('preparation_tasks').equalTo('id', id);
+    if (projectId) { predicate.equalTo('project_id', projectId); }
+    if (expected !== undefined) { predicate.equalTo('done', expected ? 1 : 0); }
+    const changed = await this.db.getStore().update({ done: done ? 1 : 0 }, predicate);
+    if (changed !== 1) { throw new Error('任务已变更或不存在，请重新加载后继续'); }
   }
   async addTemplate(bundle: PreparationBundle): Promise<void> {
     // Add only missing names/labels; never replace custom tasks or reset completion.
