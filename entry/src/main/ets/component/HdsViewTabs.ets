@@ -24,7 +24,7 @@ export struct HdsViewTabs {
     HdsTabs({ controller: this.controller, index: this.selectedIndex }) {
       ForEach(this.labels, (label: string, index: number) => {
         TabContent() {
-          // One editor/scroll container at a time; the route owns each view's return context.
+          // The native bar floats above the immersive content. Routes retain each view's scroll context.
           if (index === this.selectedIndex) { this.content() }
         }.tabBar(new BottomTabBarStyle(this.icons[index], label)
           .id(this.componentId + '-' + index)
@@ -44,6 +44,6 @@ export struct HdsViewTabs {
       })
       .onTabBarClick((): void => { HapticService.confirm(this.haptic, this.hapticLevel); })
       .width('100%').height('100%').backgroundColor(Theme.bg)
-      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.BOTTOM])
   }
 }

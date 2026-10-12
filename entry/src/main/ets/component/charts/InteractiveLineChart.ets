@@ -4,6 +4,7 @@ import { vibration } from '../../common/vibration';
 import { pressLightFieldFilter, pressVisualEffect } from '../../common/visualEffects';
 import { Theme } from '../../common/Theme';
 import { ChartConfigurationObserver } from './ChartConfigurationObserver';
+import { ContextRow } from '../ContextRow';
 
 export interface ChartViewportState { zoom: number; panRatio: number; }
 
@@ -342,6 +343,12 @@ export struct InteractiveLineChart {
         return labels.length > 0 ? labels[Math.min(this.selected, labels.length - 1)].label : '';
     }
 
+    private selectedBody(): string {
+        const detail = this.selectedDetail();
+        const prefix = this.selectedDate() + '，';
+        return detail.startsWith(prefix) ? detail.slice(prefix.length) : detail;
+    }
+
     private selectedSeriesValue(chartSeries: LineChartSeries): string {
         const point = chartSeries.points[Math.min(this.selected, chartSeries.points.length - 1)];
         return this.valueLabel(point?.value ?? 0);
@@ -590,9 +597,8 @@ export struct InteractiveLineChart {
                 if (this.sourceSeries().length > 1) {
                     this.seriesSummary()
                 } else {
-                    Text(this.selectedDetail()).fontSize(15).lineHeight(22)
-                        .id('line-chart-detail:' + this.title)
-                        .fontColor(Theme.muted).width('100%')
+                    ContextRow({ label: this.selectedDate(), text: this.selectedBody(), bodyId: 'line-chart-detail:' + this.title })
+                        .id('line-chart-summary:' + this.title)
                         .accessibilityText(this.selectedDetail())
                 }
             } else {

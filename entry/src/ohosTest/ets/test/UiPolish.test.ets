@@ -1,5 +1,5 @@
 import { getApplicationState } from '../../../main/ets/common/appState';
-import { Driver, ON } from '@kit.TestKit';
+import { Driver, ON, MatchPattern } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { monthlyExpenses, photoDistribution } from '../../../main/ets/model/Statistics';
 import { portfolioStage } from '../../../main/ets/model/Rules';
@@ -36,7 +36,7 @@ export default function uiPolishTest(): void {
       const points = monthlyExpenses(records, '2026-02-10');
       expect(points.length).assertEqual(6); expect(points[0].label).assertEqual('2025-09');
       expect(points[3].value).assertEqual(0.99); expect(points[4].value).assertEqual(0.30);
-      expect(points[4].detail).assertEqual('2026-01 · ¥0.30 · 2 笔'); expect(points[5].value).assertEqual(0);
+      expect(points[4].detail).assertEqual('2026-01，¥0.30，2 笔'); expect(points[5].value).assertEqual(0);
       expect(records.length).assertEqual(5);
     });
     it('photoDistributionCountsEveryStatusExactlyOnce', 0, () => {
@@ -71,7 +71,7 @@ export default function uiPolishTest(): void {
       await tap('相册'); await tap('按场次'); await driver.delayMs(900);
       await tap('album-distribution-toggle');
       expect(!!(await driver.findComponent(ON.text('全仓照片处理分布').inWindow(bundle)))).assertTrue();
-      await tap('album-distribution-toggle'); await tap('作品集展示 · 成片与已发布');
+      await tap('album-distribution-toggle'); await tap('album-portfolio-toggle');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-distribution.png');
       const filter = await driver.findComponent(ON.id('portfolio-status-filter').inWindow(bundle));
       expect(!!filter).assertTrue(); await filter.click(); await driver.delayMs(250); await tap('已发布');
@@ -100,15 +100,17 @@ export default function uiPolishTest(): void {
       await (await driver.findComponent(ON.id('home-expenses').inWindow(bundle))).click(); await driver.delayMs(900);
       await (await driver.findComponent(ON.id('expense-range').inWindow(bundle))).click(); await tap('全部日期');
       const expenses = await driver.findComponent(ON.id('expense-scroll').inWindow(bundle));
-      await expenses.scrollSearch(ON.id('line-chart-canvas:当前范围 · 有记录月份支出').inWindow(bundle));
-      const detail = await driver.findComponent(ON.id('line-chart-detail:当前范围 · 有记录月份支出').inWindow(bundle));
+      await expenses.scrollSearch(ON.id('line-chart-canvas:有记录月份支出').inWindow(bundle));
+      const detail = await driver.findComponent(ON.id('line-chart-detail:有记录月份支出').inWindow(bundle));
       expect(!!detail).assertTrue();
-      await (await driver.findComponent(ON.id('line-chart-canvas:当前范围 · 有记录月份支出').inWindow(bundle))).click();
+      await (await driver.findComponent(ON.id('line-chart-canvas:有记录月份支出').inWindow(bundle))).click();
       await driver.delayMs(250);
       const after = await detail.getText();
       expect(after.includes('¥')).assertTrue();
       expect(after.includes('笔')).assertTrue();
-      expect(/^(\d{4}-\d{2}|未记录日期) · ¥\d+\.\d{2} · \d+ 笔$/.test(after)).assertTrue();
+      expect(/^¥\d+\.\d{2}，\d+ 笔$/.test(after)).assertTrue();
+      const dates = await driver.findComponents(ON.text('^(\\d{4}-\\d{2}|未记录日期)$', MatchPattern.REG_EXP).within(ON.id('line-chart-summary:有记录月份支出')).inWindow(bundle));
+      expect((dates?.length || 0) > 0).assertTrue();
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-polish-expenses.png');
       await driver.pressBack(); await driver.delayMs(400);
     });

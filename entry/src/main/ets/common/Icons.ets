@@ -12,6 +12,7 @@ export class Icons {
   // 一级导航与标题菜单
   static home: Resource = $r('sys.media.return_home_fill');
   static plan: Resource = $r('sys.media.ohos_ic_public_edit');
+  static location: Resource = $r('sys.media.ohos_ic_public_location');
   static event: Resource = $r('sys.media.ohos_ic_public_clock');
   static library: Resource = $r('sys.media.rectangle_filled_and_line_horizontal_and_rectangle');
   static profile: Resource = $r('sys.media.person_badge_waveform');

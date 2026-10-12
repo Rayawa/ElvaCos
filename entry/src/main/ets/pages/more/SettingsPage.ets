@@ -22,7 +22,7 @@ export struct SettingsPage {
   @Local sheetEntrance: StaggerEntrance = new StaggerEntrance();
   private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
   @Require @Param state: AppState;
-  @Param bottomInset: number = Theme.contentBottom;
+  @Param bottomInset: number = Theme.detailBottom;
   @Local helpOpen: boolean = false;
   @Local helpKind: string = 'usage';
   @Local contentWidth: number = 0;
@@ -87,7 +87,7 @@ export struct SettingsPage {
             Text('当前同步状态').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
             Text('应用尚未接入账号登录或云端数据同步。角色、计划、照片与收录保存在本机，离线业务可直接使用。').fontSize(14).fontColor(Theme.muted)
             Text('备份到云空间').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-            Text('可以导出元数据，在系统文件选择器中选择可用的云空间位置。JSON 不包含照片，完整数据与媒体需使用系统备份。').fontSize(14).fontColor(Theme.muted)
+            Text('可以在系统文件选择器中将元数据导出到云空间。JSON 不含照片，照片原文件需另行保存；系统备份的恢复范围以设备服务为准。').fontSize(14).fontColor(Theme.muted)
             Button('导出元数据备份')
               .accessibilityText('导出元数据备份')
               .width('100%')

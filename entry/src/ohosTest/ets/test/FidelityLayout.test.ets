@@ -90,7 +90,7 @@ export default function fidelityLayoutTest(): void {
         sameRect(baselineTabs, await tabs());
       }
       await tap('衣柜');
-      expect((await driver.findComponents(ON.id('secondary-segment-3').inWindow(bundle))).length).assertEqual(0);
+      expect(((await driver.findComponents(ON.id('secondary-segment-3').inWindow(bundle)))?.length || 0)).assertEqual(0);
       const gear = await driver.findComponent(ON.id('root-action-添加装备').inWindow(bundle)); const gearBefore = await gear.getBounds();
       await scrollBody(); sameRect(gearBefore, await gear.getBounds()); sameRect(baselineTabs, await tabs());
     });
@@ -126,17 +126,22 @@ export default function fidelityLayoutTest(): void {
       sameRect(first, await photos[0].getBounds());
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-library-top.png');
     });
-    it('repeatedValidationUsesToastWithoutMovingTheForm', 0, async () => {
+    it('repeatedValidationKeepsItsInlineErrorAndFieldPosition', 0, async () => {
       await tap('计划'); await tap('plan-role-library'); await tap('添加角色');
-      const field = await driver.waitForComponent(ON.text('名称 *').inWindow(bundle), 3000);
+      await tap('保存');
+      const field = await driver.waitForComponent(ON.id('form-input:name').inWindow(bundle), 3000);
+      expect(!!field).assertTrue();
+      const error = await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle));
+      expect(!!error).assertTrue();
       const before = await field.getBounds();
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-inline-error-first.png');
+      // The error persists after a toast would have expired, and repeat validation preserves the focused field.
+      await driver.delayMs(2300);
+      expect(!!(await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle)))).assertTrue();
       await tap('保存');
       sameRect(before, await field.getBounds());
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-toast-first.png');
-      // Let the first 2-second toast expire so the second screenshot proves a new prompt.
-      await driver.delayMs(2300); await tap('保存');
-      sameRect(before, await field.getBounds());
-      await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-toast-repeat.png');
+      expect(!!(await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle)))).assertTrue();
+      await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-inline-error-repeat.png');
       await tap('sheet-close');
       expect((await driver.findComponents(ON.text('添加角色').inWindow(bundle))).length > 0).assertTrue(); await back();
     });
@@ -156,7 +161,7 @@ export default function fidelityLayoutTest(): void {
       for (let index = 0; index < sections.length; index++) {
         await tap(sections[index]); await driver.delayMs(400);
         sameRect(baseline, await segment.getBounds());
-        expect((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle))).length).assertEqual(0);
+        expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
         const action = await driver.findComponent(ON.id('detail-action-' + actions[index]).inWindow(bundle));
         const bar = await action.getBounds();
         expect(bar.bottom < baseline.top && bar.top > window.top).assertTrue();

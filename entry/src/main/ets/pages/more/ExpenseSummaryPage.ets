@@ -194,7 +194,7 @@ export struct ExpenseSummary {
             }
           }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(2))
         }
-        Blank().height(Theme.contentBottom).accessibilityLevel('no')
+        Blank().height(Theme.detailBottom).accessibilityLevel('no')
       }.width('100%').constraintSize({ maxWidth: READING_MAX_WIDTH }).alignItems(HorizontalAlign.Start)
         .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
     }.id('expense-scroll').width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Auto).transition(pageTransition())

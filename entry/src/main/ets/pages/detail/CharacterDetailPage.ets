@@ -1,3 +1,5 @@
+import { DetailLink } from '../../component/DetailLink';
+import { Icons } from '../../common/Icons';
 import { ContextRow } from '../../component/ContextRow';
 import { EntryCollectionView } from '../../component/EntryCollectionView';
 import { SheetHeader } from '../../component/SheetHeader';
@@ -45,7 +47,6 @@ export struct CharacterDetail {
   private works(): ProjectWork[] { return this.state.workCards.filter((work: ProjectWork) => work.value.characterId === this.character.id); }
   private validVersion(): boolean { return !this.route.variantId || this.variants().some((variant: CharacterVariant) => variant.id === this.route.variantId); }
   @Builder header() {
-    if (this.character.workName) { Text(this.character.workName).fontSize(15).fontColor(Theme.muted) }
     Select(new Array<SelectOption>({ value: '不指定版本' }).concat(this.variants().map((variant: CharacterVariant): SelectOption => { return { value: variant.name }; })))
       .value(this.route.variantId ? this.variants().find((variant: CharacterVariant) => variant.id === this.route.variantId)?.name || '版本已不存在' : '不指定版本')
       .constraintSize({ minHeight: 48 }).accessibilityText('新建计划使用的角色版本').id('character-plan-version')
@@ -57,25 +58,34 @@ export struct CharacterDetail {
   }
   @Builder profile() {
     if (this.character.cover) { ManagedImage({ large: true, sourcePath: this.character.cover, label: this.character.name + '角色封面（不改变计划照片）', ratio: 1.3, radius: Theme.cardRadius }).width('100%').aspectRatio(1.3) }
-    Button(this.character.favorite ? '★ 已收藏' : '☆ 收藏').constraintSize({ minHeight: 48 }).enabled(this.writable()).backgroundColor(Theme.tint).fontColor(Theme.accent)
-      .onClick((): void => { void this.favorite(); }).accessibilityText(this.character.favorite ? '取消收藏 ' + this.character.name : '收藏 ' + this.character.name)
+    Row({ space: 12 }) {
+      if (this.character.workName) { Text(this.character.workName).fontSize(15).fontColor(Theme.muted).layoutWeight(1) } else { Blank().layoutWeight(1) }
+      Button(this.character.favorite ? '★ 已收藏' : '☆ 收藏').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).enabled(this.writable()).backgroundColor(Color.Transparent).fontColor(Theme.accent)
+        .onClick((): void => { void this.favorite(); }).accessibilityText(this.character.favorite ? '取消收藏 ' + this.character.name : '收藏 ' + this.character.name)
+    }.width('100%')
     if (this.character.description) { Text(this.character.description).fontSize(15).fontColor(Theme.muted) }
-    SectionHeading({ title: '角色版本', trailing: this.variants().length + ' 个' })
-    Button('添加版本').constraintSize({ minHeight: 48 }).enabled(this.writable()).onClick((): void => { this.edit('variant', '', this.character.id); })
+    Column({ space: 12 }) { this.header() }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    Row() {
+      SectionHeading({ title: '角色版本', trailing: this.variants().length + ' 个' }).layoutWeight(1)
+      Button('添加版本').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).enabled(this.writable()).onClick((): void => { this.edit('variant', '', this.character.id); })
+    }.width('100%')
     ForEach(this.variants(), (variant: CharacterVariant) => {
       Column({ space: 8 }) {
-        Text(variant.name).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-        if (variant.notes) { Text(variant.notes).fontSize(14).fontColor(Theme.muted) }
-        Button('使用此版本新建计划').constraintSize({ minHeight: 48 }).enabled(this.writable())
-          .onClick((): void => { this.route.variantId = variant.id; this.createPlan(this.character.id, variant.id); }).accessibilityText('使用版本 ' + variant.name + ' 新建计划')
         Row({ space: 8 }) {
-          Button('编辑版本').constraintSize({ minHeight: 48 }).enabled(this.writable()).onClick((): void => { this.edit('variant', variant.id, this.character.id); }).accessibilityText('编辑版本 ' + variant.name)
-          Button('删除版本').constraintSize({ minHeight: 48 }).enabled(this.writable()).onClick((): void => { this.remove('variant', variant.id); }).accessibilityText('删除版本 ' + variant.name)
-        }
+          Text(variant.name).fontSize(20).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+          Select([{ value: '编辑版本' }, { value: '删除版本' }]).value('更多').constraintSize({ minHeight: 48 }).enabled(this.writable())
+            .onSelect((index: number): void => { if (index === 0) { this.edit('variant', variant.id, this.character.id); } else { this.remove('variant', variant.id); } }).accessibilityText(variant.name + '，编辑或删除版本')
+        }.width('100%')
+        if (variant.notes) { Text(variant.notes).fontSize(14).fontColor(Theme.muted) }
+        Button('用此版本新建计划').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).backgroundColor(Color.Transparent).fontColor(Theme.accent).enabled(this.writable())
+          .onClick((): void => { this.route.variantId = variant.id; this.createPlan(this.character.id, variant.id); }).accessibilityText('使用版本 ' + variant.name + ' 新建计划')
       }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (variant: CharacterVariant) => variant.id)
     if (!this.variants().length) { Text('可选：添加服装或造型版本，下次创建计划时复用。').fontSize(14).fontColor(Theme.muted) }
-    Button() { ContextRow({ label: '收录', text: this.state.entries.filter((entry) => entry.scopeKind === 'character' && entry.scopeId === this.character.id).length + ' 条' }) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).id('character-entry-link').onClick((): void => { this.route.entriesOpen = true; })
+    Column() {
+      DetailLink({ title: '收录', value: this.state.entries.filter((entry) => entry.scopeKind === 'character' && entry.scopeId === this.character.id).length + ' 条', icon: Icons.library,
+        componentId: 'character-entry-link', action: (): void => { this.route.entriesOpen = true; } })
+    }.width('100%').padding({ left: 16, right: 16 }).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
   }
   @Builder history() {
     SectionHeading({ title: '角色履历', trailing: this.works().length + ' 份计划' })
@@ -97,12 +107,11 @@ export struct CharacterDetail {
   }
   build() {
     Column({ space: 12 }) {
-      Blank().height(Theme.detailTop).width('100%')
-      Column({ space: 8 }) { this.header() }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: Theme.pagePadding, right: Theme.pagePadding })
       Scroll(this.scroller) {
         Column({ space: Theme.sectionSpacing }) {
+          Blank().height(Theme.detailTop).width('100%')
           if (this.route.section === 0) { this.profile() } else if (this.route.section === 1) { this.history() } else { this.references() }
-          Blank().height(Theme.contentBottom).width('100%')
+          Blank().height(Theme.detailFloatingBottom).width('100%')
         }.constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding })
       }.id('character-detail-scroll').width('100%').layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
         .onAreaChange((_, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })

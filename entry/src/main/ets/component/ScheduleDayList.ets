@@ -31,10 +31,17 @@ export struct ScheduleDayList {
       if (this.taskError) { Text(this.taskError).id('schedule-task-error').fontSize(16).fontColor(Theme.accent).accessibilityText(this.taskError) }
       ForEach(this.events, (event: CosEvent) => {
         Button() {
-          Column({ space: 6 }) {
-            ContextRow({ label: event.eventType || '活动', text: displayName(event.name), prominent: true })
-            Text(eventTimeLabel(event) + '，' + (event.venue || event.city || '地点待定')).fontSize(14).fontColor(Theme.muted)
-          }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
+          Row({ space: 12 }) {
+            Column({ space: 5 }) {
+              Text(event.timeMode === 'none' ? '未标记' : event.startTime).fontSize(event.timeMode === 'none' ? 12 : 17).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+              if (event.timeMode === 'range') { Text(event.endTime).fontSize(12).fontColor(Theme.muted) }
+            }.width(60).alignItems(HorizontalAlign.Start)
+            Rect().width(3).height(42).fill(Theme.brand).radius(2)
+            Column({ space: 6 }) {
+              Text(displayName(event.name)).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(2)
+              Text([event.city, event.venue].filter((value: string) => Boolean(value)).join(' ') || '地点待定').fontSize(14).fontColor(Theme.muted).maxLines(2)
+            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+          }.width('100%').padding(16)
         }.id('schedule-event:' + event.id).width('100%').type(ButtonType.Normal).constraintSize({ minHeight: 48 })
           .backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).onClick((): void => { this.open('event', event.id); })
           .accessibilityText('打开活动 ' + event.name + '，' + eventDateLabel(event))

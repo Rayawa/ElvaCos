@@ -266,7 +266,8 @@ export default function settingsLayoutTest(): void {
         await driver.delayMs(800);
         const scroll = await required(ON.id('expense-scroll'), 'statistics scroll');
         await scroll.scrollSearch(ON.id('expense-category:服装').inWindow(bundle));
-        expect(await (await required(ON.text('¥3.00 · 75.0%'), 'clothing ratio')).getText()).assertEqual('¥3.00 · 75.0%');
+        expect(await (await required(ON.text('¥3.00').within(ON.id('expense-category:服装')), 'clothing amount')).getText()).assertEqual('¥3.00');
+        expect(await (await required(ON.text('75.0%').within(ON.id('expense-category:服装')), 'clothing ratio')).getText()).assertEqual('75.0%');
         const category = await required(ON.id('expense-category:服装'), 'category filter');
         const bounds = await category.getBounds();
         const viewport = await scroll.getBounds();
@@ -281,7 +282,8 @@ export default function settingsLayoutTest(): void {
         await scroll.scrollSearch(ON.id('expense-record:chart-photo').inWindow(bundle));
         expect(((await driver.findComponents(ON.id('expense-record:chart-photo').inWindow(bundle)))?.length || 0)).assertEqual(1);
         await scroll.scrollSearch(ON.id('expense-category:其他').inWindow(bundle));
-        expect(await (await required(ON.text('¥0.00 · 0.0%'), 'zero ratio')).getText()).assertEqual('¥0.00 · 0.0%');
+        expect(await (await required(ON.text('¥0.00').within(ON.id('expense-category:其他')), 'zero amount')).getText()).assertEqual('¥0.00');
+        expect(await (await required(ON.text('0.0%').within(ON.id('expense-category:其他')), 'zero ratio')).getText()).assertEqual('0.0%');
       }
     });
   });

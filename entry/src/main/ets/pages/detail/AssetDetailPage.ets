@@ -1,3 +1,5 @@
+import { DetailLink } from '../../component/DetailLink';
+import { Icons } from '../../common/Icons';
 import { displayName } from '../../common/format';
 import { ContextRow } from '../../component/ContextRow';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, ASSET_TYPES, ASSET_TYPE_LABELS, PROJECT_STATUSES, PROJECT_LABELS } from '../../common/constants';
@@ -68,28 +70,42 @@ export struct AssetDetail {
     if (this.actionError || this.state.error) { Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger) }
   }
   @Builder facts() {
-    FactRow({ label: '存放位置', value: this.asset.location.trim() || '未记录位置' })
-    if (!this.asset.location.trim()) { Button('补充存放位置').constraintSize({ minHeight: 48 }).enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { this.edit('asset', this.asset.id, ''); }) }
-    if (this.asset.brand) { FactRow({ label: '品牌店铺', value: this.asset.brand }) }
-    if (this.asset.size) { FactRow({ label: '尺码', value: this.asset.size }) }
-    FactRow({ label: '资料价格', value: '¥' + (this.asset.priceCents / 100).toFixed(2) + '（未计入花费）' })
-    if (this.asset.purchaseUrl) { FactRow({ label: '购买链接', value: this.asset.purchaseUrl, copyable: true }) }
-    if (this.asset.notes) { FactRow({ label: '备注', value: this.asset.notes }) }
-    Button() { ContextRow({ label: '收录', text: this.state.assetUsage(this.asset.id).entryIds.length + ' 条' }) }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'asset|' + this.asset.id); })
+    Column({ space: 12 }) {
+      Text('存放位置').fontSize(13).fontColor(Theme.muted)
+      Text(this.asset.location.trim() || '未记录位置').fontSize(25).fontWeight(FontWeight.Medium).fontColor(Theme.ink).copyOption(CopyOptions.LocalDevice)
+      Button(this.asset.location.trim() ? '修改位置' : '补充存放位置').type(ButtonType.Normal).constraintSize({ minHeight: 48 })
+        .backgroundColor(Theme.tint).fontColor(Theme.accent).padding({ left: 16, right: 16 }).borderRadius(12)
+        .enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { this.edit('asset', this.asset.id, ''); })
+    }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    if (this.asset.brand || this.asset.size || this.asset.purchaseUrl || this.asset.notes || this.asset.priceCents) {
+      Column({ space: 18 }) {
+        if (this.asset.brand) { FactRow({ label: '品牌店铺', value: this.asset.brand }) }
+        if (this.asset.size) { FactRow({ label: '尺码', value: this.asset.size }) }
+        FactRow({ label: '资料价格', value: '¥' + (this.asset.priceCents / 100).toFixed(2) + '（未计入花费）' })
+        if (this.asset.purchaseUrl) { FactRow({ label: '购买链接', value: this.asset.purchaseUrl, copyable: true }) }
+        if (this.asset.notes) { Text(this.asset.notes).fontSize(15).fontColor(Theme.muted).copyOption(CopyOptions.LocalDevice) }
+      }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    }
+    Column() {
+      DetailLink({ title: '收录', value: this.state.assetUsage(this.asset.id).entryIds.length + ' 条', icon: Icons.library, action: (): void => { this.open('inbox', 'asset|' + this.asset.id); } })
+    }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
   }
   @Builder uses() {
-    SectionHeading({ title: '使用计划', trailing: this.state.assetUsage(this.asset.id).projects.length + ' 份' })
-    Text('装备资料与状态由衣柜统一维护；加入计划同时建立对应打包项。').fontSize(14).fontColor(Theme.muted)
-    Button('加入计划').constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length)
-      .onClick((): void => { this.actionError = ''; this.route.projectQuery = ''; this.route.linking = true; })
+    Row({ space: 12 }) {
+      SectionHeading({ title: '使用计划', trailing: this.state.assetUsage(this.asset.id).projects.length + ' 份' }).layoutWeight(1)
+      Button('加入计划').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
+        .enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { this.actionError = ''; this.route.projectQuery = ''; this.route.linking = true; })
+    }.width('100%')
     ForEach(this.state.assetUsage(this.asset.id).projects, (project: CosProject) => {
-      Column({ space: 8 }) {
-        Button() { ContextRow({ label: '计划', text: displayName(project.name), prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('project', project.id); })
-        ContextRow({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: this.state.readiness(project.id).date || '日期待定' })
-        Button('解除本计划关联').constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { void this.unlink(project); }).accessibilityText('解除 ' + project.name + ' 的装备关联')
-      }.width('100%').alignItems(HorizontalAlign.Start)
+      Column() {
+        DetailLink({ title: displayName(project.name), subtitle: this.state.readiness(project.id).date || '日期待定',
+          value: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], action: (): void => { this.open('project', project.id); } })
+        Divider().color(Theme.line)
+        Button('解除关联').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).fontSize(14).fontColor(Theme.muted).backgroundColor(Color.Transparent)
+          .enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { void this.unlink(project); }).accessibilityText('解除 ' + project.name + ' 的装备关联')
+      }.padding({ left: 16, right: 16 }).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (project: CosProject) => project.id)
-    if (!this.state.assetUsage(this.asset.id).projects.length) { Text('尚未被计划使用，衣柜记录仍保留。').fontSize(14).fontColor(Theme.muted) }
+    if (!this.state.assetUsage(this.asset.id).projects.length) { EmptyState({ title: '还没有计划使用它', message: '加入计划会同时建立对应打包项。', button: '加入计划', action: (): void => { this.actionError = ''; this.route.projectQuery = ''; this.route.linking = true; } }) }
   }
   @Builder planSheet() {
     Column({ space: 14 }) {
@@ -117,11 +133,11 @@ export struct AssetDetail {
   build() {
     Scroll(this.scroller) {
       Column({ space: Theme.sectionSpacing }) {
-        Blank().height(this.segmented() ? Theme.detailTop : Theme.detailTop).width('100%')
+        Blank().height(Theme.detailTop).width('100%')
         this.heading()
         if (this.route.section === 0 || !this.segmented()) { this.facts() }
         if (this.route.section === 1 || !this.segmented()) { this.uses() }
-        Blank().height(Theme.contentBottom).width('100%')
+        Blank().height(this.segmented() ? Theme.detailFloatingBottom : Theme.detailBottom).width('100%')
       }.constraintSize({ maxWidth: Theme.contentMaxWidth }).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
     }.id('asset-detail-scroll').width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
       .onAreaChange((_old: Area, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })

@@ -31,7 +31,7 @@ export struct ReferenceDetail {
           if (this.reference.caption) { Text(this.reference.caption).fontSize(15).fontColor(Theme.ink) }
           if (!this.reference.localPath) { Text('元数据中保留了这张参考图。请回到所属计划或角色，重新选择同一张图片恢复本机副本。').fontColor(Theme.muted).fontSize(13) }
         }.width('100%').alignItems(HorizontalAlign.Start).attributeModifier(this.entrance.group(2))
-        Blank().height(Theme.contentBottom).width('100%')
+        Blank().height(Theme.detailBottom).width('100%')
       }.width('100%')
         .constraintSize({ maxWidth: Theme.contentMaxWidth })
         .alignItems(HorizontalAlign.Start)

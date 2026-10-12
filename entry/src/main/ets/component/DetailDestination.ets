@@ -5,7 +5,6 @@ import { MainEntranceSession, StaggerEntrance } from '../common/motion';
 @ComponentV2
 export struct DetailDestination {
   @Param titleOptions: HdsNavigationTitleBarOptions = {};
-  @Param customTitle: boolean = false;
   @Event back: () => void = () => {};
   @Event hidden: () => void = () => {};
   @Event shown: () => void = () => {};
@@ -34,12 +33,17 @@ export struct DetailDestination {
     if (this.entranceSession && this.entranceKey) { this.entrance.finish(4); }
     else { this.entrance.reset(); }
   }
+  // Native chrome floats over the full body. The caller avoids the system status area once.
+  private safeTitleOptions(): HdsNavigationTitleBarOptions {
+    return { padding: this.titleOptions.padding, style: this.titleOptions.style, content: this.titleOptions.content,
+      enableHoverMode: this.titleOptions.enableHoverMode, avoidLayoutSafeArea: this.titleOptions.avoidLayoutSafeArea, enableComponentSafeArea: false };
+  }
   build() {
     HdsNavDestination() { this.content(this.entrance) }
-      .titleBar(this.titleOptions).titleMode(HdsNavDestinationTitleMode.MINI)
-      .hideTitleBar(this.customTitle)
+      .titleBar(this.safeTitleOptions()).titleMode(HdsNavDestinationTitleMode.MINI)
+      .hideTitleBar(false)
       .hideToolBar(true).backgroundColor(Theme.bg)
-      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], this.customTitle ? [LayoutSafeAreaEdge.BOTTOM] : [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
+      .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.BOTTOM])
       .onWillShow((): void => { this.prepareEntrance(); })
       .onShown((): void => { this.showEntrance(); this.shown(); })
       .onHidden((): void => { this.releaseEntrance(); this.hidden(); })

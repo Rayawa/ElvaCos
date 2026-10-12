@@ -1,3 +1,7 @@
+import { window } from '@kit.ArkUI';
+import { LocationSheet } from '../../component/LocationSheet';
+import { DetailLink } from '../../component/DetailLink';
+import { DayTaskRow } from '../../component/DayTaskRow';
 import { ContextRow } from '../../component/ContextRow';
 import { displayName } from '../../common/format';
 import { ProjectShot } from '../../model/Shot';
@@ -7,11 +11,11 @@ import { ASSET_STATUSES, ASSET_STATUS_LABELS, PROJECT_STATUSES, PROJECT_LABELS }
 import { Theme } from '../../common/Theme';
 import { AppState } from '../../model/ApplicationState';
 import { EventRoute } from '../../model/EventRoute';
-import { CosEvent, CosProject, ChecklistItem } from '../../model/Entities';
+import { CosEvent, CosProject, ChecklistItem, AssetStatus } from '../../model/Entities';
 import { TeamMember } from '../../model/Planning';
 import { CollectedEntry, entryTitle } from '../../model/CollectedEntry';
 import { eventDateLabel, eventTimeLabel } from '../../model/Schedule';
-import { DayModule, DayTimelineItem, eventTimeline, planShootingLabel, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState, dayContext } from '../../model/DayMode';
+import { DayModule, DayTimelineItem, eventTimeline, planShootingLabel, hasEventShots, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState, dayContext } from '../../model/DayMode';
 import { StaggerEntrance } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
 import { confirm } from '../../common/Confirm';
@@ -37,23 +41,39 @@ export struct EventDetail {
   @Event openAsset: (id: string, projectId: string) => void = () => {};
   @Event edit: (kind: string, id: string, parent: string) => void = () => {};
   @Event back: () => void = () => {};
+  @Local locationOpen: boolean = false;
   @Local linking: boolean = false;
-  @Local configuring: boolean = false;
-  @Local recording: boolean = false;
-  @Local recordKind: number = 0;
   @Local recordError: string = '';
   @Local recordText: string = '';
   @Local viewing: boolean = false;
   @Local credential: CollectedEntry = new CollectedEntry();
   @Local sheetEntrance: StaggerEntrance = new StaggerEntrance();
+  @Local contentTop: number = Theme.contentTop;
+  private systemTop: number = 0;
+  private contentOrigin: number = 0;
+  private updateTopInset(): void { this.contentTop = Theme.detailTop + Math.max(0, this.systemTop - this.contentOrigin); }
+  private hostWindow: window.Window | undefined = undefined;
+  private departed: boolean = false;
+  private avoidChanged = (value: window.AvoidAreaOptions): void => {
+    if (value.type === window.AvoidAreaType.TYPE_SYSTEM) { this.systemTop = this.getUIContext().px2vp(value.area.topRect.height); this.updateTopInset(); }
+  };
+  private async observeSystemArea(): Promise<void> {
+    try {
+      const host = await window.getLastWindow(this.getUIContext().getHostContext() as common.UIAbilityContext);
+      if (this.departed) { return; }
+      this.hostWindow = host;
+      this.systemTop = this.getUIContext().px2vp(host.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM).topRect.height); this.updateTopInset();
+      host.on('avoidAreaChange', this.avoidChanged);
+    } catch (error) { console.warn('Event window safe area unavailable'); }
+  }
   private scroller: Scroller = new Scroller();
   private displayedIndex: number = 0;
   private restoring: boolean = true;
   private measured: boolean = false;
   private restoreTimer: number = -1;
   private offsetIndex(): number { return this.route.dayMode ? 4 + this.route.section : this.route.section; }
-  aboutToAppear(): void { this.displayedIndex = this.offsetIndex(); this.restoreScroll(); }
-  aboutToDisappear(): void { if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } }
+  aboutToAppear(): void { this.departed = false; void this.observeSystemArea(); this.displayedIndex = this.offsetIndex(); this.restoreScroll(); }
+  aboutToDisappear(): void { this.departed = true; try { this.hostWindow?.off('avoidAreaChange', this.avoidChanged); } catch (error) { console.warn('Event safe area listener could not detach'); } this.hostWindow = undefined; if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); } }
   @Monitor('route.section', 'route.dayMode')
   private viewChanged(): void {
     if (this.restoreTimer >= 0) { clearTimeout(this.restoreTimer); this.restoreTimer = -1; }
@@ -90,8 +110,8 @@ export struct EventDetail {
     catch (error) { this.state.reportError('复制失败，请重试或长按备注复制'); }
   }
   private recordFor(project: CosProject): void {
-    this.recording = false;
-    if (this.recordKind === 0) { this.edit('expense', '', project.id); }
+    this.route.recording = false;
+    if (this.route.recordKind === 0) { this.edit('expense', '', project.id); }
     else { this.state.importPhotos(project.id); }
   }
   private async captureText(): Promise<void> {
@@ -107,16 +127,16 @@ export struct EventDetail {
   }
   private async canCloseSheet(): Promise<boolean> {
     if (this.state.busy) { return false; }
-    if (this.recording && this.recordText.trim()) {
+    if (this.route.recording && this.recordText.trim()) {
       if (!await confirm(this.getUIContext(), '放弃这条未保存的收录？', '取消可继续输入；已保存的收录会保留。', '放弃输入')) { return false; }
       this.recordText = '';
     }
     return true;
   }
-  private closeSheets(): void { this.linking = false; this.configuring = false; this.recording = false; this.viewing = false; }
+  private closeSheets(): void { this.locationOpen = false; this.linking = false; this.route.configuring = false; this.route.recording = false; this.viewing = false; }
   private async requestClose(): Promise<void> { if (await this.canCloseSheet()) { this.closeSheets(); } }
   private sheetOptions(): SheetOptions {
-    const options = appSheetOptions((): void => { this.closeSheets(); }, this.sheetEntrance, this.getUIContext());
+    const options = appSheetOptions((): void => { this.closeSheets(); }, this.sheetEntrance, this.getUIContext(), this.locationOpen ? SheetSize.MEDIUM : SheetSize.LARGE);
     options.onWillDismiss = (action: DismissSheetAction): void => { this.canCloseSheet().then((allowed: boolean): void => { if (allowed) { action.dismiss(); } }); };
     return options;
   }
@@ -136,7 +156,7 @@ export struct EventDetail {
   }
   @Builder configurationSheet() {
     Column({ space: 16 }) {
-      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: '今天模式模块', hint: '两段固定；有对应内容的模块才会显示', close: (): void => { this.configuring = false; } })
+      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: '今天模式模块', hint: '两段固定；有对应内容的模块才会显示', close: (): void => { this.route.configuring = false; } })
       Scroll() {
         Column({ space: 16 }) {
           ForEach([0, 1], (section: number) => {
@@ -159,10 +179,16 @@ export struct EventDetail {
   }
   @Builder recordSheet() {
     Column({ space: 16 }) {
-      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: this.recordKind === 0 ? '选择记账计划' : this.recordKind === 1 ? '收录一条' : '选择照片所属计划', close: (): void => { this.requestClose(); } })
+      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: this.route.recordKind < 0 ? '快速记录' : this.route.recordKind === 0 ? '选择记账计划' : this.route.recordKind === 1 ? '收录一条' : '选择照片所属计划', close: (): void => { this.requestClose(); } })
       Scroll() {
         Column({ space: 12 }) {
-          if (this.recordKind === 1) {
+          if (this.route.recordKind < 0) {
+            DetailLink({ title: '记一笔', subtitle: '记录这次活动的花费', icon: Icons.plan, action: (): void => { this.route.recordKind = 0; this.recordError = ''; } })
+            Divider().color(Theme.line)
+            DetailLink({ title: '收录一条', subtitle: '保存链接、文字或图片', icon: Icons.library, action: (): void => { this.route.recordKind = 1; this.recordError = ''; } })
+            Divider().color(Theme.line)
+            DetailLink({ title: '传照片', subtitle: '导入到本场计划', icon: Icons.importPhoto, action: (): void => { this.route.recordKind = 2; this.recordError = ''; } })
+          } else if (this.route.recordKind === 1) {
             TextArea({ text: this.recordText, placeholder: '粘贴链接或写一句话' }).height(120).enabled(!this.state.busy).onChange((value: string): void => { this.recordText = value; })
             if (this.recordError) { Text(this.recordError).id('day-record-error').fontSize(14).fontColor(Theme.danger).accessibilityText(this.recordError) }
             Button('收录').width('100%').constraintSize({ minHeight: 64 }).enabled(!this.state.busy && Boolean(this.recordText.trim())).onClick((): void => { this.captureText(); })
@@ -172,7 +198,7 @@ export struct EventDetail {
             ForEach(this.projects(), (project: CosProject) => {
               Button(project.name).width('100%').constraintSize({ minHeight: 64 }).enabled(!this.state.busy).onClick((): void => { this.recordFor(project); })
             }, (project: CosProject) => project.id)
-            if (!this.projects().length) { EmptyState({ title: '先为本次活动建立计划', message: '花费和照片都属于具体计划。', button: '新建计划', action: (): void => { this.recording = false; this.edit('eventProject', '', this.event.id); } }) }
+            if (!this.projects().length) { EmptyState({ title: '先为本次活动建立计划', message: '花费和照片都属于具体计划。', button: '新建计划', action: (): void => { this.route.recording = false; this.edit('eventProject', '', this.event.id); } }) }
           }
         }.width('100%')
       }.layoutWeight(1).width('100%')
@@ -192,18 +218,33 @@ export struct EventDetail {
       }.layoutWeight(1).width('100%')
     }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
   }
+  private dateTitle(): string {
+    if (this.event.dateMode === 'pending' || !this.event.date) { return '日期待定'; }
+    const start = Number(this.event.date.slice(5, 7)) + '月' + Number(this.event.date.slice(8)) + '日';
+    if (this.event.dateMode !== 'multiple' || !this.event.endDate) { return start; }
+    if (this.event.date.slice(0, 4) !== this.event.endDate.slice(0, 4)) { return eventDateLabel(this.event); }
+    return start + ' — ' + (this.event.date.slice(5, 7) === this.event.endDate.slice(5, 7) ? '' : Number(this.event.endDate.slice(5, 7)) + '月') + Number(this.event.endDate.slice(8)) + '日';
+  }
   @Builder overview() {
-    Column({ space: 14 }) {
-      StatusPill({ label: this.event.ticketPurchased ? '门票已准备' : '门票待确认' })
-      FactRow({ label: '类型', value: this.event.eventType })
-      FactRow({ label: '日期', value: eventDateLabel(this.event) })
-      FactRow({ label: '时间', value: eventTimeLabel(this.event) })
-      FactRow({ label: '城市', value: this.event.city })
-      FactRow({ label: '场馆', value: this.event.venue || '地点待定', copyable: true })
-      if (this.event.url) { Button('打开官方链接').constraintSize({ minHeight: 48 }).onClick((): void => { this.openLink(this.event.url); }) }
-      if (this.event.notes) { FactRow({ label: '备注', value: this.event.notes }) }
-      Button('进入今天模式').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 0; this.route.dayMode = true; })
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    Column({ space: 12 }) {
+      Row() {
+        Text(this.event.eventType).fontSize(14).fontColor(Theme.muted).layoutWeight(1)
+        StatusPill({ label: this.event.ticketPurchased ? '门票已准备' : '门票待确认' })
+      }.width('100%')
+      Text(this.dateTitle()).fontSize(25).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+      Text((this.event.date ? this.event.date.slice(0, 4) + '年，' : '') + eventTimeLabel(this.event)).fontSize(16).fontColor(Theme.muted)
+      Button('进入今天模式').width('100%').height(52).backgroundColor(Theme.brand).fontColor(Theme.onAccent)
+        .onClick((): void => { this.route.section = 0; this.route.dayMode = true; })
+    }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    Column() {
+      DetailLink({ title: this.event.venue || '添加地点', subtitle: this.event.city, icon: Icons.location, componentId: 'event-location-open', action: (): void => { this.locationOpen = true; } })
+    }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    if (this.event.url || this.event.notes) {
+      Column({ space: 16 }) {
+        if (this.event.url) { DetailLink({ title: '官方链接', icon: Icons.library, action: (): void => { this.openLink(this.event.url); } }) }
+        if (this.event.notes) { Text(this.event.notes).fontSize(15).fontColor(Theme.muted).copyOption(CopyOptions.LocalDevice) }
+      }.padding(16).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    }
   }
   @Builder plans() {
     Column({ space: 14 }) {
@@ -217,50 +258,57 @@ export struct EventDetail {
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   @Builder reminders() {
-    Column({ space: 14 }) {
-      SectionHeading({ title: '活动提醒' })
-      Text(reminderState(this.event, this.state.clockTime)).fontSize(17).fontColor(Theme.ink)
-      if (this.event.reminderMinutes >= 0) { FactRow({ label: '用户选择', value: this.event.reminderMinutes === 0 ? '开始时' : '提前 ' + this.event.reminderMinutes + ' 分钟' }) }
-      Button('编辑提醒').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('event', this.event.id, ''); })
-      Button('通知设置').constraintSize({ minHeight: 48 }).onClick((): void => { this.state.openReminderSettings(); })
-      Button('添加到系统日历').constraintSize({ minHeight: 48 }).enabled(!this.state.busy).onClick((): void => { this.state.addEventToCalendar(this.event); })
-      Text('在系统确认页选择账户。已添加的日程由系统日历独立管理；取消确认不会添加。').fontSize(14).fontColor(Theme.muted)
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    Column({ space: 12 }) {
+      Text(reminderState(this.event, this.state.clockTime)).fontSize(23).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+      if (this.event.reminderMinutes >= 0) { Text(this.event.reminderMinutes === 0 ? '活动开始时提醒' : '提前 ' + this.event.reminderMinutes + ' 分钟').fontSize(14).fontColor(Theme.muted) }
+    }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    Column() {
+      DetailLink({ title: '编辑提醒', icon: Icons.edit, action: (): void => { this.edit('event', this.event.id, ''); } })
+      Divider().color(Theme.line)
+      DetailLink({ title: '通知设置', icon: Icons.event, action: (): void => { this.state.openReminderSettings(); } })
+      Divider().color(Theme.line)
+      DetailLink({ title: '添加到系统日历', subtitle: '在系统确认页选择账户', icon: Icons.event, interactive: !this.state.busy, action: (): void => { this.state.addEventToCalendar(this.event); } })
+    }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
   }
   @Builder dayHeader() {
-    Column({ space: 10 }) {
-      Row({ space: 10 }) {
-        Button('返回').constraintSize({ minHeight: 64, minWidth: 64 }).onClick((): void => { this.back(); }).accessibilityText('返回来源页面')
-        Row({ space: 8 }) {
-          StatusPill({ label: dayContext(this.event, this.state.clockTime) })
-          Text(displayName(this.event.name)).id('day-title').fontSize(21).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
-        }.layoutWeight(1)
-        Select([{ value: '记一笔' }, { value: '收录一条' }, { value: '传照片' }]).value('记').height(64).constraintSize({ minWidth: 64 })
-          .onSelect((index: number): void => { this.recordKind = index; this.recordError = ''; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
-      }.width('100%')
+    Column({ space: 8 }) {
       Row({ space: 8 }) {
-        Text(eventDateLabel(this.event)).id('day-date-time').fontSize(15).fontColor(Theme.muted)
+        Button() {
+          Row({ space: 8 }) {
+            Image(Icons.location).width(20).height(20).fillColor(Theme.accent)
+            Text(this.event.venue || this.event.city || '添加地点').fontSize(20).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(2).layoutWeight(1)
+            Image(Icons.chevronRight).width(14).height(14).fillColor(Theme.muted)
+          }.width('100%')
+        }.id('day-location').type(ButtonType.Normal).backgroundColor(Color.Transparent).constraintSize({ minHeight: 48 }).layoutWeight(1).onClick((): void => { this.locationOpen = true; }).accessibilityText('查看活动地点与地图')
+        StatusPill({ label: dayContext(this.event, this.state.clockTime) })
         if (dayNumber(this.event, this.state.clockTime)) { StatusPill({ label: dayNumber(this.event, this.state.clockTime) }) }
       }.width('100%')
-      ContextRow({ label: '时间', text: eventTimeLabel(this.event) }).id('day-time')
-      ContextRow({ label: '地点', text: this.event.venue || this.event.city || '地点待定' }).id('day-location')
-    }.padding({ top: 16, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 12 }).width('100%').backgroundColor(Theme.bg)
+      Text(eventDateLabel(this.event) + '，' + eventTimeLabel(this.event)).id('day-date-time').fontSize(14).fontColor(Theme.muted).maxLines(2)
+    }.padding({ top: 12, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 16 }).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.bg)
   }
   @Builder packing(project: CosProject) {
-    Column({ space: 10 }) {
-      Text(displayName(project.name)).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-      Text('已装包 ' + this.state.readiness(project.id).pack.packed + ' / ' + this.state.readiness(project.id).pack.total + ' 件').fontSize(14).fontColor(Theme.muted)
+    Column() {
+      DetailLink({ title: displayName(project.name), subtitle: '已装包 ' + this.state.readiness(project.id).pack.packed + ' / ' + this.state.readiness(project.id).pack.total + ' 件', action: (): void => { this.open('outing', project.id); } })
+      Divider().color(Theme.line)
       if (!this.state.checklist.some((item: ChecklistItem) => item.projectId === project.id)) {
-        Button('建立打包清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('packing', project.id); })
+        DetailLink({ title: '建立打包清单', icon: Icons.add, action: (): void => { this.open('packing', project.id); } })
       }
       ForEach(this.state.checklist.filter((item: ChecklistItem) => item.projectId === project.id).sort((a: ChecklistItem, b: ChecklistItem) => a.sortOrder - b.sortOrder), (item: ChecklistItem) => {
-        Button() { ContextRow({ label: item.done ? '已装包' : '未装包', text: item.label, prominent: true }) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 }).fontSize(18)
-          .fontColor(item.done ? Theme.muted : Theme.ink).backgroundColor(Theme.surface).enabled(!this.state.busy && !this.state.staleScopes.length)
-          .onClick((): void => { void this.togglePacking(item); }).accessibilityText(item.label + (item.done ? '，已装包，点击改为未装包' : '，未装包，点击确认装包'))
-        if (item.assetId) { Button() { ContextRow({ label: this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在', text: this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(Theme.muted).fontSize(14).constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openAsset(item.assetId, project.id); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
+        DayTaskRow({ title: item.label, done: item.done, interactive: !this.state.busy && !this.state.staleScopes.length,
+          subtitle: item.assetId ? this.packingLocation(item) : '', statusLabel: item.assetId ? this.packingStatus(item) : '', secondaryLabel: item.assetId ? '装备' : '',
+          toggle: (): void => { void this.togglePacking(item); }, secondary: (): void => { this.openAsset(item.assetId, project.id); } })
+        Divider().color(Theme.line)
       }, (item: ChecklistItem) => item.id)
-      Button('打开出门清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('outing', project.id); })
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    }.padding({ left: 12, right: 12 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+  }
+  private packingLocation(item: ChecklistItem): string {
+    const asset = this.state.assets.find((asset) => asset.id === item.assetId);
+    if (!asset) { return '装备已不存在'; }
+    return asset.location || '未记录位置';
+  }
+  private packingStatus(item: ChecklistItem): string {
+    const asset = this.state.assets.find((asset) => asset.id === item.assetId);
+    return asset && asset.status !== AssetStatus.OWNED ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] : '';
   }
   private async togglePacking(item: ChecklistItem): Promise<void> {
     this.packingError = '';
@@ -271,106 +319,131 @@ export struct EventDetail {
     if (!operationCommitted(result)) { this.shotError = this.state.error || '拍摄勾选未保存，请重试'; }
   }
   @Builder shots(project: CosProject) {
-    Button() { ContextRow({ label: '已拍 ' + this.state.readiness(project.id).shots.done + ' / ' + this.state.readiness(project.id).shots.total, text: displayName(project.name), prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
-      .onClick((): void => { this.openShot(project.id, ''); })
-    ForEach(this.state.readiness(project.id).shots.items, (shot: ProjectShot) => {
-      Column({ space: 8 }) {
-        Button() { ContextRow({ label: shot.done ? '已拍' : '待拍', text: shot.title, prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 64 }).width('100%').fontSize(18).enabled(!this.state.busy && !this.state.staleScopes.length)
-          .onClick((): void => { void this.toggleShot(shot); }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
-        if (shot.referenceId) { Button('查看这条拍摄参考').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.open('reference', shot.referenceId); }) }
-        Button('查看所属计划拍摄事项').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openShot(project.id, shot.id); }).accessibilityText('在计划照片中查看 ' + shot.title)
-      }.width('100%').alignItems(HorizontalAlign.Start)
-    }, (shot: ProjectShot) => shot.id)
+    Column() {
+      DetailLink({ title: displayName(project.name), subtitle: '已拍 ' + this.state.readiness(project.id).shots.done + ' / ' + this.state.readiness(project.id).shots.total + ' 项', action: (): void => { this.openShot(project.id, ''); } })
+      Divider().color(Theme.line)
+      ForEach(this.state.readiness(project.id).shots.items, (shot: ProjectShot) => {
+        DayTaskRow({ title: shot.title, done: shot.done, interactive: !this.state.busy && !this.state.staleScopes.length,
+          secondaryLabel: shot.referenceId ? '参考' : '详情', toggle: (): void => { void this.toggleShot(shot); },
+          secondary: (): void => { if (shot.referenceId) { this.open('reference', shot.referenceId); } else { this.openShot(project.id, shot.id); } } })
+        Divider().color(Theme.line)
+      }, (shot: ProjectShot) => shot.id)
+    }.padding({ left: 12, right: 12 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
   }
   @Builder dayModule(module: DayModule) {
-    Column({ space: 14 }) {
-      SectionHeading({ title: module.label })
+    Column({ space: 10 }) {
+      SectionHeading({ title: module.id === 'packing' ? '打包清单' : module.id === 'people' ? '同行的人' : module.label })
       if (module.id === 'packing') {
-        if (this.packingError) { Text(this.packingError).id('day-packing-error').fontSize(17).fontColor(Theme.danger) }
+        if (this.packingError) { Text(this.packingError).id('day-packing-error').fontSize(15).fontColor(Theme.danger) }
         ForEach(this.projects(), (project: CosProject) => { this.packing(project) }, (project: CosProject) => project.id)
-      }
-      else if (module.id === 'credentials') {
-        ForEach(this.credentials(), (entry: CollectedEntry) => {
-          Button() {
-            Row({ space: 12 }) {
-              if (entry.thumbnailPath || entry.localPath) { ManagedImage({ sourcePath: entry.thumbnailPath || entry.localPath, label: entryTitle(entry), ratio: 1 }).width(64).height(64) }
-              Text(entryTitle(entry)).fontSize(18).layoutWeight(1).fontColor(Theme.ink)
-            }.width('100%').padding(8)
-          }.width('100%').constraintSize({ minHeight: 64 }).backgroundColor(Theme.tint).onClick((): void => { this.credential = entry; this.viewing = true; }).accessibilityText('打开凭证 ' + entryTitle(entry))
-        }, (entry: CollectedEntry) => entry.id)
+      } else if (module.id === 'credentials') {
+        Column() {
+          ForEach(this.credentials(), (entry: CollectedEntry) => {
+            Button() {
+              Row({ space: 12 }) {
+                if (entry.thumbnailPath || entry.localPath) { ManagedImage({ sourcePath: entry.thumbnailPath || entry.localPath, label: entryTitle(entry), ratio: 1 }).width(48).height(48) }
+                else { Image(Icons.library).width(24).height(24).fillColor(Theme.muted) }
+                Text(entryTitle(entry)).fontSize(17).layoutWeight(1).fontColor(Theme.ink)
+                Image(Icons.chevronRight).width(14).height(14).fillColor(Theme.muted)
+              }.width('100%').padding({ top: 12, bottom: 12 })
+            }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 }).backgroundColor(Color.Transparent)
+              .onClick((): void => { this.credential = entry; this.viewing = true; }).accessibilityText('打开凭证 ' + entryTitle(entry))
+            Divider().color(Theme.line)
+          }, (entry: CollectedEntry) => entry.id)
+        }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
       } else if (module.id === 'people') {
-        ForEach(this.projects(), (project: CosProject) => {
-          ForEach(this.state.team.filter((member: TeamMember) => member.projectId === project.id), (member: TeamMember) => {
-            Column({ space: 6 }) {
-              ContextRow({ label: member.role, text: member.name, prominent: true })
-              Text(displayName(project.name)).fontSize(14).fontColor(Theme.muted)
-            }.width('100%').alignItems(HorizontalAlign.Start)
-            if (member.notes) { Text(member.notes).fontColor(Theme.muted).copyOption(CopyOptions.LocalDevice)
-              Button('复制备注 / 联系方式').constraintSize({ minHeight: 64 }).onClick((): void => { this.copyContact(member); }) }
-          }, (member: TeamMember) => member.id)
-        }, (project: CosProject) => project.id)
+        Column() {
+          ForEach(this.projects(), (project: CosProject) => {
+            ForEach(this.state.team.filter((member: TeamMember) => member.projectId === project.id), (member: TeamMember) => {
+              Row({ space: 12 }) {
+                Column({ space: 6 }) {
+                  Row({ space: 8 }) {
+                    Text(member.name).fontSize(17).fontColor(Theme.ink).layoutWeight(1)
+                    if (member.role) { StatusPill({ label: member.role }) }
+                  }.width('100%')
+                  Text(member.notes || displayName(project.name)).fontSize(13).fontColor(Theme.muted).maxLines(2).copyOption(CopyOptions.LocalDevice)
+                }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+                if (member.notes) { Button('复制').type(ButtonType.Normal).constraintSize({ minHeight: 64, minWidth: 48 }).backgroundColor(Color.Transparent).fontColor(Theme.accent).fontSize(14)
+                  .onClick((): void => { this.copyContact(member); }).accessibilityText('复制 ' + member.name + ' 的备注或联系方式') }
+              }.width('100%').padding({ top: 12, bottom: 12 })
+              Divider().color(Theme.line)
+            }, (member: TeamMember) => member.id)
+          }, (project: CosProject) => project.id)
+        }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
       } else if (module.id === 'plans') {
-        ForEach(this.projects(), (project: CosProject) => {
-          Button() { Column({ space: 6 }) { ContextRow({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: displayName(project.name), prominent: true }); Text(planShootingLabel(project, this.state.events)).fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
-        }, (project: CosProject) => project.id)
+        Column() {
+          ForEach(this.projects(), (project: CosProject) => {
+            DetailLink({ title: displayName(project.name), subtitle: planShootingLabel(project, this.state.events),
+              value: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], action: (): void => { this.open('project', project.id); } })
+            Divider().color(Theme.line)
+          }, (project: CosProject) => project.id)
+        }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
       } else if (module.id === 'shots') {
-        if (this.shotError) { Text(this.shotError).fontSize(17).fontColor(Theme.danger) }
+        if (this.shotError) { Text(this.shotError).fontSize(15).fontColor(Theme.danger) }
         ForEach(this.projects().filter((project: CosProject) => this.state.readiness(project.id).shots.total > 0), (project: CosProject) => { this.shots(project) }, (project: CosProject) => project.id)
       } else if (module.id === 'timeline') {
-        ForEach(eventTimeline(this.event, this.state.projects), (item: DayTimelineItem) => {
-          if (item.projectId) { Button() { Column({ space: 6 }) { ContextRow({ label: item.time, text: displayName(item.label), prominent: true }); Text(item.date || '日期待定').fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start) }.type(ButtonType.Normal).id('day-timeline:' + item.id).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
-            .onClick((): void => { this.open('project', item.projectId); }).accessibilityText('查看计划，' + (item.date || '日期待定') + '，' + item.time + '，' + item.label) }
-          else { Column({ space: 6 }) { ContextRow({ label: item.time, text: displayName(item.label), prominent: true }); Text(item.date || '日期待定').fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start).id('day-timeline:' + item.id) }
-        }, (item: DayTimelineItem) => item.id)
+        Column() {
+          ForEach(eventTimeline(this.event, this.state.projects), (item: DayTimelineItem) => {
+            Row({ space: 12 }) {
+              Text(item.time).width(64).fontSize(17).fontWeight(FontWeight.Medium).fontColor(Theme.accent)
+              if (item.projectId) { DetailLink({ title: displayName(item.label), subtitle: item.date || '日期待定', action: (): void => { this.open('project', item.projectId); } }).layoutWeight(1) }
+              else { Column({ space: 5 }) { Text(displayName(item.label)).fontSize(16).fontColor(Theme.ink); Text(item.date || '日期待定').fontSize(13).fontColor(Theme.muted) }.layoutWeight(1).alignItems(HorizontalAlign.Start).padding({ top: 16, bottom: 16 }) }
+            }.id('day-timeline:' + item.id).width('100%').constraintSize({ minHeight: 64 })
+            Divider().color(Theme.line)
+          }, (item: DayTimelineItem) => item.id)
+        }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+      } else if (module.id === 'wrapup') {
+        Column() {
+          DetailLink({ title: '留下今天的照片', subtitle: '选择所属计划后导入', icon: Icons.importPhoto, action: (): void => { this.route.recordKind = 2; this.route.recording = true; } })
+        }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
       }
-      else if (module.id === 'wrapup') { Text('今天结束了？选好所属计划后导入照片。').fontSize(18).fontColor(Theme.ink)
-        Button('导入照片').constraintSize({ minHeight: 64 }).onClick((): void => { this.recordKind = 2; this.recording = true; }) }
-    }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
   @Local availableWidth: number = 360;
   build() {
     Column() {
-      if (this.route.dayMode) { this.dayHeader() }
+      if (this.route.dayMode) { Blank().height(this.contentTop - 16).width('100%'); this.dayHeader() }
       HdsViewTabs({ labels: this.route.dayMode ? ['出发前', '现场'] : ['概览', '本场计划', '收录', '提醒'],
         icons: this.route.dayMode ? [Icons.library, Icons.event] : [Icons.home, Icons.plan, Icons.importPhoto, Icons.event],
         selectedIndex: this.route.section, componentId: 'event-view-tabs', effects: this.state.settings.effects,
         materialLevel: this.state.settings.materialLevel, availableWidth: this.availableWidth,
         haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
         changed: (index: number): void => { this.route.section = index; }, content: (): void => { this.viewContent(); } }).layoutWeight(1)
-    }.width('100%').height('100%').onAreaChange((_, area: Area): void => { this.availableWidth = Number(area.width); })
+    }.width('100%').height('100%').onAreaChange((_, area: Area): void => { this.availableWidth = Number(area.width); this.contentOrigin = Number(area.globalPosition.y); this.updateTopInset(); })
   }
   @Builder viewContent() {
     Column() {
       if (!this.route.dayMode && this.route.section === 2) {
         EntryCollectionView({ state: this.state, route: this.route.entries, componentId: 'event-entries-scroll', restoreVersion: this.route.restoreVersion,
-          topInset: Theme.detailTop, bottomInset: Theme.contentBottom, horizontalPadding: Theme.pagePadding, open: this.open }).layoutWeight(1)
+          topInset: this.contentTop, bottomInset: Theme.detailFloatingBottom, horizontalPadding: Theme.pagePadding, open: this.open }).layoutWeight(1)
       } else {
       Scroll(this.scroller) {
         Column({ space: Theme.sectionSpacing }) {
           if (!this.route.dayMode) {
-            Blank().height(Theme.detailTop).width('100%')
+
             if (this.route.section === 0) { this.overview() }
             else if (this.route.section === 1) { this.plans() }
             else { this.reminders() }
           } else {
             ForEach(this.modules(), (module: DayModule) => { this.dayModule(module) }, (module: DayModule) => module.id)
             if (!this.modules().length) { Text('这一段暂时没有内容。可以在详情中关联计划、收录凭证，或开启已关闭的模块。').fontSize(17).fontColor(Theme.muted) }
-            Button('模块开关与排序').constraintSize({ minHeight: 64 }).onClick((): void => { this.configuring = true; })
-            Button('返回活动详情').constraintSize({ minHeight: 64 }).onClick((): void => { this.route.section = 0; this.route.dayMode = false; })
           }
-          Blank().height(Theme.contentBottom).width('100%')
-        }.width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
+          Blank().height(Theme.detailFloatingBottom).width('100%')
+        }.width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).padding({ top: this.route.dayMode ? 0 : this.contentTop, left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
       }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top)
         .onAreaChange((_, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreScroll(); } })
         .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset; } })
       }
     }.width('100%').height('100%')
-      .bindSheet(this.linking || this.configuring || this.recording || this.viewing, this.activeSheet(), this.sheetOptions())
+      .bindSheet(this.locationOpen || this.linking || this.route.configuring || this.route.recording || this.viewing, this.activeSheet(), this.sheetOptions())
   }
   @Builder activeSheet() {
-    if (this.linking) { this.linkSheet() }
-    else if (this.configuring) { this.configurationSheet() }
-    else if (this.recording) { this.recordSheet() }
+    if (this.locationOpen) {
+      LocationSheet({ city: this.event.city, venue: this.event.venue, writable: !this.state.busy && !this.state.staleScopes.length,
+        close: (): void => { this.locationOpen = false; }, editLocation: (): void => { this.locationOpen = false; this.edit('event', this.event.id, ''); } })
+    } else if (this.linking) { this.linkSheet() }
+    else if (this.route.configuring) { this.configurationSheet() }
+    else if (this.route.recording) { this.recordSheet() }
     else { this.credentialSheet() }
   }
 }

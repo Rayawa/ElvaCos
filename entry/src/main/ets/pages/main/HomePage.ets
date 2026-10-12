@@ -11,7 +11,7 @@ import { HomeTaskRow, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, ho
 import { nextPlan } from '../../model/Rules';
 import { daysUntil, displayName } from '../../common/format';
 import { eventEnd } from '../../model/Schedule';
-import { dayTitle } from '../../model/DayMode';
+import { dayTitle, dayContext } from '../../model/DayMode';
 import { SectionHeading, EmptyState } from '../../component/Surfaces';
 import { ManagedImage } from '../../component/ManagedImage';
 
@@ -105,9 +105,15 @@ export struct HomePage {
     Column({ space: 8 }) {
       SectionHeading({ title: '接下来' })
       if (this.state.todayEvents.length) {
-        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? '，还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
+        Button() {
+          Column({ space: 6 }) {
+            ContextRow({ label: dayContext(this.state.todayEvents[0], this.state.clockTime), text: displayName(this.state.todayEvents[0].name), prominent: true })
+            if (this.state.todayEvents.length > 1) { Text('还有 ' + (this.state.todayEvents.length - 1) + ' 场活动').fontSize(14).fontColor(Theme.muted) }
+          }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
+        }.type(ButtonType.Normal)
           .id('home-day-entry').width('100%').constraintSize({ minHeight: 64 }).fontSize(18).fontColor(Theme.accent).backgroundColor(Theme.tint)
           .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); })
+          .accessibilityText('进入' + dayTitle(this.state.todayEvents[0], this.state.clockTime) + '的今天模式')
       }
       if (this.upcoming) { this.planHero(this.upcoming!) }
       else if (!this.state.todayEvents.length && this.nextEvent()) {

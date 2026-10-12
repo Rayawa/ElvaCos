@@ -199,6 +199,7 @@ export default function uiShellTest(): void {
         await plans[0].click(); await driver.delayMs(500);
         const viewport = await boundsFor('project-overview');
         for (const id of ['project-money-open', 'project-team-open']) {
+          await scrollSearch(await driver.findComponent(ON.id('project-overview').inWindow(bundle)), ON.id(id).inWindow(bundle));
           const bounds = await boundsFor(id);
           expect(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom).assertTrue();
         }
@@ -209,8 +210,8 @@ export default function uiShellTest(): void {
       }
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
       await tap('日程'); await present('添加活动');
-      await tap('日历'); await present('今天'); await tap('今天'); await tap('列表'); await present('查看某一天（可选）');
-      await tap('清除'); await present('event-list-filter');
+      await tap('日历'); await present('今天'); await tap('今天'); await tap('列表'); await present('schedule-date-picker');
+      await tap('schedule-clear-date'); await present('event-list-filter');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
       await tap('衣柜'); await present('添加装备');
       await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
@@ -325,9 +326,13 @@ export default function uiShellTest(): void {
         await tap('首页');
       }
     });
-    it('inboxAndOwnerCollectionsKeepKindAndScrolledRowsThroughReturnAndSheetReopening', 0, async () => {
+    it('inboxAndEventCollectionsKeepKindAndScrolledRowsThroughReturn', 0, async () => {
       const state = getApplicationState(); const oldEntries = state.entries; const oldEvents = state.events;
       const oldProjects = state.projects; const oldCharacters = state.characters;
+      const started = Date.now();
+      const step = async (label: string): Promise<void> => {
+        await abilityDelegatorRegistry.getAbilityDelegator().print('[CollectionUI] ' + (Date.now() - started) + ' ms: ' + label + '\n');
+      };
       const event = new CosEvent(); event.id = 'ui-inbox-context-event'; event.name = '收录返回验证'; event.dateMode = 'pending';
       const fixtures: CollectedEntry[] = [];
       for (let index = 0; index < 32; index++) {
@@ -335,70 +340,89 @@ export default function uiShellTest(): void {
       }
       const loose = new CollectedEntry(); loose.id = 'ui-inbox-context-loose'; loose.text = '未归位只读验证'; fixtures.push(loose);
       try {
-        state.events = oldEvents.concat(event); state.entries = fixtures;
+        state.events = oldEvents.concat(event); state.entries = fixtures; await step('open inbox');
         await tap('首页'); await scrollSearch(await driver.findComponent(ON.id('home-scroll').inWindow(bundle)), ON.id('home-inbox').inWindow(bundle)); await tap('home-inbox');
         await present('未归位'); await tap('entry-scope-filter'); await tap('全部收录'); await tap('entry-kind-filter'); await tap('地图');
         const id = 'entry-row:ui-inbox-context-30'; const scroll = await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle));
-        await scrollSearch(scroll, ON.id(id).inWindow(bundle)); await driver.delayMs(350);
-        const before = await boundsFor(id); await tap(id);
-        await present('event-view-tabs'); await present('收录');
+        await step('find inbox row 30'); await scrollSearch(scroll, ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+        const before = await boundsFor(id); await step('open event from row 30'); await tap(id);
+        await present('event-view-tabs'); await present('收录'); await step('filter event entries');
         await tap('entry-kind-filter'); await tap('地图');
-        await scrollSearch(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle)); await driver.delayMs(350);
-        const eventBefore = await boundsFor(id);
+        await step('find event row 30'); await scrollSearch(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+        const eventBefore = await boundsFor(id); await step('switch event views and return');
         await tap('概览'); await tap('收录'); await present('event-entries-scroll');
         const eventAfter = await boundsFor(id);
-        await diagnostic('event-return');
+        await diagnostic('event-return'); await step('compare event position');
         expect(Math.abs(eventAfter.top - eventBefore.top) <= 2 && Math.abs(eventAfter.bottom - eventBefore.bottom) <= 2).assertTrue();
-        await revealHeader(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle)); await driver.delayMs(350); await present('地图');
+        await step('reveal event filter'); await revealHeader(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle)); await driver.delayMs(350); await present('地图');
         await scrollSearch(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle)); await tap(id);
         const editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
         await scrollSearch(editor, ON.id('entry-input:url').inWindow(bundle));
         const urlInput = await driver.findComponent(ON.id('entry-input:url').inWindow(bundle)); await urlInput.inputText('not-a-url');
         await driver.pressBack(); await driver.delayMs(350); await diagnostic('entry-before-save');
         await scrollSearch(editor, ON.text('保存修改').inWindow(bundle)); await tap('保存修改');
-        await present('entry-action-error'); await driver.delayMs(2300); await diagnostic('entry-validation');
+        await present('entry-action-error'); await driver.delayMs(2300); await diagnostic('entry-validation'); await step('verify persistent validation');
         expect(await (await driver.findComponent(ON.id('entry-action-error').inWindow(bundle))).getText()).assertEqual('链接需要以 https:// 或 http:// 开头');
         await scrollSearch(editor, ON.id('entry-input:url').inWindow(bundle));
         expect(await (await driver.findComponent(ON.id('entry-input:url').inWindow(bundle))).getText()).assertEqual('not-a-url');
         expect(state.entries.find((entry: CollectedEntry): boolean => entry.id === 'ui-inbox-context-30')!.url).assertEqual('');
         // This editor fits the sheet. Its close button is already visible above the covered page's title bar.
-        await tap('sheet-close'); await present('放弃本次修改？'); await tap('放弃修改');
+        await tap('sheet-close'); await present('放弃本次修改？'); await tap('放弃修改'); await step('discard editor');
         await revealHeader(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle)); await driver.delayMs(350);
         await tap('entry-kind-filter'); await tap('链接'); await present('没有匹配的收录'); await tap('entry-kind-filter'); await tap('地图');
         await present('entry-kind-filter'); await back(); await present(id);
         const after = await boundsFor(id);
         expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
         await revealHeader(await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle)), ON.id('entry-scope-filter').inWindow(bundle)); await driver.delayMs(350);
-        await present('全部收录'); await present('地图'); await back();
-        const role = new Character(); role.id = 'ui-owner-collection-role'; role.name = '收录位置验证角色';
-        const plan = new CosProject(); plan.id = 'ui-owner-collection-plan'; plan.name = '收录位置验证计划'; plan.characterId = role.id;
-        state.characters = oldCharacters.concat(role); state.projects = oldProjects.concat(plan);
-        const checkOwnerSheet = async (kind: string, ownerId: string, sheetScrollId: string, pageScrollId: string, entryButtonId: string): Promise<void> => {
-          state.entries = fixtures.map((entry: CollectedEntry): CollectedEntry => {
-            const copy = new CollectedEntry(); copy.id = entry.id; copy.kind = entry.kind; copy.title = entry.title; copy.text = entry.text;
-            copy.scopeKind = entry.scopeKind === 'global' ? 'global' : kind; copy.scopeId = copy.scopeKind === 'global' ? '' : ownerId; return copy;
-          });
-          await tap('首页'); await scrollSearch(await driver.findComponent(ON.id('home-scroll').inWindow(bundle)), ON.id('home-inbox').inWindow(bundle)); await tap('home-inbox');
-          await tap('entry-scope-filter'); await tap('全部收录'); await tap('entry-kind-filter'); await tap('地图');
-          await scrollSearch(await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle)); await tap(id);
-          await present(sheetScrollId); await tap('entry-kind-filter'); await tap('地图');
-          await scrollSearch(await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle)), ON.id(id).inWindow(bundle)); await driver.delayMs(350);
-          const sheetBefore = await boundsFor(id);
-          await tap('sheet-close');
-          await scrollSearch(await driver.findComponent(ON.id(pageScrollId).inWindow(bundle)), ON.id(entryButtonId).inWindow(bundle)); await tap(entryButtonId);
-          await present(sheetScrollId);
-          const sheetAfter = await boundsFor(id);
-          expect(Math.abs(sheetAfter.top - sheetBefore.top) <= 2 && Math.abs(sheetAfter.bottom - sheetBefore.bottom) <= 2).assertTrue();
-          await revealHeader(await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle)); await driver.delayMs(350); await present('地图');
-          await tap('sheet-close'); await back(); await back();
-        };
-        await checkOwnerSheet('project', plan.id, 'project-entries-scroll', 'project-overview', 'project-entry-link');
-        await checkOwnerSheet('character', role.id, 'character-entries-scroll', 'character-detail-scroll', 'character-entry-link');
+        await present('全部收录'); await present('地图'); await back(); await step('inbox offset and filters restored');
       } finally {
         for (let attempt = 0; attempt < 4 && !await atRoot(); attempt++) { await back(); }
         state.entries = oldEntries; state.events = oldEvents; state.projects = oldProjects; state.characters = oldCharacters;
       }
     });
+    const ownerCollectionCase = async (kind: string): Promise<void> => {
+      const state = getApplicationState(); const oldEntries = state.entries;
+      const oldProjects = state.projects; const oldCharacters = state.characters;
+      const stamp = String(Date.now()), started = Date.now();
+      const role = new Character(); role.id = 'ui-owner-role-' + stamp; role.name = '收录位置验证角色';
+      const plan = new CosProject(); plan.id = 'ui-owner-plan-' + stamp; plan.name = '收录位置验证计划'; plan.characterId = role.id;
+      const ownerId = kind === 'project' ? plan.id : role.id;
+      const sheetScrollId = kind === 'project' ? 'project-entries-scroll' : 'character-entries-scroll';
+      const pageScrollId = kind === 'project' ? 'project-overview' : 'character-detail-scroll';
+      const entryButtonId = kind === 'project' ? 'project-entry-link' : 'character-entry-link';
+      const fixtures: CollectedEntry[] = [];
+      for (let index = 0; index < 32; index++) {
+        const entry = new CollectedEntry(); entry.id = 'ui-owner-entry-' + stamp + '-' + index; entry.kind = 'map';
+        entry.scopeKind = kind; entry.scopeId = ownerId; entry.title = '返回位置地图 ' + index; entry.text = '只读内存验证'; fixtures.push(entry);
+      }
+      const loose = new CollectedEntry(); loose.id = 'ui-owner-loose-' + stamp; loose.text = '未归位只读验证'; fixtures.push(loose);
+      const id = 'entry-row:ui-owner-entry-' + stamp + '-30';
+      const step = async (label: string): Promise<void> => {
+        await abilityDelegatorRegistry.getAbilityDelegator().print('[OwnerCollectionUI] ' + kind + ' ' + (Date.now() - started) + ' ms: ' + label + '\n');
+      };
+      try {
+        state.characters = oldCharacters.concat(role); state.projects = oldProjects.concat(plan); state.entries = fixtures;
+        await step('open inbox');
+        await tap('首页'); await scrollSearch(await driver.findComponent(ON.id('home-scroll').inWindow(bundle)), ON.id('home-inbox').inWindow(bundle)); await tap('home-inbox');
+        await tap('entry-scope-filter'); await tap('全部收录'); await tap('entry-kind-filter'); await tap('地图');
+        await scrollSearch(await driver.findComponent(ON.id('inbox-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle)); await tap(id);
+        await present(sheetScrollId); await tap('entry-kind-filter'); await tap('地图');
+        await scrollSearch(await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle)), ON.id(id).inWindow(bundle)); await driver.delayMs(350);
+        const before = await boundsFor(id); await step('row 30 in owner sheet');
+        await tap('sheet-close');
+        await scrollSearch(await driver.findComponent(ON.id(pageScrollId).inWindow(bundle)), ON.id(entryButtonId).inWindow(bundle)); await tap(entryButtonId);
+        await present(sheetScrollId);
+        const after = await boundsFor(id);
+        expect(Math.abs(after.top - before.top) <= 2 && Math.abs(after.bottom - before.bottom) <= 2).assertTrue();
+        await revealHeader(await driver.findComponent(ON.id(sheetScrollId).inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle)); await driver.delayMs(350); await present('地图');
+        await tap('sheet-close'); await back(); await back(); await step('sheet position and kind restored');
+      } finally {
+        for (let attempt = 0; attempt < 6 && !await atRoot(); attempt++) { await back(); }
+        state.entries = oldEntries; state.projects = oldProjects; state.characters = oldCharacters;
+      }
+    };
+    it('projectCollectionKeepsKindAndScrolledRowsWhenReopeningItsSheet', 0, async () => { await ownerCollectionCase('project'); });
+    it('characterCollectionKeepsKindAndScrolledRowsWhenReopeningItsSheet', 0, async () => { await ownerCollectionCase('character'); });
     it('residentTodaySnackBarFloatsAboveStableTabsAndReturnsFromDayMode', 0, async () => {
       const state = getApplicationState(); const oldEvents = state.events;
       const event = new CosEvent(); event.id = 'ui-snackbar-' + Date.now(); event.name = '今日通知位置验证'; event.date = localDay(Date.now());
@@ -414,11 +438,11 @@ export default function uiShellTest(): void {
         expect(after.top).assertEqual(before.top); expect(after.bottom).assertEqual(before.bottom);
         expect((await enter.getBounds()).bottom < after.top).assertTrue();
         expect((await close.getBounds()).bottom < after.top).assertTrue();
-        await enter.click(); await driver.delayMs(500); await present('day-title'); await present('现场');
+        await enter.click(); await driver.delayMs(500); await present(event.name); await present('detail-action-快速记录'); await present('现场');
         expect(((await driver.findComponents(ON.type('Column').text('首页').inWindow(bundle)))?.length || 0)).assertEqual(0);
         const dayDate = await driver.findComponent(ON.id('day-date-time').inWindow(bundle));
-        expect(await dayDate.getText()).assertEqual(event.date);
-        await present('day-time'); await present('未标记时间');
+        expect((await dayDate.getText()).includes(event.date)).assertTrue();
+        expect((await dayDate.getText()).includes('未标记时间')).assertTrue();
         await present('day-location'); const dateBefore = await dayDate.getBounds();
         await tap('event-view-tabs-1'); await driver.delayMs(350);
         const dateAfter = await boundsFor('day-date-time');

@@ -89,9 +89,12 @@ class ThemeTokens {
   readonly daySnackGap: number = LAYOUT_DAY_SNACK_GAP;
   readonly daySnackReservation: number = LAYOUT_DAY_SNACK_RESERVATION;
   readonly contentTop: number = LAYOUT_CONTENT_TOP;
-  /** 二级页面与一级页面共用同一套标题栏几何，顶部留白一致（与 Dashboard AppDetailPage 对照确认）。 */
+  /** Insets belong to scroll content; the viewport stays immersive behind native chrome. */
+  readonly detailBottom: number = 16;
+  readonly detailTitleHeight: number = 56;
+  readonly detailFloatingBottom: number = LAYOUT_MAIN_TABS_HEIGHT + LAYOUT_MAIN_TABS_BOTTOM_MARGIN + 16;
   readonly detailTop: number = LAYOUT_DETAIL_TOP;
-  /** 标题栏内还有分段按钮时，分段会向下溢出标题栏，内容再多留一点。 */
+  /** Secondary titles use native floating chrome rather than a second segmented title. */
   readonly detailTopWithSegment: number = LAYOUT_DETAIL_TOP_WITH_SEGMENT;
   readonly contentBottom: number = LAYOUT_CONTENT_BOTTOM;
   readonly homeContentBottom: number = LAYOUT_HOME_CONTENT_BOTTOM;

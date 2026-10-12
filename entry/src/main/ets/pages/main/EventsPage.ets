@@ -1,3 +1,4 @@
+import { LengthMetrics } from '@kit.ArkUI';
 import { displayName } from '../../common/format';
 import { ContextRow } from '../../component/ContextRow';
 import { today, daysUntil } from '../../common/format';
@@ -10,7 +11,7 @@ import { TaskQueueItem } from '../../model/TaskQueue';
 import { ScheduleDayList } from '../../component/ScheduleDayList';
 import { DateField } from '../../component/DateField';
 import { EventCalendar } from '../../component/EventCalendar';
-import { eventEnd, eventDateLabel, ScheduleGroup } from '../../model/Schedule';
+import { eventEnd, eventDateLabel, eventTimeLabel, ScheduleGroup } from '../../model/Schedule';
 import { vibration } from '../../common/vibration';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
@@ -69,21 +70,25 @@ export struct EventsPage {
   private events(): CosEvent[] { return this.groups().reduce((events: CosEvent[], group: ScheduleGroup) => events.concat(group.events), []); }
   private typeOptions(): SelectOption[] { const options: SelectOption[] = [{ value: '全部类型' }]; return options.concat(this.types().map((type: string): SelectOption => { return { value: type }; })); }
   private types(): string[] { return Array.from(new Set(this.state.events.map((event: CosEvent) => event.eventType))); }
+  private chooseDate(): void {
+    this.getUIContext().showDatePickerDialog({ selected: new Date(this.route.selectedDate + 'T12:00:00'),
+      onDateAccept: (date: Date): void => {
+        this.route.selectDate(String(date.getFullYear()) + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'));
+        this.resetPosition();
+      } });
+  }
   @Builder content(e: CosEvent) {
-    Row({ space: 18 }) {
-      Column({ space: 4 }) { Text(e.dateMode === 'pending' ? '日期' : e.date.slice(5, 7) + '月')
-        .fontSize(13)
-        .fontColor(Theme.accent); Text(e.dateMode === 'pending' ? '待定' : e.date.slice(8))
-        .fontSize(32)
-        .fontWeight(FontWeight.Lighter)
-        .fontColor(Theme.ink) }.width(55)
-      Column({ space: 6 }) { Text(displayName(e.name))
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.ink); ContextRow({ label: eventDateLabel(e), text: e.city || e.venue || '地点待定' }); StatusPill({
-          label: e.ticketPurchased ? '已购票' : e.dateMode === 'pending' ? '日期待定' : daysUntil(e.date) >= 0 ? daysUntil(e.date) + ' 天后' : eventEnd(e) >= today() ? '进行中' : '已结束'
-        }) }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-    }.width('100%')
+    Row({ space: 12 }) {
+      Column({ space: 5 }) {
+        Text(e.timeMode === 'none' ? '未标记' : e.startTime).fontSize(e.timeMode === 'none' ? 12 : 17).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+        if (e.timeMode === 'range') { Text(e.endTime).fontSize(12).fontColor(Theme.muted) }
+      }.width(60).alignItems(HorizontalAlign.Start)
+      Rect().width(3).height(42).fill(Theme.brand).radius(2)
+      Column({ space: 6 }) {
+        Text(displayName(e.name)).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(2)
+        Text([e.city, e.venue].filter((value: string) => Boolean(value)).join(' ') || '地点待定').fontSize(14).fontColor(Theme.muted).maxLines(2)
+      }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+    }.width('100%').padding(16)
   }
   build() {
     Column({ space: 12 }) {
@@ -91,26 +96,29 @@ export struct EventsPage {
         Column({ space: 14 }) {
           Column({ space: 14 }) {
             Blank().height(this.topInset).width('100%')
-            Row({ space: 8 }) {
-              SectionHeading({ title: '活动安排', trailing: this.route.calendar ? '' : this.events().length + ' 场' }).layoutWeight(1)
+            Flex({ space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) }, wrap: FlexWrap.Wrap }) {
               if (!this.route.calendar && !this.route.dateFocused) {
                 Select([{ value: '全部日期' }, { value: '已结束' }, { value: '日期待定' }, { value: '今天' }, { value: '即将到来' }])
-                  .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.route.filter])
+                  .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.route.filter]).constraintSize({ minHeight: 48 })
                   .onSelect((index: number): void => { vibration.dotVibration(); this.route.filter = index; this.route.dateFocused = false; this.resetPosition(); })
-                  .id('event-list-filter')
-                  .accessibilityText('活动日期筛选')
-                  .visualEffect(this.feedback.effect('select-1'))
-                  .compositingFilter(this.feedback.filter('select-1'))
-                  .attributeModifier(this.feedback.control('select-1'))
+                  .id('event-list-filter').accessibilityText('活动日期筛选')
               }
+              Select(this.typeOptions()).value(this.route.eventType || '全部类型').constraintSize({ minHeight: 48 })
+                .onSelect((index: number): void => { this.route.eventType = index === 0 ? '' : this.types()[index - 1]; this.resetPosition(); }).accessibilityText('活动类型筛选')
             }.width('100%')
             if (!this.route.calendar) {
-              DateField({ label: '查看某一天（可选）', value: this.route.dateFocused ? this.route.selectedDate : '', optional: true,
-                change: (value: string): void => { if (value) { this.route.selectDate(value); } else { this.route.clearDate(); } this.resetPosition(); } })
-              if (!this.route.dateFocused && this.route.filter === 0) { Text('当前按日期分组查看全部安排。').fontSize(14).fontColor(Theme.muted) }
+              Row({ space: 8 }) {
+                Button(this.route.dateFocused ? this.route.selectedDate : '选择日期').id('schedule-date-picker').type(ButtonType.Normal).constraintSize({ minHeight: 48 })
+                  .backgroundColor(Color.Transparent).fontColor(Theme.accent).onClick((): void => { this.chooseDate(); }).accessibilityText('选择要查看的日程日期')
+                if (this.route.dateFocused) {
+                  Button('全部日程').id('schedule-clear-date').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).backgroundColor(Color.Transparent).fontColor(Theme.muted)
+                    .onClick((): void => { this.route.clearDate(); this.resetPosition(); })
+                } else {
+                  Button('今天').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).backgroundColor(Color.Transparent).fontColor(Theme.accent)
+                    .onClick((): void => { this.route.selectDate(this.state.localDate); this.resetPosition(); })
+                }
+              }.width('100%')
             }
-            Select(this.typeOptions())
-              .value(this.route.eventType || '全部类型').onSelect((index: number): void => { this.route.eventType = index === 0 ? '' : this.types()[index - 1]; this.resetPosition(); }).accessibilityText('活动类型筛选')
           }.
         width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 14 }) {
@@ -118,7 +126,6 @@ export struct EventsPage {
               Button() { ContextRow({ label: '日期待定', text: this.view.pendingCount + ' 场活动' }) }.type(ButtonType.Normal).id('schedule-pending-entry').width('100%').constraintSize({ minHeight: 48 })
                 .backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.route.showPending(); this.resetPosition(); })
             }
-            if (this.route.eventType) { Text('活动类型筛选只影响活动，准备任务截止项仍按所选日期显示。').fontSize(14).fontColor(Theme.muted) }
             if (this.route.calendar) { EventCalendar({
                 state: this.state, route: this.route, view: this.view,
                 openTask: (item: TaskQueueItem): void => { this.openTask(item); },
@@ -131,12 +138,14 @@ export struct EventsPage {
             } else {
             ForEach(this.groups(), (group: ScheduleGroup) => {
               if (group.events.length > 0) { SectionHeading({ title: group.label, trailing: group.events.length + ' 场' }) }
-              ForEach(group.events, (e: CosEvent) => { InteractiveCard({
-                label: e.name,
-                effects: this.state.settings.effects,
-                action: () => this.open('event', e.id),
-                content: (): void => this.content(e)
-              }) }, (e: CosEvent) => e.id)
+              ForEach(group.events, (event: CosEvent, index: number) => {
+                if (event.dateMode !== 'pending' && (index === 0 || eventDateLabel(group.events[index - 1]) !== eventDateLabel(event))) {
+                  Text(eventDateLabel(event)).fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink).padding({ top: 8, bottom: 2 })
+                }
+                Button() { this.content(event) }.id('schedule-event:' + event.id).type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 })
+                  .backgroundColor(Theme.surface).borderRadius(14).onClick((): void => { this.open('event', event.id); })
+                  .accessibilityText('打开活动 ' + event.name + '，' + eventDateLabel(event) + '，' + eventTimeLabel(event))
+              }, (event: CosEvent) => event.id)
             }, (group: ScheduleGroup) => group.label)
             if (this.events().length === 0) { EmptyState({
                 title: this.state.events.length ? '没有匹配的活动' : '下一场见面，值得期待',

@@ -65,7 +65,7 @@ export struct SearchPage {
           else { Text('查找计划、角色与版本、活动、装备、照片说明或收录；参考图在所属计划或角色的参考区查看。').fontSize(16).fontColor(Theme.muted) }
         }
       }
-      ListItem() { Column() { Blank().height(Theme.contentBottom).width('100%') }.width('100%') }
+      ListItem() { Column() { Blank().height(Theme.detailFloatingBottom).width('100%') }.width('100%') }
     }.id('search-results').width('100%').height('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).scrollBar(BarState.Off)
       .onAreaChange((_old: Area, area: Area): void => { if (!this.measured && Number(area.height) > 0) { this.measured = true; this.restoreOffset(); } })
       .onDidScroll((): void => { if (this.measured && !this.restoring) { this.route.offsets[this.route.section] = this.scroller.currentOffset().yOffset; } })

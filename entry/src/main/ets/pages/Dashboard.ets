@@ -284,7 +284,12 @@ import { EmptyState } from '../component/Surfaces';
     route.returnPaths = [];
   }
   private eventMenus(route: EventRoute): HdsNavigationMenuItemOptions[] {
-    if (route.dayMode || !this.state.events.some((event: CosEvent) => event.id === route.id)) { return []; }
+    if (!this.state.events.some((event: CosEvent) => event.id === route.id)) { return []; }
+    if (route.dayMode) {
+      return [{ content: { label: '快速记录', icon: Icons.add, isEnabled: !this.state.busy, action: (): void => { route.recordKind = -1; route.recording = true; } } },
+        { content: { label: '活动详情', icon: Icons.event, action: (): void => { route.section = 0; route.dayMode = false; } } },
+        { content: { label: '模块安排', icon: Icons.settings, action: (): void => { route.configuring = true; } } }];
+    }
     return [{ content: { label: '编辑活动', icon: Icons.edit, isEnabled: !this.state.busy, action: (): void => { this.edit('event', route.id); } } },
       { content: { label: '删除活动', icon: Icons.remove, isEnabled: !this.state.busy, action: (): void => { this.remove('event', route.id); } } }];
   }
@@ -300,8 +305,8 @@ import { EmptyState } from '../component/Surfaces';
   }
   @Builder scheduleDestination(kind: string, param: Object) {
     if (kind === 'event') {
-      DetailDestination({ customTitle: (param as EventRoute).dayMode, titleOptions: SystemCapability.titleBar((param as EventRoute).dayMode ? '今天模式' : this.destinationTitle('event', (param as EventRoute).id), this.state.settings.effects, this.state.settings.materialLevel,
-        undefined, this.eventMenus(param as EventRoute), false, (): void => { this.closeEvent(param as EventRoute); }),
+      DetailDestination({ titleOptions: SystemCapability.titleBar(this.destinationTitle('event', (param as EventRoute).id), this.state.settings.effects, this.state.settings.materialLevel,
+        undefined, this.eventMenus(param as EventRoute), true, (): void => { this.closeEvent(param as EventRoute); }),
         back: (): void => { this.closeEvent(param as EventRoute); }, shown: (): void => { (param as EventRoute).restoreVersion++; }, content: this.eventContent.bind(this, param as EventRoute) })
     }
   }
@@ -466,7 +471,7 @@ import { EmptyState } from '../component/Surfaces';
             entrance: entrance,
             state: this.state,
             topInset: Theme.detailTop,
-            bottomInset: Theme.contentBottom,
+            bottomInset: Theme.detailFloatingBottom,
             sidePadding: Theme.pagePadding,
             route: (param as ProjectRoute).photos, from: 'project',
             header: (): void => { this.projectPhotoHeader(param as ProjectRoute); },
@@ -573,10 +578,10 @@ import { EmptyState } from '../component/Surfaces';
     if (kind === 'search') {
       SearchPage({ state: this.state, route: param as SearchRoute, open: (hit: SearchHit): void => { this.openSearchResult(param as SearchRoute, hit); }, library: (): void => { this.open('characters', 'all'); } })
     } else if (kind === 'characters') {
-      CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.contentBottom,
+      CosPage({ state: this.state, route: param as PlanListRoute, projects: false, active: true, topInset: Theme.detailTop, bottomInset: Theme.detailBottom,
         open: (k: string, id: string): void => { this.open(k, id); }, add: (k: string, parent: string): void => { this.edit(k, '', parent); } })
     } else if (kind === 'album') {
-      AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }, importPhotos: (id: string): void => { this.chooseImport(id); } })
+      AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, topInset: Theme.detailTop, bottomInset: Theme.detailFloatingBottom, view: (route: PhotoViewerRoute): void => { this.openPhoto(route); }, importPhotos: (id: string): void => { this.chooseImport(id); } })
     } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo' || kind === 'asset' || kind === 'character') {
       this.detailContent(kind, param, entrance)
     } else if (kind === 'tasks') {
@@ -589,7 +594,7 @@ import { EmptyState } from '../component/Surfaces';
         entrance: entrance,
         entranceSession: this.mainEntranceSession,
         state: this.state,
-        bottomInset: Theme.contentBottom,
+        bottomInset: Theme.detailBottom,
         destructive: (k: string): void => { this.destructive(k); },
         openDeveloper: (): void => { this.openDeveloper(); }
       })

@@ -117,7 +117,7 @@ export struct AppLogPage {
         if (this.filteredLogs.length === 0) {
           EmptyState({ title: '暂无符合条件的日志', message: '可在标题栏开启需要查看的发布类型' })
         }
-        Blank().height(Theme.contentBottom).accessibilityLevel('no')
+        Blank().height(Theme.detailBottom).accessibilityLevel('no')
       }.width('90%').constraintSize({ maxWidth: READING_MAX_WIDTH })
         .alignItems(HorizontalAlign.Start)
         .attributeModifier(entrance.group(1))

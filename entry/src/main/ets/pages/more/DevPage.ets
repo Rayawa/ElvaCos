@@ -128,7 +128,7 @@ export struct DevPage {
       Text('开发者选项只影响本机数据；再次进入可在设置页连点版本号五次。')
         .fontSize(12).fontColor(Theme.muted).width('100%').padding({ top: 6, left: 4, right: 4 })
         .accessibilityText('开发者选项只影响本机数据，再次进入可在设置页连点版本号五次')
-      Blank().height(Theme.contentBottom).accessibilityLevel('no')
+      Blank().height(Theme.detailBottom).accessibilityLevel('no')
     }
     .width('100%').constraintSize({ maxWidth: READING_MAX_WIDTH })
     .padding({ left: Theme.pagePadding, right: Theme.pagePadding })

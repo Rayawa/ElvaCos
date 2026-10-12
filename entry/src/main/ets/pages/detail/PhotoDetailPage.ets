@@ -1,3 +1,5 @@
+import { DetailLink } from '../../component/DetailLink';
+import { Icons } from '../../common/Icons';
 import { displayName } from '../../common/format';
 import { ContextRow } from '../../component/ContextRow';
 import { photoStatusLabel } from '../../model/PhotoStages';
@@ -74,38 +76,30 @@ export struct PhotoDetail {
           }
           if (!this.checking && this.original === 'available') {
             if (this.thumbnail !== 'available') { Text(this.thumbnail === 'unlinked' ? '尚未建立缩略图，原图仍可查看。' : this.thumbnail === 'missing' ? '缩略图文件缺失，原图仍可查看。' : '缩略图暂时无法读取，原图仍可查看。').fontSize(14).fontColor(Theme.muted) }
-            Button(this.thumbnail === 'available' ? '重建缩略图' : '从原图重建缩略图').constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length)
-              .onClick((): void => { void this.repair(true); })
+            DetailLink({ title: this.thumbnail === 'available' ? '重建缩略图' : '从原图重建缩略图', icon: Icons.importPhoto, interactive: !this.state.busy && !this.state.staleScopes.length,
+              action: (): void => { void this.repair(true); } })
           }
 
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 1 ? 1 : 0).translate({ y: this.entrance.step >= 1 ? 0 : 20 })
         Column({ space: Theme.sectionSpacing }) {
           if (this.repairError || this.state.error) { Text(this.repairError || this.state.error).fontSize(14).fontColor(Theme.danger) }
-          SectionHeading({ title: '照片说明' })
-          Text(this.photo.caption || '尚未填写照片说明').fontSize(14).fontColor(this.photo.caption ? Theme.ink : Theme.muted)
-          Button('编辑照片说明').constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length)
-            .onClick((): void => { this.edit('photo', this.photo.id, this.photo.projectId); })
-          SectionHeading({ title: '照片工作流' })
-          Select(PHOTO_LABELS.map((label: string): SelectOption => { return { value: label }; }))
-            .value(photoStatusLabel(this.photo.status))
-            .constraintSize({ minHeight: 48 }).enabled(!this.state.busy && !this.state.staleScopes.length)
-            .onSelect((i: number) => { vibration.dotVibration(); this.state.setPhotoStatus(this.photo, PHOTO_STATUSES[i]); })
-            .accessibilityText('照片业务状态')
-            .visualEffect(this.feedback.effect('select-1'))
-            .compositingFilter(this.feedback.filter('select-1'))
-            .attributeModifier(this.feedback.control('select-1'))
-          Button() { ContextRow({ label: '所属计划', text: displayName(this.state.projectName(this.photo.projectId)) }) }.type(ButtonType.Normal)
-            .width('100%')
-            .backgroundColor(Theme.tint)
-            .fontColor(Theme.accent)
-            .constraintSize({ minHeight: 52 })
-            .onClick((): void => { vibration.dotVibration(); this.open('project', this.photo.projectId); })
-            .accessibilityText('打开所属计划 ' + this.state.projectName(this.photo.projectId)).visualEffect(this.feedback.effect('button-2')).compositingFilter(this.feedback.filter('button-2')).attributeModifier(this.feedback.control('button-2'))
-          Text('导入与修复保存应用内副本，不修改系统相册。').fontSize(14).fontColor(Theme.muted)
+          Column() {
+            DetailLink({ title: '照片说明', subtitle: this.photo.caption || '尚未填写，点击补充', icon: Icons.edit, interactive: !this.state.busy && !this.state.staleScopes.length,
+              action: (): void => { this.edit('photo', this.photo.id, this.photo.projectId); } })
+            Divider().color(Theme.line)
+            Row({ space: 12 }) {
+              Text('照片状态').fontSize(16).fontColor(Theme.ink).layoutWeight(1)
+              Select(PHOTO_LABELS.map((label: string): SelectOption => { return { value: label }; }))
+                .value(photoStatusLabel(this.photo.status)).constraintSize({ minHeight: 48 }).enabled(!this.state.busy && !this.state.staleScopes.length)
+                .onSelect((index: number): void => { vibration.dotVibration(); this.state.setPhotoStatus(this.photo, PHOTO_STATUSES[index]); }).accessibilityText('照片业务状态')
+            }.width('100%').padding({ top: 8, bottom: 8 })
+            Divider().color(Theme.line)
+            DetailLink({ title: displayName(this.state.projectName(this.photo.projectId)), subtitle: '所属计划', icon: Icons.plan, action: (): void => { this.open('project', this.photo.projectId); } })
+          }.padding({ left: 16, right: 16 }).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
-        Blank().height(Theme.contentBottom).width('100%')
+        Blank().height(Theme.detailBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).width('100%').padding({ left: Theme.pagePadding, right: Theme.pagePadding }).alignItems(HorizontalAlign.Start)
     }.width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())

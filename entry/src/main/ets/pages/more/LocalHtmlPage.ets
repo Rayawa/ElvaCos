@@ -66,7 +66,7 @@ export struct LocalHtmlPage {
               .accessibilityLevel('yes')
           }, (_block: DocumentBlock, index: number): string => index.toString())
         }
-        Blank().height(Theme.contentBottom).accessibilityLevel('no')
+        Blank().height(Theme.detailBottom).accessibilityLevel('no')
       }.width('100%').constraintSize({ maxWidth: READING_MAX_WIDTH })
         .alignItems(HorizontalAlign.Start)
         .padding({ left: Theme.pagePadding, right: Theme.pagePadding })

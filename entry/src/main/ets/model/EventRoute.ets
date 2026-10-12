@@ -9,6 +9,9 @@ export class EventRoute {
   id: string;
   @Trace dayMode: boolean;
   @Trace section: number = 0;
+  @Trace configuring: boolean = false;
+  @Trace recording: boolean = false;
+  @Trace recordKind: number = -1;
   @Trace restoreVersion: number = 0;
   sourceTab: number = 2;
   returnPaths: EventReturnPath[] = [];

@@ -1,3 +1,5 @@
+import { DetailLink } from '../../component/DetailLink';
+import { Icons } from '../../common/Icons';
 import { displayName } from '../../common/format';
 import { ContextRow } from '../../component/ContextRow';
 import { WorkCard } from '../../component/WorkCard';
@@ -113,7 +115,7 @@ export struct ProjectDetail {
           ListItem() {
             Button() {
               Row() {
-                Column({ space: 5 }) { Text(asset.name)
+                Column({ space: 5 }) { Text(displayName(asset.name))
                   .fontColor(Theme.ink); ContextRow({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)], text: asset.location || '位置待补充' }) }.alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
                 Text(this.linked(asset) ? '已添加' : '＋ 添加').fontColor(Theme.accent)
@@ -184,13 +186,7 @@ export struct ProjectDetail {
       }
     }.width('100%')
     if (this.project.shootingTime) { ContextRow({ label: '拍摄 / 约拍', text: this.project.shootingTime }).id('project-shooting-time') }
-    if (this.project.eventId) {
-      Button() {
-        ContextRow({ label: '活动', text: displayName(this.state.events.find((e: CosEvent) => e.id === this.project.eventId)?.name || '未关联') })
-      }.type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent).constraintSize({ minHeight: 48 })
-        .onClick((): void => { vibration.dotVibration(); this.open('event', this.project.eventId); })
-        .accessibilityText('打开关联活动')
-    }
+
   }
 
   private categorySummary(id: string): string { const category = this.state.readiness(this.project.id).prep.categories.find((item) => item.id === id); return category ? category.done + '/' + category.total + ' 完成' : '尚未添加任务'; }
@@ -266,12 +262,16 @@ export struct ProjectDetail {
   }
 
   @Builder preparation() {
-    Column({ space: 12 }) {
-      SectionHeading({ title: '准备', trailing: this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项完成' })
-      if (this.state.readiness(this.project.id).prep.total > 8) { Progress({ value: this.state.preparationPercent(this.project.id), total: 100, type: ProgressType.Linear }).width('100%').color(Theme.brand).backgroundColor(Theme.tint) }
-      ContextRow({ label: '在途 ' + this.state.readiness(this.project.id).prep.waiting + ' 项', text: '装备可用 ' + this.state.readiness(this.project.id).equipment.available + ' / ' + this.state.readiness(this.project.id).equipment.total + ' 件' })
-      Button(this.route.showCompleted ? '收起已完成' : '显示已完成').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.showCompleted = !this.route.showCompleted; })
-    }.width('100%').alignItems(HorizontalAlign.Start)
+    Column({ space: 14 }) {
+      Row({ space: 12 }) {
+        Text('准备 ' + this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total).fontSize(24).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+        if (this.state.readiness(this.project.id).prep.waiting) { StatusPill({ label: '在途 ' + this.state.readiness(this.project.id).prep.waiting }) }
+      }.width('100%')
+      Row() {
+        Text('显示已完成').fontSize(14).fontColor(Theme.muted).layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.route.showCompleted }).onChange((value: boolean): void => { this.route.showCompleted = value; }).accessibilityText('显示已完成准备任务')
+      }.width('100%').constraintSize({ minHeight: 48 })
+    }.width('100%').padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).alignItems(HorizontalAlign.Start)
   }
 
   @Builder preparationList() {
@@ -286,45 +286,18 @@ export struct ProjectDetail {
       Column({ space: 10 }) {
         Row({ space: 8 }) {
           Button() {
-            Column({ space: 3 }) { Text(category.name)
-              .fontColor(Theme.ink)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis }); ContextRow({ label: this.route.expandedCategories.includes(category.id) ? '收起' : '展开', text: this.categorySummary(category.id) }) }.alignItems(HorizontalAlign.Start)
-              .width('100%')
-          }.type(ButtonType.Normal)
-            .backgroundColor(Theme.transparent)
-            .layoutWeight(1)
-            .onClick((): void => this.expandCategory(category.id))
-            .accessibilityText((this.route.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
-            .visualEffect(this.feedback.effect('button-11' + ":" + category.id))
-            .compositingFilter(this.feedback.filter('button-11' + ":" + category.id))
-            .attributeModifier(this.feedback.control('button-11' + ":" + category.id))
-          Button('编辑')
-            .backgroundColor(Theme.bg)
-            .fontColor(Theme.muted)
-            .fontSize(12)
-            .onClick((): void => { vibration.dotVibration(); this.edit('category', category.id, this.project.id); })
-            .accessibilityText('编辑分类 ' + category.name)
-            .visualEffect(this.feedback.effect('button-12' + ":" + category.id))
-            .compositingFilter(this.feedback.filter('button-12' + ":" + category.id))
-            .attributeModifier(this.feedback.control('button-12' + ":" + category.id))
-          Button('＋')
-            .backgroundColor(Theme.tint)
-            .fontColor(Theme.accent)
-            .onClick((): void => { vibration.dotVibration(); this.edit('preparation', '', category.id); })
-            .accessibilityText('添加 ' + category.name + ' 任务')
-            .visualEffect(this.feedback.effect('button-13' + ":" + category.id))
-            .compositingFilter(this.feedback.filter('button-13' + ":" + category.id))
-            .attributeModifier(this.feedback.control('button-13' + ":" + category.id))
-          Button('−')
-            .backgroundColor(Theme.bg)
-            .fontColor(Theme.muted)
-            .enabled(!this.state.busy)
-            .onClick((): void => { vibration.dotVibration(); this.remove('category', category.id); })
-            .accessibilityText('删除分类 ' + category.name)
-            .visualEffect(this.feedback.effect('button-14' + ":" + category.id))
-            .compositingFilter(this.feedback.filter('button-14' + ":" + category.id))
-            .attributeModifier(this.feedback.control('button-14' + ":" + category.id))
+            Column({ space: 5 }) {
+              Text(category.name).fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(this.categorySummary(category.id)).fontSize(13).fontColor(Theme.muted)
+            }.alignItems(HorizontalAlign.Start).width('100%').padding({ top: 8, bottom: 8 })
+          }.type(ButtonType.Normal).backgroundColor(Color.Transparent).layoutWeight(1).constraintSize({ minHeight: 48 })
+            .onClick((): void => { this.expandCategory(category.id); }).accessibilityText((this.route.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
+          Select([{ value: '添加任务' }, { value: '编辑分类' }, { value: '删除分类' }]).value('更多').constraintSize({ minHeight: 48 })
+            .enabled(!this.state.busy && !this.state.staleScopes.length).onSelect((index: number): void => {
+              if (index === 0) { this.edit('preparation', '', category.id); }
+              else if (index === 1) { this.edit('category', category.id, this.project.id); }
+              else { this.remove('category', category.id); }
+            }).accessibilityText(category.name + '，添加任务、编辑或删除分类')
         }.width('100%')
         ForEach(this.visibleTasks(category.id), (task: PreparationTask) => {
           Row({ space: 8 }) {
@@ -339,7 +312,7 @@ export struct ProjectDetail {
                 .compositingFilter(this.feedback.filter('button-15' + ":" + category.id + ":" + task.id))
                 .attributeModifier(this.feedback.control('button-15' + ":" + category.id + ":" + task.id))
             Column({ space: 4 }) {
-              Text(task.label)
+              Text(displayName(task.label))
                 .fontSize(15)
                 .fontColor(task.done ? Theme.muted : Theme.ink)
                 .decoration({ type: task.done ? TextDecorationType.LineThrough : TextDecorationType.None })
@@ -353,19 +326,14 @@ export struct ProjectDetail {
               .visualEffect(this.feedback.effect('column-16' + ":" + category.id + ":" + task.id))
               .compositingFilter(this.feedback.filter('column-16' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('column-16' + ":" + category.id + ":" + task.id))
-            Button('−')
-              .backgroundColor(Theme.bg)
-              .fontColor(Theme.muted)
-              .enabled(!this.state.busy)
-              .onClick((): void => { vibration.dotVibration(); this.remove('preparation', task.id); })
-              .accessibilityText('删除准备任务 ' + task.label)
-              .visualEffect(this.feedback.effect('button-17' + ":" + category.id + ":" + task.id))
-              .compositingFilter(this.feedback.filter('button-17' + ":" + category.id + ":" + task.id))
-              .attributeModifier(this.feedback.control('button-17' + ":" + category.id + ":" + task.id))
+            Select([{ value: '编辑任务' }, { value: '删除任务' }]).value('更多').constraintSize({ minHeight: 48 }).font({ size: 12 })
+              .enabled(!this.state.busy && !this.state.staleScopes.length).onSelect((index: number): void => {
+                if (index === 0) { this.edit('preparation', task.id, this.project.id); } else { this.remove('preparation', task.id); }
+              }).accessibilityText(task.label + '，编辑或删除任务')
           }.id('preparation-row:' + task.id).width('100%').padding(8).border({ width: task.id === this.route.focusTaskId ? 1 : 0, color: Theme.accent }).borderRadius(12)
             .onAreaChange((_, area: Area): void => { this.focusItem(task.id, area); })
         }, (task: PreparationTask) => task.id)
-        if (this.tasks(category.id).length === 0) { Text('点击 ＋ 添加第一项任务').fontSize(12).fontColor(Theme.muted) }
+        if (this.tasks(category.id).length === 0) { Text('在更多菜单中添加第一项任务').fontSize(12).fontColor(Theme.muted) }
       }.padding(14)
         .width('100%')
         .backgroundColor(Theme.surface)
@@ -381,7 +349,7 @@ export struct ProjectDetail {
     SectionHeading({ title: '本次装备', trailing: this.state.readiness(this.project.id).equipment.total + ' 件' })
     ForEach(this.equipment(), (asset: Asset) => {
       Row({ space: 8 }) {
-        Column({ space: 5 }) { Text(asset.name)
+        Column({ space: 5 }) { Text(displayName(asset.name))
           .fontSize(16)
           .fontColor(Theme.ink); ContextRow({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)], text: asset.location || '存放位置待补充' }) }.layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
@@ -481,57 +449,82 @@ export struct ProjectDetail {
     }, (m: TeamMember) => m.id)
     if (!this.state.team.some((m: TeamMember) => m.projectId === this.project.id)) { Text('记录毛娘、妆娘、摄影、后勤和后期的人选。').fontColor(Theme.muted).fontSize(13) }
   }
+  private nextActionLabel(): string {
+    const readiness = this.state.readiness(this.project.id);
+    if (readiness.hint?.label === '日程') { return '安排日期'; }
+    if (readiness.prep.next || readiness.prep.waiting || readiness.equipment.unavailable.length || !readiness.prep.total) { return '查看准备'; }
+    return '确认打包';
+  }
+  private nextAction(): void {
+    if (this.nextActionLabel() === '安排日期') { this.edit('project', this.project.id, ''); }
+    else { this.route.section = this.nextActionLabel() === '确认打包' ? 2 : 1; }
+  }
   @Builder overview() {
-    Column({ space: 14 }) {
-      if (![ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status)) { ContextRow({ label: this.state.readiness(this.project.id).hint?.label || '准备', text: this.state.readiness(this.project.id).hint?.text || '当前没有准备卡点', prominent: true }) }
-      Row({ space: 8 }) {
-        Button() {
-          Column({ space: 4 }) {
-            Text('花费 ¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2)).fontSize(17).fontColor(Theme.ink)
-            Text(budgetLabel(this.project.budgetConfigured, this.project.budgetCents)).fontSize(13).fontColor(Theme.muted)
-          }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
-        }.id('project-money-open').layoutWeight(1).constraintSize({ minHeight: 64 }).type(ButtonType.Normal)
-          .backgroundColor(Theme.surface).borderRadius(16).onClick((): void => { this.open('expenseStats', this.project.id); })
-          .accessibilityText('查看本计划花费统计，已记录支出 ' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2) + ' 元')
-        Button() {
-          Column({ space: 4 }) {
-            ContextRow({ label: '团队', text: (this.state.projectWork(this.project.id)?.value.credits.length || 0) + ' 人', prominent: true })
-            Text('查看 / 编辑分工').fontSize(13).fontColor(Theme.muted)
-          }.width('100%').alignItems(HorizontalAlign.Start).padding(12)
-        }.id('project-team-open').layoutWeight(1).constraintSize({ minHeight: 64 }).type(ButtonType.Normal)
-          .backgroundColor(Theme.surface).borderRadius(16).onClick((): void => { this.route.contextSheet = 'team'; })
-          .accessibilityText('查看团队并编辑分工')
-      }.width('100%').alignItems(VerticalAlign.Top)
-      if ([ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status) && this.state.projectWork(this.project.id)) { WorkCard({ work: this.state.projectWork(this.project.id)!, hint: '双击查看本计划照片', open: (): void => { this.route.section = 3; } }) }
-      Button() { ContextRow({ label: '角色', text: displayName(this.state.characterName(this.project.characterId) + (this.project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在') : '')) }) }.type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('character', this.project.characterId); })
-      Row({ space: 8 }) {
-        Button('改日期 / 关联活动').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('project', this.project.id, ''); })
-        Button('记一笔').constraintSize({ minHeight: 48 }).onClick((): void => { this.edit('expense', '', this.project.id); })
-      }.width('100%')
-      Button() {
-        Row({ space: 8 }) {
-          ContextRow({ label: '准备', text: this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total + ' 项完成' }).layoutWeight(1)
-          if (this.state.readiness(this.project.id).prep.waiting) { StatusPill({ label: '在途 ' + this.state.readiness(this.project.id).prep.waiting }) }
-        }.width('100%')
-      }.type(ButtonType.Normal).backgroundColor(Color.Transparent).width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 1; })
-      Button() { ContextRow({ label: '打包', text: this.state.readiness(this.project.id).pack.packed + ' / ' + this.state.readiness(this.project.id).pack.total + ' 件确认' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 2; })
-      Text(this.state.readiness(this.project.id).equipment.total ? '装备可用 ' + this.state.readiness(this.project.id).equipment.available + ' / ' + this.state.readiness(this.project.id).equipment.total + ' 件' : '尚未关联装备').fontSize(15).fontColor(Theme.muted)
-      ForEach(this.state.readiness(this.project.id).equipment.unavailable.slice(0, 1), (asset: Asset) => {
-        Button() { ContextRow({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)], text: displayName(asset.name) }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('asset', asset.id); })
-      }, (asset: Asset) => asset.id)
-      if (this.state.readiness(this.project.id).equipment.unavailable.length > 0) {
-        Button() { ContextRow({ label: '装备问题', text: this.state.readiness(this.project.id).equipment.unavailable.length + ' 件' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).id('project-equipment-issues').width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.section = 1; })
+    Column({ space: 18 }) {
+      if (![ProjectStatus.COMPLETED, ProjectStatus.ARCHIVED].includes(this.project.status)) {
+        Column({ space: 12 }) {
+          StatusPill({ label: this.state.readiness(this.project.id).hint?.label || '下一步' })
+          Text(displayName(this.state.readiness(this.project.id).hint?.text || this.state.readiness(this.project.id).pack.pending[0]?.label || '继续整理这份计划'))
+            .fontSize(24).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(2)
+          Button(this.nextActionLabel()).width('100%').height(52).backgroundColor(Theme.brand).fontColor(Theme.onAccent)
+            .onClick((): void => { this.nextAction(); })
+        }.padding(20).width('100%').alignItems(HorizontalAlign.Start).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+      } else if (this.state.projectWork(this.project.id)) {
+        WorkCard({ work: this.state.projectWork(this.project.id)!, hint: '双击查看本计划照片', open: (): void => { this.route.section = 3; } })
       }
-      Button() { ContextRow({ label: '参考图', text: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id).length + ' 张' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).width('100%').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'references'; })
-      this.entryLink()
-      Button() { ContextRow({ label: '计划记录', text: this.state.projectDiary(this.project.id).length + ' 条' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).id('project-records-open').width('100%').constraintSize({ minHeight: 48 })
-        .onClick((): void => { this.route.contextSheet = 'records'; })
-      if (this.project.notes) { Text(this.project.notes).fontSize(15).fontColor(Theme.muted) }
+      Row({ space: 12 }) {
+        Button() {
+          Column({ space: 8 }) {
+            Text(this.state.readiness(this.project.id).prep.done + ' / ' + this.state.readiness(this.project.id).prep.total).fontSize(25).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+            Text('准备完成').fontSize(13).fontColor(Theme.muted)
+          }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
+        }.type(ButtonType.Normal).layoutWeight(1).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).onClick((): void => { this.route.section = 1; }).accessibilityText('查看准备任务')
+        Button() {
+          Column({ space: 8 }) {
+            Text(this.state.readiness(this.project.id).pack.packed + ' / ' + this.state.readiness(this.project.id).pack.total).fontSize(25).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+            Text('打包确认').fontSize(13).fontColor(Theme.muted)
+          }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
+        }.type(ButtonType.Normal).layoutWeight(1).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).onClick((): void => { this.route.section = 2; }).accessibilityText('查看打包清单')
+      }.width('100%')
+      Column() {
+        DetailLink({ title: '花费', value: '¥' + (this.state.readiness(this.project.id).money.spentCents / 100).toFixed(2), subtitle: budgetLabel(this.project.budgetConfigured, this.project.budgetCents), icon: Icons.plan,
+          componentId: 'project-money-open', action: (): void => { this.open('expenseStats', this.project.id); } })
+        Divider().color(Theme.line)
+        DetailLink({ title: '记一笔', icon: Icons.add, action: (): void => { this.edit('expense', '', this.project.id); } })
+        if (this.state.readiness(this.project.id).equipment.unavailable.length) {
+          Divider().color(Theme.line)
+          DetailLink({ title: '装备问题', value: this.state.readiness(this.project.id).equipment.unavailable.length + ' 件', icon: Icons.library,
+            componentId: 'project-equipment-issues', action: (): void => { this.route.section = 1; } })
+        }
+      }.width('100%').padding({ left: 16, right: 16 }).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+      SectionHeading({ title: '关联资料' })
+      Column() {
+        DetailLink({ title: displayName(this.state.characterName(this.project.characterId)), subtitle: this.project.variantId ? this.state.variants.find((variant) => variant.id === this.project.variantId)?.name || '版本已不存在' : '',
+          icon: Icons.profile, action: (): void => { this.open('character', this.project.characterId); } })
+        if (this.project.eventId) {
+          Divider().color(Theme.line)
+          DetailLink({ title: displayName(this.state.events.find((event: CosEvent) => event.id === this.project.eventId)?.name || '活动已不存在'), icon: Icons.event,
+            action: (): void => { this.open('event', this.project.eventId); } })
+        }
+        Divider().color(Theme.line)
+        DetailLink({ title: '日期与活动', subtitle: this.state.readiness(this.project.id).date || '日期待定', icon: Icons.event, action: (): void => { this.edit('project', this.project.id, ''); } })
+        Divider().color(Theme.line)
+        DetailLink({ title: '团队分工', value: (this.state.projectWork(this.project.id)?.value.credits.length || 0) + ' 人', icon: Icons.profile,
+          componentId: 'project-team-open', action: (): void => { this.route.contextSheet = 'team'; } })
+        Divider().color(Theme.line)
+        DetailLink({ title: '参考图', value: this.state.references.filter((image: ReferenceImage) => image.projectId === this.project.id).length + ' 张', icon: Icons.importPhoto, action: (): void => { this.route.contextSheet = 'references'; } })
+        Divider().color(Theme.line)
+        this.entryLink()
+        Divider().color(Theme.line)
+        DetailLink({ title: '计划记录', value: this.state.projectDiary(this.project.id).length + ' 条', icon: Icons.plan,
+          componentId: 'project-records-open', action: (): void => { this.route.contextSheet = 'records'; } })
+      }.width('100%').padding({ left: 16, right: 16 }).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+      if (this.project.notes) { Text(this.project.notes).fontSize(15).fontColor(Theme.muted).padding(16).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius) }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
-
   @Builder entryLink() {
-    Button() { ContextRow({ label: '收录', text: this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条' }) }.type(ButtonType.Normal).id('project-entry-link').width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).constraintSize({ minHeight: 48 }).onClick((): void => { this.route.contextSheet = 'entries'; })
+    DetailLink({ title: '收录', value: this.state.entries.filter((entry) => entry.scopeKind === 'project' && entry.scopeId === this.project.id).length + ' 条', icon: Icons.library,
+      componentId: 'project-entry-link', action: (): void => { this.route.contextSheet = 'entries'; } })
   }
 
   @Builder packing() {
@@ -555,7 +548,7 @@ export struct ProjectDetail {
       Row({ space: 12 }) {
         if (this.state.hand() === 'left') { this.checkButton(item) }
         Column({ space: 6 }) {
-          Text(item.label)
+          Text(displayName(item.label))
             .fontSize(this.route.outing ? 20 : 16)
             .fontColor(item.done ? Theme.muted : Theme.ink)
             .decoration({ type: item.done ? TextDecorationType.LineThrough : TextDecorationType.None })
@@ -593,7 +586,7 @@ export struct ProjectDetail {
           if (this.route.section === 0) { this.overview() } else if (this.route.section === 2) { this.packing() } else { this.preparationList(); this.equipmentList() }
         }.width('100%').alignItems(HorizontalAlign.Start)
           .opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })
-        Blank().height(Theme.contentBottom).width('100%')
+        Blank().height(Theme.detailFloatingBottom).width('100%')
       }.
     constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start).padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%')
     }.id(this.route.section === 2 ? 'project-packing' : this.route.section === 0 ? 'project-overview' : 'project-preparation')

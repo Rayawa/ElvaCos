@@ -17,8 +17,8 @@ export class SystemCapability {
   static grip(): boolean { return canIUse('SystemCapability.MultimodalAwareness.Motion'); }
   static share(): boolean { return canIUse('SystemCapability.Collaboration.SystemShare'); }
   // Dashboard.ets / AppDetailPage.ets titleBar style, with title, segment, menu and back action injected by the caller.
-  // avoidSafeArea 与 Dashboard 保持一致默认 false：HDS 自己已经避让状态栏，
-  // 额外开启会让标题栏再下移一个状态栏高度（二级页面标题被推入内容区的原因）。
+  // 全局详情的父容器已避让状态栏，默认 false；日程栈与根页扩展了顶部，须传 true。
+  // 目的地不要再次扩展 TOP，否则标题与内容对状态栏高度的计算会错位。
   static titleBar(title: ResourceStr, enabled: boolean, level: number = 1, segment?: CustomBuilder, menus: HdsNavigationMenuItemOptions[] = [], avoidSafeArea: boolean = false, backAction?: () => void): HdsNavigationTitleBarOptions {
     menus.forEach((menu: HdsNavigationMenuItemOptions): void => {
       if (menu.content && !menu.content.componentId && typeof menu.content.label === 'string') {
