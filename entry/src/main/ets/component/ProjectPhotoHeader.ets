@@ -1,3 +1,4 @@
+import { ContextRow } from './ContextRow';
 import { AppState } from '../model/ApplicationState';
 import { ProjectRoute } from '../model/ProjectRoute';
 import { ProjectShot } from '../model/Shot';
@@ -76,21 +77,21 @@ export struct ProjectPhotoHeader {
   @Builder sheet() {
     Column({ space: 14 }) {
       SheetHeader({ title: '拍摄清单', hint: this.state.projectName(this.route.id), haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => { this.close(); } })
-      Text('已拍 ' + this.state.readiness(this.route.id).shots.done + ' / ' + this.state.readiness(this.route.id).shots.total + ' 项 · 不计入准备进度').fontSize(15).fontColor(Theme.muted)
+      ContextRow({ label: '已拍', text: this.state.readiness(this.route.id).shots.done + ' / ' + this.state.readiness(this.route.id).shots.total + ' 项' })
       Button('添加拍摄事项').constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable()).onClick((): void => { this.startEdit(''); })
       if (this.actionError || this.state.error) { Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger) }
       Scroll(this.scroller) {
         Column({ space: 12 }) {
           ForEach(this.items(), (shot: ProjectShot) => {
             Column({ space: 8 }) {
-              Button((shot.done ? '✓ 已拍 · ' : '拍摄后勾选 · ') + shot.title).constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable())
+              Button() { ContextRow({ label: shot.done ? '已拍' : '待拍', text: shot.title, prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable())
                 .backgroundColor(shot.done ? Theme.tint : Theme.surface).fontColor(Theme.ink).id('shot-row:' + shot.id).focusable(true)
                 .onClick((): void => { void this.toggle(shot); }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
               if (this.reference(shot)) {
                 Button() {
                   Row({ space: 10 }) {
                     if (this.reference(shot)?.thumbnailPath) { ManagedImage({ sourcePath: this.reference(shot)?.thumbnailPath || '', label: '拍摄参考图' }).width(64).height(64) }
-                    Text('查看参考图 · ' + (this.reference(shot)?.caption || '无说明')).fontSize(14).fontColor(Theme.accent).layoutWeight(1)
+                    ContextRow({ label: '参考图', text: this.reference(shot)?.caption || '无说明' }).layoutWeight(1)
                   }.width('100%')
                 }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).onClick((): void => { this.startReference(shot.referenceId); })
               }
@@ -114,7 +115,7 @@ export struct ProjectPhotoHeader {
       Text('本计划照片 ' + this.state.readiness(this.route.id).photos.total + ' 张').fontSize(14).fontColor(Theme.muted)
       Button('在相册查看本计划').width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
         .onClick((): void => { this.openAlbum(); })
-      Button('拍摄清单 · 已拍 ' + this.state.readiness(this.route.id).shots.done + ' / ' + this.state.readiness(this.route.id).shots.total + ' 项').width('100%').constraintSize({ minHeight: 48 }).id('project-shots-open')
+      Button() { ContextRow({ label: '拍摄清单', text: '已拍 ' + this.state.readiness(this.route.id).shots.done + ' / ' + this.state.readiness(this.route.id).shots.total + ' 项' }) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).id('project-shots-open')
         .onClick((): void => { this.actionError = ''; this.route.shotsOpen = true; })
     }.width('100%').alignItems(HorizontalAlign.Start)
       .bindSheet(this.route.shotsOpen, this.sheet(), this.options())

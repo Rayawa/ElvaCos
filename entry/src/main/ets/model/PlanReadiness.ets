@@ -47,6 +47,11 @@ export class PhotoReadiness {
   byStage: number[] = [0, 0, 0, 0, 0, 0];
   get total(): number { return this.byStage.reduce((sum: number, count: number) => sum + count, 0); }
 }
+export class ReadinessHint {
+  label: string;
+  text: string;
+  constructor(label: string, text: string) { this.label = label; this.text = text; }
+}
 export class PlanReadiness {
   id: string = '';
   date: string = '';
@@ -58,7 +63,7 @@ export class PlanReadiness {
   shots: ShotReadiness = new ShotReadiness();
   photos: PhotoReadiness = new PhotoReadiness();
   money: MoneyReadiness = new MoneyReadiness();
-  blockers: string[] = [];
+  hint?: ReadinessHint;
 }
 export function isWaiting(task: PreparationTask): boolean { return !task.done && Boolean(task.waitingOn || task.waitingUntil); }
 export function budgetLabel(configured: boolean | undefined, cents: number): string {
@@ -106,8 +111,9 @@ export function buildPlanReadiness(project: CosProject, tasks: PreparationTask[]
   result.photos.byStage = photoStageCounts(photos.filter((photo: PhotoAsset) => photo.projectId === project.id));
   result.money.spentCents = expenses.filter((expense: Expense) => expense.projectId === project.id).reduce((sum: number, expense: Expense) => sum + expense.amountCents, 0);
   result.money.budgetCents = project.budgetCents; result.money.budgetConfigured = project.budgetConfigured;
-  result.blockers = result.prep.waitingItems.map((task: PreparationTask) => task.label + ' · ' + (task.waitingOn || '等待至 ' + task.waitingUntil));
-  result.blockers = result.blockers.concat(result.equipment.unavailable.map((asset: Asset) => asset.name + ' · 装备暂不可用'));
-  if (!result.date) { result.blockers.push('日期待定'); }
+  if (result.prep.waitingItems.length) { result.hint = new ReadinessHint('在途', result.prep.waitingItems[0].label); }
+  else if (result.equipment.unavailable.length) { result.hint = new ReadinessHint('装备不可用', result.equipment.unavailable[0].name); }
+  else if (!result.date) { result.hint = new ReadinessHint('日程', '日期待定'); }
+  else if (result.prep.next) { result.hint = new ReadinessHint('下一项', result.prep.next.label); }
   return result;
 }

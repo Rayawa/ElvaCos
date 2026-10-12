@@ -127,7 +127,7 @@ export class EditDraft {
       if (event) { d.eventId = event.id; d.date = event.date; }
       if (!id && variant) { d.variantId = variant; d.advanced = true; }
       d.newCharacter = !d.characterId; d.status = ProjectStatus.PREPARING;
-      d.name = d.characterId ? state.characterName(d.characterId) + ' · 计划' : '';
+      d.name = d.characterId ? state.characterName(d.characterId) + '计划' : '';
       const p = state.projects.find((item: CosProject) => item.id === id);
       if (p) {
         d.name = p.name;

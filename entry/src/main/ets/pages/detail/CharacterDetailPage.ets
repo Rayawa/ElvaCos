@@ -1,3 +1,4 @@
+import { ContextRow } from '../../component/ContextRow';
 import { EntryCollectionView } from '../../component/EntryCollectionView';
 import { SheetHeader } from '../../component/SheetHeader';
 import { appSheetOptions } from '../../common/sheet';
@@ -44,7 +45,6 @@ export struct CharacterDetail {
   private works(): ProjectWork[] { return this.state.workCards.filter((work: ProjectWork) => work.value.characterId === this.character.id); }
   private validVersion(): boolean { return !this.route.variantId || this.variants().some((variant: CharacterVariant) => variant.id === this.route.variantId); }
   @Builder header() {
-    Text(this.character.name).fontSize(21).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
     if (this.character.workName) { Text(this.character.workName).fontSize(15).fontColor(Theme.muted) }
     Select(new Array<SelectOption>({ value: '不指定版本' }).concat(this.variants().map((variant: CharacterVariant): SelectOption => { return { value: variant.name }; })))
       .value(this.route.variantId ? this.variants().find((variant: CharacterVariant) => variant.id === this.route.variantId)?.name || '版本已不存在' : '不指定版本')
@@ -75,7 +75,7 @@ export struct CharacterDetail {
       }.width('100%').alignItems(HorizontalAlign.Start).padding(16).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (variant: CharacterVariant) => variant.id)
     if (!this.variants().length) { Text('可选：添加服装或造型版本，下次创建计划时复用。').fontSize(14).fontColor(Theme.muted) }
-    Button('收录 · ' + this.state.entries.filter((entry) => entry.scopeKind === 'character' && entry.scopeId === this.character.id).length + ' 条').width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).id('character-entry-link').onClick((): void => { this.route.entriesOpen = true; })
+    Button() { ContextRow({ label: '收录', text: this.state.entries.filter((entry) => entry.scopeKind === 'character' && entry.scopeId === this.character.id).length + ' 条' }) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).id('character-entry-link').onClick((): void => { this.route.entriesOpen = true; })
   }
   @Builder history() {
     SectionHeading({ title: '角色履历', trailing: this.works().length + ' 份计划' })

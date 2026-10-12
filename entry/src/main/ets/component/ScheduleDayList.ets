@@ -1,3 +1,5 @@
+import { displayName } from '../common/format';
+import { ContextRow } from './ContextRow';
 import { AppState } from '../model/ApplicationState';
 import { CosEvent } from '../model/Entities';
 import { ScheduleTaskItem, scheduleTaskRoute } from '../model/ScheduleView';
@@ -25,14 +27,13 @@ export struct ScheduleDayList {
   }
   build() {
     Column({ space: 14 }) {
-      SectionHeading({ title: this.date, trailing: this.events.length + ' 场活动 · ' + this.tasks.length + ' 项截止任务' })
+      SectionHeading({ title: this.date, trailing: this.events.length + ' 场活动，' + this.tasks.length + ' 项截止任务' })
       if (this.taskError) { Text(this.taskError).id('schedule-task-error').fontSize(16).fontColor(Theme.accent).accessibilityText(this.taskError) }
       ForEach(this.events, (event: CosEvent) => {
         Button() {
           Column({ space: 6 }) {
-            Text('活动 · ' + event.name).fontSize(17).fontColor(Theme.ink)
-            Text(event.eventType + ' · ' + eventDateLabel(event)).fontSize(14).fontColor(Theme.muted)
-            Text(eventTimeLabel(event) + ' · ' + (event.venue || event.city || '地点待定')).fontSize(14).fontColor(Theme.muted)
+            ContextRow({ label: event.eventType || '活动', text: displayName(event.name), prominent: true })
+            Text(eventTimeLabel(event) + '，' + (event.venue || event.city || '地点待定')).fontSize(14).fontColor(Theme.muted)
           }.width('100%').alignItems(HorizontalAlign.Start).padding(16)
         }.id('schedule-event:' + event.id).width('100%').type(ButtonType.Normal).constraintSize({ minHeight: 48 })
           .backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).onClick((): void => { this.open('event', event.id); })
@@ -46,9 +47,8 @@ export struct ScheduleDayList {
             .accessibilityText(item.task.label + (item.task.done ? '，已完成，取消完成' : '，未完成，标记完成'))
           Button() {
             Column({ space: 6 }) {
-              Text('准备任务 · ' + item.task.label).fontSize(16).fontColor(item.task.done ? Theme.muted : Theme.ink)
-                .decoration({ type: item.task.done ? TextDecorationType.LineThrough : TextDecorationType.None })
-              Text(item.projectName + ' · 截止 ' + item.task.dueDate + (item.task.done ? ' · 已完成' : item.waiting ? ' · 在途，不计逾期' : item.overdue ? ' · 逾期' : '')).fontSize(14).fontColor(Theme.muted)
+              ContextRow({ label: item.task.done ? '已完成' : item.waiting ? '在途' : item.overdue ? '逾期' : '准备任务', text: item.task.label, prominent: true })
+              Text(displayName(item.projectName) + '，截止 ' + item.task.dueDate).fontSize(14).fontColor(Theme.muted)
             }.width('100%').alignItems(HorizontalAlign.Start)
           }.layoutWeight(1).type(ButtonType.Normal).constraintSize({ minHeight: 48 }).fontColor(Theme.ink).backgroundColor(Theme.surface)
             .onClick((): void => { this.openTask(scheduleTaskRoute(item)); }).accessibilityText('打开准备任务 ' + item.task.label + '，所属计划 ' + item.projectName)

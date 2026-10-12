@@ -1,3 +1,4 @@
+import { ContextRow } from '../../component/ContextRow';
 import { HdsNavigationMenuItemOptions } from '@kit.UIDesignKit';
 import { APP_LOG, READING_MAX_WIDTH } from '../../common/constants';
 import { ReleaseNote, ReleaseType } from '../../common/types';
@@ -87,8 +88,7 @@ export struct AppLogPage {
             .accessibilityText('正式发布版本')
         }
       }.width('100%')
-      Text(release.date + ' · 构建号 ' + release.buildNumber)
-        .fontSize(13).fontColor(Theme.muted).width('100%')
+      ContextRow({ label: '构建 ' + release.buildNumber, text: release.date })
         .accessibilityText(release.date + '，构建号 ' + release.buildNumber)
       ForEach(release.changes, (change: string) => {
         Row({ space: 5 }) {

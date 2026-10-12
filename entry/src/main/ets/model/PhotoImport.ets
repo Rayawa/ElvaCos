@@ -32,7 +32,7 @@ export class PhotoImportJob {
   cancel(): void { if (this.phase === 'importing') { this.stopRequested = true; } }
   clear(): void { if (this.phase !== 'importing' && this.phase !== 'picking') { this.phase = 'idle'; this.failures = []; } }
   summary(): string {
-    return '成功 ' + this.succeeded + ' 张 · 跳过重复 ' + this.skipped + ' 张 · 失败 ' + this.failures.length + ' 张' + (this.cancelled ? ' · 未处理 ' + this.cancelled + ' 张' : '');
+    return '成功 ' + this.succeeded + ' 张，跳过重复 ' + this.skipped + ' 张，失败 ' + this.failures.length + ' 张' + (this.cancelled ? '，未处理 ' + this.cancelled + ' 张' : '');
   }
   async run(uris: string[], ports: PhotoImportPorts): Promise<void> {
     this.phase = 'importing'; this.total = uris.length;

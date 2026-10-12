@@ -1,3 +1,4 @@
+import { ContextRow } from './ContextRow';
 import { ReferenceImage } from '../model/Planning';
 import { shotReferences } from '../model/Shot';
 import { today } from '../common/format';
@@ -161,23 +162,23 @@ export struct FormEditor {
               .onSelect((index: number) => {
                 vibration.dotVibration();
                 const previous = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId);
-                const automatic = !this.draft.name || this.draft.name === previous + ' · 计划';
+                const automatic = !this.draft.name || this.draft.name === previous + '计划' || this.draft.name === previous + ' · 计划';
                 this.draft.newCharacter = !this.draft.id && index === 0; this.draft.characterId = this.draft.newCharacter ? '' : this.state.characters[index - (this.draft.id ? 0 : 1)].id; this.draft.variantId = '';
-                if (automatic && !this.draft.id) { const role = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId); this.draft.name = role ? role + ' · 计划' : ''; }
+                if (automatic && !this.draft.id) { const role = this.draft.newCharacter ? this.draft.characterName : this.state.characterName(this.draft.characterId); this.draft.name = role ? role + '计划' : ''; }
               }).accessibilityText('计划角色').visualEffect(this.feedback.effect('select-1')).compositingFilter(this.feedback.filter('select-1')).attributeModifier(this.feedback.control('select-1'))
               .id('form-input:characterId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => { this.fieldArea('characterId', area); })
             this.fieldIssue('characterId')
             if (this.draft.newCharacter) {
               Field({ componentId: 'form-input:characterName', error: this.issue('characterName'), area: (area: Area): void => { this.fieldArea('characterName', area); }, focused: (): void => { this.focus('characterName'); }, label: '角色名称 *', value: this.draft.characterName, placeholder: '例如：初音未来', change: (v: string) => {
-                const automatic = !this.draft.name || this.draft.name === this.draft.characterName + ' · 计划';
-                this.draft.characterName = v; if (automatic) { this.draft.name = v ? v + ' · 计划' : ''; }
+                const automatic = !this.draft.name || this.draft.name === this.draft.characterName + '计划' || this.draft.name === this.draft.characterName + ' · 计划';
+                this.draft.characterName = v; if (automatic) { this.draft.name = v ? v + '计划' : ''; }
               } })
               Field({ componentId: 'form-input:work', error: this.issue('work'), area: (area: Area): void => { this.fieldArea('work', area); }, focused: (): void => { this.focus('work'); }, label: '所属作品（可选）', value: this.draft.work, change: (v: string) => { this.draft.work = v; } })
             }
             Field({ componentId: 'form-input:name', error: this.issue('name'), area: (area: Area): void => { this.fieldArea('name', area); }, focused: (): void => { this.focus('name'); },
               label: '计划名称 *',
               value: this.draft.name,
-              placeholder: '例如：初音未来 · 秋日漫展',
+              placeholder: '例如：初音未来秋日漫展',
               change: (v: string) => { this.draft.name = v; }
             })
             DateField({ componentId: 'form-input:date', error: this.issue('date'), area: (area: Area): void => { this.fieldArea('date', area); }, label: '目标日期（可选）',
@@ -186,7 +187,7 @@ export struct FormEditor {
               change: (v: string) => { this.draft.date = v; }
             })
             if (!this.draft.id) {
-              Button(this.draft.preparationExpanded ? '收起准备模板' : '准备模板 · 已选 ' + this.draft.preparationKeys.length + ' 项')
+              Button() { ContextRow({ label: this.draft.preparationExpanded ? '收起模板' : '准备模板', text: '已选 ' + this.draft.preparationKeys.length + ' 项' }) }.type(ButtonType.Normal)
                 .accessibilityText(this.draft.preparationExpanded ? '收起准备模板' : '展开准备模板，已选择 ' + this.draft.preparationKeys.length + ' 项')
                 .backgroundColor(Theme.tint)
                 .fontColor(Theme.accent)
@@ -200,7 +201,7 @@ export struct FormEditor {
                   change: (keys: string[], mode: number): void => { this.draft.preparationKeys = keys; this.draft.preparationMode = mode; }
                 }) }
             }
-            Button(this.draft.advanced ? '收起更多设置' : '更多设置 · 版本、活动、拍摄、预算')
+            Button() { ContextRow({ label: this.draft.advanced ? '收起设置' : '更多设置', text: '版本、活动、拍摄、预算' }) }.type(ButtonType.Normal)
               .id('form-project-more').accessibilityText(this.draft.advanced ? '收起更多设置' : '展开角色版本、活动、拍摄时间与预算设置')
               .backgroundColor(Theme.tint)
               .fontColor(Theme.accent)
@@ -431,7 +432,7 @@ export struct FormEditor {
           }
           if (this.draft.kind === 'shot') {
             Text('参考图（可选）').fontSize(14).fontColor(Theme.muted)
-            Select(new Array<SelectOption>({ value: '不关联参考图' }).concat(this.references().map((reference: ReferenceImage): SelectOption => { return { value: (reference.caption || '参考图') + (reference.projectId ? ' · 此计划' : ' · 此角色') }; })))
+            Select(new Array<SelectOption>({ value: '不关联参考图' }).concat(this.references().map((reference: ReferenceImage): SelectOption => { return { value: (reference.caption || '参考图') + (reference.projectId ? '（此计划）' : '（此角色）') }; })))
               .value(this.draft.referenceId ? (this.references().find((reference: ReferenceImage) => reference.id === this.draft.referenceId)?.caption || (this.references().some((reference: ReferenceImage) => reference.id === this.draft.referenceId) ? '参考图' : '参考图已不存在，请重新选择')) : '不关联参考图')
               .constraintSize({ minHeight: 48 }).id('form-input:referenceId').accessibilityText('拍摄参考图')
               .onSelect((index: number): void => { this.draft.referenceId = index === 0 ? '' : this.references()[index - 1].id; })

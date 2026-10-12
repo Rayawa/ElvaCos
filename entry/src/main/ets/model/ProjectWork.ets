@@ -23,7 +23,7 @@ export function buildProjectWork(project: CosProject, readiness: PlanReadiness, 
     .sort((a: PhotoAsset, b: PhotoAsset) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))[0];
   const credits = team.filter((member: TeamMember) => member.projectId === project.id)
     .sort((a: TeamMember, b: TeamMember) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    .map((member: TeamMember) => member.role + ' · ' + member.name);
+    .map((member: TeamMember) => member.role + '：' + member.name);
   const value: ProjectShareObject = {
     schemaVersion: 2, kind: 'cos-project', projectId: project.id, characterId: project.characterId, name: project.name,
     character: character?.name || '角色已不存在', work: character?.workName || '',
@@ -49,5 +49,5 @@ export function recentWork(works: ProjectWork[], date: string): ProjectWork | un
   return workHistory(works.filter((work: ProjectWork) => work.completed || work.value.finalCount > 0 && (!work.value.date || work.value.date <= date)))[0];
 }
 export function projectShareText(value: ProjectShareObject): string {
-  return value.character + ' / ' + value.variant + ' · ' + value.name + '\n状态：' + value.status + '\n场次：' + value.event + '\n日期：' + (value.date || '日期待定') + (value.dateFromEvent ? '（来自活动）' : '') + '\n成片：' + value.finalCount + ' 张\n已记录支出：¥' + (value.spentCents / 100).toFixed(2) + '\n团队署名：' + (value.credits.join('；') || '未记录') + '\n衣柜复用：' + value.reusedEquipmentCount + ' 件（资料原值 ¥' + (value.equipmentValueCents / 100).toFixed(2) + '，未计入支出）';
+  return value.character + ' / ' + value.variant + '，' + value.name + '\n状态：' + value.status + '\n场次：' + value.event + '\n日期：' + (value.date || '日期待定') + (value.dateFromEvent ? '（来自活动）' : '') + '\n成片：' + value.finalCount + ' 张\n已记录支出：¥' + (value.spentCents / 100).toFixed(2) + '\n团队署名：' + (value.credits.join('；') || '未记录') + '\n衣柜复用：' + value.reusedEquipmentCount + ' 件（资料原值 ¥' + (value.equipmentValueCents / 100).toFixed(2) + '，未计入支出）';
 }

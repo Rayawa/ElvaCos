@@ -1,3 +1,5 @@
+import { ContextRow } from '../../component/ContextRow';
+import { StatusPill } from '../../component/Surfaces';
 import { WorkCard } from '../../component/WorkCard';
 import { ProjectWork, recentWork } from '../../model/ProjectWork';
 import { AppState } from '../../model/ApplicationState';
@@ -7,7 +9,7 @@ import { CosProject, CosEvent } from '../../model/Entities';
 import { TaskQueueItem } from '../../model/TaskQueue';
 import { HomeTaskRow, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, homeTaskCapacity, visiblePreparationUndos } from '../../model/HomeSummary';
 import { nextPlan } from '../../model/Rules';
-import { daysUntil } from '../../common/format';
+import { daysUntil, displayName } from '../../common/format';
 import { eventEnd } from '../../model/Schedule';
 import { dayTitle } from '../../model/DayMode';
 import { SectionHeading, EmptyState } from '../../component/Surfaces';
@@ -45,7 +47,7 @@ export struct HomePage {
   get rows(): HomeTaskRow[] {
     return reconcileHomeRows(this.snapshot, this.state.taskQueue,
       visiblePreparationUndos(this.state.preparationUndos, this.state.preparationTasks, this.state.projects, this.state.clockTime, this.state.busy || !!this.state.staleScopes.length), this.state.clockTime)
-      .slice(0, homeTaskCapacity(this.viewportHeight, this.topInset, this.bottomInset, this.nextHeight, this.recentHeight, this.rowHeight));
+      .slice(0, Math.min(2, homeTaskCapacity(this.viewportHeight, this.topInset, this.bottomInset, this.nextHeight, this.recentHeight, this.rowHeight)));
   }
   @Computed
   get upcoming(): CosProject | undefined { return nextPlan(this.state.projects, this.state.events, this.state.localDate); }
@@ -56,8 +58,14 @@ export struct HomePage {
   private planDateLabel(project: CosProject): string {
     const readiness = this.state.readiness(project.id);
     if (!readiness.date) { return '日期待定'; }
+    return readiness.date;
+  }
+  private planDateContext(project: CosProject): string {
+    const readiness = this.state.readiness(project.id);
+    if (!readiness.date) { return ''; }
+    if (readiness.dateFromEvent) { return '活动日期'; }
     const days = daysUntil(readiness.date);
-    return readiness.date + (readiness.dateFromEvent ? ' · 来自活动' : '') + (days > 0 ? ' · 还有 ' + days + ' 天' : days === 0 ? ' · 今天' : ' · 日期已过');
+    return days > 0 ? days + ' 天后' : days === 0 ? '今天' : '日期已过';
   }
   private versionLabel(project: CosProject): string {
     return this.state.characterName(project.characterId) + (project.variantId ? ' / ' + (this.state.variants.find((variant) => variant.id === project.variantId)?.name || '版本已不存在') : '');
@@ -79,16 +87,17 @@ export struct HomePage {
         if (this.state.characters.find((character) => character.id === project.characterId)?.cover) {
           ManagedImage({ sourcePath: this.state.characters.find((character) => character.id === project.characterId)?.cover || '', label: this.versionLabel(project) + '封面' }).width(64).height(80).borderRadius(12)
         } else { Text(this.state.characterName(project.characterId).slice(0, 1)).width(64).height(80).textAlign(TextAlign.Center).fontSize(28).fontColor(Theme.accent).backgroundColor(Theme.tint).borderRadius(12).accessibilityLevel('no') }
-        Column({ space: 3 }) {
-          Text(project.name).fontSize(18).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
-          Text(this.versionLabel(project)).fontSize(14).fontColor(Theme.muted)
-          Text(this.planDateLabel(project)).id('home-plan-date').fontSize(14).fontColor(Theme.muted)
-          Text(this.state.readiness(project.id).prep.total ? '准备 ' + this.state.readiness(project.id).prep.done + ' / ' + this.state.readiness(project.id).prep.total : '尚未添加准备任务').fontSize(14).fontColor(Theme.muted)
-          if (this.state.readiness(project.id).blockers.length || this.state.readiness(project.id).prep.next) {
-            Text(this.state.readiness(project.id).blockers[0] || '下一项 · ' + (this.state.readiness(project.id).prep.next?.label || '')).fontSize(14).fontColor(Theme.accent)
+        Column({ space: 8 }) {
+          Text(displayName(project.name)).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Row({ space: 8 }) {
+            if (this.planDateContext(project)) { StatusPill({ label: this.planDateContext(project) }) }
+            Text(this.planDateLabel(project)).id('home-plan-date').fontSize(14).fontColor(Theme.muted)
+          }
+          if (this.state.readiness(project.id).hint) {
+            ContextRow({ label: this.state.readiness(project.id).hint!.label, text: displayName(this.state.readiness(project.id).hint!.text) })
           }
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      }.width('100%').padding(10)
+      }.width('100%').padding(16)
     }.id('home-next-plan').width('100%').type(ButtonType.Normal).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
       .onClick((): void => { this.open('project', project.id); }).accessibilityText('打开计划 ' + project.name + '，' + this.versionLabel(project) + '，' + this.planDateLabel(project))
   }
@@ -96,13 +105,13 @@ export struct HomePage {
     Column({ space: 8 }) {
       SectionHeading({ title: '接下来' })
       if (this.state.todayEvents.length) {
-        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? ' · 还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
+        Button(dayTitle(this.state.todayEvents[0], this.state.clockTime) + (this.state.todayEvents.length > 1 ? '，还有 ' + (this.state.todayEvents.length - 1) + ' 个' : ''))
           .id('home-day-entry').width('100%').constraintSize({ minHeight: 64 }).fontSize(18).fontColor(Theme.accent).backgroundColor(Theme.tint)
           .onClick((): void => { this.open('dayEvent', this.state.todayEvents[0]?.id || ''); })
       }
       if (this.upcoming) { this.planHero(this.upcoming!) }
       else if (!this.state.todayEvents.length && this.nextEvent()) {
-        Button((this.nextEvent()?.date || '') + ' · ' + (this.nextEvent()?.name || '')).width('100%').constraintSize({ minHeight: 48 })
+        Button(displayName(this.nextEvent()?.name || '')).width('100%').constraintSize({ minHeight: 48 })
           .onClick((): void => { this.open('event', this.nextEvent()?.id || ''); })
       } else if (!this.state.todayEvents.length) { Button('新建计划').constraintSize({ minHeight: 48 }).onClick((): void => { this.add('project', ''); }) }
     }.id('home-next').width('100%').alignItems(HorizontalAlign.Start)
@@ -122,8 +131,9 @@ export struct HomePage {
         }
         Button() {
           Column({ space: 3 }) {
-            Text((row.undo ? '已完成 · ' : row.item.kind === 'waiting' ? '在途 · ' : row.item.group === 'overdue' ? '逾期 · ' : '') + row.item.title).fontSize(16).fontColor(row.undo ? Theme.muted : Theme.ink)
-            Text(row.item.projectName + ' · ' + (row.undo ? this.state.staleScopes.length ? '已保存，显示待刷新' : '10 秒内可撤销' : row.item.detail)).fontSize(14).fontColor(Theme.muted)
+            ContextRow({ label: row.undo ? '已完成' : row.item.kind === 'waiting' ? '在途' : row.item.group === 'overdue' ? '逾期' : '待办', text: displayName(row.item.title), prominent: true })
+            Text(row.undo ? this.state.staleScopes.length ? '已保存，显示待刷新' : '10 秒内可撤销' : displayName(row.item.projectName)).fontSize(14).fontColor(Theme.muted)
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           }.width('100%').alignItems(HorizontalAlign.Start)
         }.id('home-task-open:' + row.item.focusId).layoutWeight(1).type(ButtonType.Normal).constraintSize({ minHeight: 48 }).backgroundColor(Theme.surface)
           .onClick((): void => { this.openTask(row.item); }).accessibilityText('打开事项 ' + row.item.title + '，所属计划 ' + row.item.projectName + (row.undo ? '，已完成' : '，' + row.item.detail))
@@ -135,35 +145,48 @@ export struct HomePage {
   }
   @Builder tasks() {
     Column() {
-      SectionHeading({ title: '在途与待办', trailing: '需要处理 ' + this.state.actionItems.length + ' 项' }).margin({ bottom: 8 })
+      Row({ space: 12 }) {
+        Text('在途与待办').fontSize(15).fontWeight(FontWeight.Medium).fontColor(Theme.muted).layoutWeight(1)
+        Button('全部待办 ' + this.state.taskQueue.length + ' 项').id('home-all-tasks').constraintSize({ minHeight: 48 }).fontSize(14)
+          .fontColor(Theme.muted).backgroundColor(Color.Transparent).onClick((): void => { this.open('tasks', 'all'); })
+      }.width('100%').margin({ bottom: 8 })
       if (this.taskError) { Text(this.taskError).id('home-task-error').fontSize(16).fontColor(Theme.accent).margin({ bottom: 8 }).accessibilityText(this.taskError) }
       ForEach(this.rows, (row: HomeTaskRow) => { this.taskRow(row) }, (row: HomeTaskRow) => row.key)
       if (!this.rows.some((row: HomeTaskRow) => !row.retired)) { Text('当前摘要已处理；未定期和其他事项可在全部待办查看。').fontSize(14).fontColor(Theme.muted).margin({ bottom: 8 }) }
-      Button('全部待办 ' + this.state.taskQueue.length + ' 项').id('home-all-tasks').width('100%').constraintSize({ minHeight: 48 }).fontSize(16).fontColor(Theme.accent).backgroundColor(Theme.tint).onClick((): void => { this.open('tasks', 'all'); })
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   @Builder recentSection() {
-    Column({ space: 8 }) {
-      Row({ space: 8 }) {
-        Text('最近').fontSize(15).fontWeight(FontWeight.Medium).fontColor(Theme.muted)
-        Button('搜索').id('home-search').constraintSize({ minWidth: 48, minHeight: 48 }).fontSize(14).fontColor(Theme.accent).backgroundColor(Theme.bg).onClick((): void => { this.open('search', 'all'); }).accessibilityText('打开全局搜索')
-        Button('本月已记录支出 ¥' + (this.state.monthSpendingCents / 100).toFixed(2) + ' · 花费统计').fontSize(14).layoutWeight(1).id('home-expenses').constraintSize({ minHeight: 48 }).fontColor(Theme.accent).backgroundColor(Theme.bg).onClick((): void => { this.open('expenseStats', 'all'); })
+    Column({ space: 12 }) {
+      Row({ space: 12 }) {
+        Text('最近').fontSize(15).fontWeight(FontWeight.Medium).fontColor(Theme.muted).layoutWeight(1)
+        Button('搜索').id('home-search').constraintSize({ minWidth: 48, minHeight: 48 }).fontSize(14).fontColor(Theme.muted)
+          .backgroundColor(Color.Transparent).onClick((): void => { this.open('search', 'all'); }).accessibilityText('打开全局搜索')
       }.width('100%')
       if (this.recent()) { WorkCard({ work: this.recent()!, compact: true, open: (): void => { this.open('project', this.recent()?.value.projectId || ''); } }) }
-      else { Text('完成一次计划或整理成片后，可以在这里回看。').fontSize(14).fontColor(Theme.muted) }
-      Row({ space: 8 }) {
-        Button('记一笔').layoutWeight(1).fontSize(16).constraintSize({ minHeight: 48 }).onClick((): void => { this.add('expense', ''); })
+      else { Text('完成计划或整理成片后，在这里回看。').fontSize(14).fontColor(Theme.muted) }
+      Row({ space: 12 }) {
+        Button('记一笔').layoutWeight(1).fontSize(16).constraintSize({ minHeight: 48 }).fontColor(Theme.ink).backgroundColor(Theme.surface)
+          .onClick((): void => { this.add('expense', ''); })
         Button() {
           Column({ space: 2 }) {
-            Text('收录一条').fontSize(16)
-            if (this.state.untriagedEntries.length) { Text('收录箱 · 未归位 ' + this.state.untriagedEntries.length).fontSize(14) }
-          }.padding({ top: 4, bottom: 4 })
-        }.id('home-inbox').layoutWeight(1).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
-        Button('角色库').layoutWeight(1).fontSize(16).constraintSize({ minHeight: 48 }).onClick((): void => { this.open('characters', 'all'); })
+            Text('收录一条').fontSize(16).fontColor(Theme.ink)
+            if (this.state.untriagedEntries.length) { Text('未归位 ' + this.state.untriagedEntries.length).fontSize(12).fontColor(Theme.muted) }
+          }.padding({ top: 6, bottom: 6 })
+        }.id('home-inbox').layoutWeight(1).constraintSize({ minHeight: 48 }).backgroundColor(Theme.surface)
+          .onClick((): void => { this.open('inbox', 'global'); })
       }.width('100%')
+      Button() {
+        Row({ space: 12 }) {
+          Text('本月已记录支出 ¥' + (this.state.monthSpendingCents / 100).toFixed(2)).fontSize(14).fontColor(Theme.muted).layoutWeight(1)
+          Text('花费统计 ›').fontSize(14).fontColor(Theme.muted)
+        }.width('100%')
+      }.id('home-expenses').width('100%').type(ButtonType.Normal).constraintSize({ minHeight: 48 }).backgroundColor(Color.Transparent)
+        .onClick((): void => { this.open('expenseStats', 'all'); })
+        .accessibilityText('本月已记录支出 ' + (this.state.monthSpendingCents / 100).toFixed(2) + ' 元，打开花费统计')
     }.id('home-recent').width('100%').alignItems(HorizontalAlign.Start)
       .onAreaChange((_, area: Area): void => { this.recentHeight = Number(area.height); })
   }
+
   build() {
     Scroll(this.scroller) {
       Column() {
@@ -174,7 +197,7 @@ export struct HomePage {
             Button('先收录一个想法').constraintSize({ minHeight: 48 }).onClick((): void => { this.open('inbox', 'global'); })
             Button('搜索').id('home-search').constraintSize({ minWidth: 48, minHeight: 48 }).onClick((): void => { this.open('search', 'all'); }).accessibilityText('打开全局搜索')
           }
-        } else { this.next(); Blank().height(8); this.tasks(); Blank().height(8); this.recentSection() }
+        } else { this.next(); Blank().height(24); this.tasks(); Blank().height(24); this.recentSection() }
         Blank().height(this.bottomInset).width('100%')
       }.padding({ left: Theme.pagePadding, right: Theme.pagePadding }).width('100%').constraintSize({ maxWidth: Theme.contentMaxWidth }).alignItems(HorizontalAlign.Start)
     }.id('home-scroll').width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off)

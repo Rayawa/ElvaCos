@@ -40,10 +40,11 @@ export function dayEntries(events: CosEvent[], dismissed: Record<string, string>
       return rank(a) - rank(b) || a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
     });
 }
-export function dayTitle(event: CosEvent, now: number): string {
+export function dayContext(event: CosEvent, now: number): string {
   const date = localDay(now);
-  return (event.date > date && dayWindow(event, now) ? '明天' : event.date <= date && eventEnd(event) >= date ? '今天' : event.dateMode === 'pending' ? '日期待定' : event.date) + ' · ' + event.name;
+  return (event.date > date && dayWindow(event, now) ? '明天' : event.date <= date && eventEnd(event) >= date ? '今天' : event.dateMode === 'pending' ? '日期待定' : event.date);
 }
+export function dayTitle(event: CosEvent, now: number): string { return dayContext(event, now) + ' ' + event.name; }
 export function dayNumber(event: CosEvent, now: number): string {
   if (event.dateMode !== 'multiple' || localDay(now) < event.date || localDay(now) > eventEnd(event)) { return ''; }
   const start = new Date(event.date + 'T12:00:00'); const date = new Date(localDay(now) + 'T12:00:00');
@@ -88,7 +89,7 @@ export function reminderState(event: CosEvent, now: number): string {
 }
 
 export function planShootingLabel(project: CosProject, events: CosEvent[]): string {
-  return project.shootingTime ? (planDate(project, events) || '日期待定') + ' · ' + project.shootingTime : '拍摄时间未设置';
+  return project.shootingTime ? (planDate(project, events) || '日期待定') + ' ' + project.shootingTime : '拍摄时间未设置';
 }
 export class DayTimelineItem {
   id: string; date: string; time: string; label: string; projectId: string;
@@ -103,7 +104,7 @@ export function eventTimeline(event: CosEvent, projects: CosProject[]): DayTimel
   if (event.timeMode === 'range' && validTime(event.endTime) && event.dateMode !== 'pending') { result.push(new DayTimelineItem('event-end', eventEnd(event), event.endTime, '活动结束')); }
   for (const project of projects) {
     if (project.eventId === event.id && validTime(project.shootingTime || '')) {
-      result.push(new DayTimelineItem('project:' + project.id, planDate(project, [event]), project.shootingTime, project.name + ' · 拍摄 / 约拍', project.id));
+      result.push(new DayTimelineItem('project:' + project.id, planDate(project, [event]), project.shootingTime, project.name + ' 拍摄 / 约拍', project.id));
     }
   }
   return result.sort((a: DayTimelineItem, b: DayTimelineItem) => (a.date || '9999').localeCompare(b.date || '9999') || a.time.localeCompare(b.time) || a.id.localeCompare(b.id));

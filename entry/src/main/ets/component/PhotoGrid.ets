@@ -1,3 +1,5 @@
+import { StatusPill } from './Surfaces';
+import { displayName } from '../common/format';
 import { PhotoImportStatus } from './PhotoImportStatus';
 import { PHOTO_FILTER_LABELS, photoStatusLabel, PHOTO_EDIT_STATUSES } from '../model/PhotoStages';
 import { PhotoCollectionRoute, PhotoViewerRoute, selectPhotoCollection } from '../model/PhotoCollection';
@@ -111,7 +113,7 @@ export struct PhotoGrid {
         }.width('100%')
       }
       if (this.route.feedback) { Text(this.route.feedback).id('photo-collection-feedback').fontSize(14).fontColor(Theme.accent) }
-    }.width('100%')
+    }.width('100%').alignItems(HorizontalAlign.Start)
   }
   @Builder photoContent(photo: PhotoAsset) {
     Column({ space: 6 }) {
@@ -123,8 +125,8 @@ export struct PhotoGrid {
       }
       Column({ space: 6 }) {
         if (this.route.selecting) { Text(this.selectedPhotoIds.has(photo.id) ? '✓ 已选' : '○ 点选').fontSize(14).fontColor(Theme.accent) }
-        Text(photoStatusLabel(photo.status)).fontSize(14).fontColor(Theme.accent)
-        Text(this.state.projectName(photo.projectId)).fontSize(14).fontColor(Theme.muted).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        StatusPill({ label: photoStatusLabel(photo.status) })
+        Text(displayName(this.state.projectName(photo.projectId))).fontSize(14).fontColor(Theme.muted).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
       }.id('photo-caption:' + photo.id).width('100%').alignItems(HorizontalAlign.Start).padding({ left: 12, right: 12, top: 4, bottom: 14 })
     }.width('100%')
   }

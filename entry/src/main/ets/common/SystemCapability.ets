@@ -1,3 +1,4 @@
+import { displayName } from './format';
 import {
   HdsNavigationTitleBarOptions,
   HdsNavigationMenuItemOptions,
@@ -19,6 +20,11 @@ export class SystemCapability {
   // avoidSafeArea 与 Dashboard 保持一致默认 false：HDS 自己已经避让状态栏，
   // 额外开启会让标题栏再下移一个状态栏高度（二级页面标题被推入内容区的原因）。
   static titleBar(title: ResourceStr, enabled: boolean, level: number = 1, segment?: CustomBuilder, menus: HdsNavigationMenuItemOptions[] = [], avoidSafeArea: boolean = false, backAction?: () => void): HdsNavigationTitleBarOptions {
+    menus.forEach((menu: HdsNavigationMenuItemOptions): void => {
+      if (menu.content && !menu.content.componentId && typeof menu.content.label === 'string') {
+        menu.content.componentId = 'detail-action-' + menu.content.label;
+      }
+    });
     const options: HdsNavigationTitleBarOptions = {
       avoidLayoutSafeArea: avoidSafeArea,
       style: {
@@ -47,7 +53,7 @@ export class SystemCapability {
           materialLevel: level,
         } : undefined,
       },
-      content: { title: { mainTitle: title, mainTitleSize: HDS_TITLE_SIZE_SMALL, mainTitleAccessibilityText: title }, stackBuilder: segment, menu: { value: menus, maxCount: 3 } },
+      content: { title: { mainTitle: typeof title === 'string' ? displayName(title) : title, mainTitleSize: HDS_TITLE_SIZE_SMALL, mainTitleAccessibilityText: title }, stackBuilder: segment, menu: { value: menus, maxCount: 3 } },
     };
     if (backAction !== undefined && options.content !== undefined) {
       // 与 Dashboard AppDetailPage 一致：返回按钮走调用方动作，保证返回振动与栈操作不被 HDS 默认行为吞掉。

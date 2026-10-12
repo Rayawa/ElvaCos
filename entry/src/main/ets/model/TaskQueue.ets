@@ -45,7 +45,7 @@ export function buildTaskQueue(plans: PlanReadiness[], projects: CosProject[], t
       const item = make(waiting ? 'waiting' : 'preparation', task.id, task.label);
       item.source = 'preparation'; item.date = waiting ? task.waitingUntil : task.dueDate;
       item.group = waiting ? 'waiting' : plan.prep.overdue.includes(task) ? 'overdue' : plan.prep.today.includes(task) ? 'today' : plan.prep.upcoming.includes(task) ? 'week' : !task.dueDate ? 'undated' : 'later';
-      item.detail = waiting ? (task.waitingOn || '等待外部进展') + (task.waitingUntil ? ' · 等待至 ' + task.waitingUntil : '') : task.dueDate ? '截止 ' + task.dueDate : '未定期';
+      item.detail = waiting ? (task.waitingOn || '等待外部进展') + (task.waitingUntil ? '，等待至 ' + task.waitingUntil : '') : task.dueDate ? '截止 ' + task.dueDate : '未定期';
       items.push(item);
     }
     for (const asset of plan.equipment.waiting) {

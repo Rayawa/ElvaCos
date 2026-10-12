@@ -334,7 +334,7 @@ export struct InteractiveLineChart {
             const point = chartSeries.points[Math.min(this.selected, chartSeries.points.length - 1)];
             values.push(`${chartSeries.label} ${this.valueLabel(point?.value ?? 0)}`);
         }
-        return `${labels[Math.min(this.selected, labels.length - 1)].label} · ${values.join(' · ')}`;
+        return `${labels[Math.min(this.selected, labels.length - 1)].label}，${values.join('，')}`;
     }
 
     private selectedDate(): string {

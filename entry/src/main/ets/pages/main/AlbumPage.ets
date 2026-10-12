@@ -1,3 +1,6 @@
+import { ContextRow } from '../../component/ContextRow';
+import { StatusPill } from '../../component/Surfaces';
+import { displayName } from '../../common/format';
 import { PhotoImportStatus } from '../../component/PhotoImportStatus';
 import { AppState } from '../../model/ApplicationState';
 import { AlbumRoute } from '../../model/AlbumRoute';
@@ -73,14 +76,17 @@ export struct AlbumPage {
   @Builder scope() {
     Column({ space: 12 }) {
       this.planFilter()
-      Text(this.route.mode === 'queue' ? '跨计划待选 / 待修；处理状态与计划照片同步。' : '按场次 / 计划整理；日期来自计划或关联活动，未设日期明确标注。').fontSize(14).fontColor(Theme.muted)
-      if (this.route.mode === 'byPlan') {
-        Button(this.route.byPlan.portfolio ? '作品集展示 · 返回全部照片' : '作品集展示 · 成片与已发布').constraintSize({ minHeight: 48 }).width('100%')
-          .enabled(!this.state.busy && !this.route.collection.submitting).backgroundColor(Theme.tint).fontColor(Theme.accent)
-          .onClick((): void => { this.route.byPlan.setPortfolio(!this.route.byPlan.portfolio); })
-      }
-      Button(this.distributionOpen ? '收起照片处理分布' : '展开照片处理分布').id('album-distribution-toggle').constraintSize({ minHeight: 48 }).width('100%')
-        .backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.distributionOpen = !this.distributionOpen; })
+      Flex({ wrap: FlexWrap.Wrap }) {
+        if (this.route.mode === 'byPlan') {
+          Button(this.route.byPlan.portfolio ? '全部照片' : '作品集').id('album-portfolio-toggle').constraintSize({ minHeight: 48 }).fontSize(14)
+            .enabled(!this.state.busy && !this.route.collection.submitting).backgroundColor(Color.Transparent).fontColor(Theme.muted)
+            .onClick((): void => { this.route.byPlan.setPortfolio(!this.route.byPlan.portfolio); })
+            .accessibilityText(this.route.byPlan.portfolio ? '退出作品集，返回全部照片' : '作品集，查看成片与已发布').margin({ right: 12 })
+        }
+        Button(this.distributionOpen ? '收起分布' : '处理分布').id('album-distribution-toggle').constraintSize({ minHeight: 48 }).fontSize(14)
+          .backgroundColor(Color.Transparent).fontColor(Theme.muted).onClick((): void => { this.distributionOpen = !this.distributionOpen; })
+          .accessibilityText(this.distributionOpen ? '收起照片处理分布' : '展开照片处理分布')
+      }.width('100%')
       if (this.distributionOpen) { DistributionChart({ title: this.route.collection.planId ? '本计划照片处理分布' : '全仓照片处理分布', items: this.distribution(), paletteId: Theme.paletteId }) }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
@@ -89,10 +95,14 @@ export struct AlbumPage {
       if (plan.cover?.thumbnailPath) { ManagedImage({ sourcePath: plan.cover.thumbnailPath, label: plan.name + '封面', failureText: '封面缩略图加载失败' }).width(80).height(100) }
       else { Text(plan.total ? '封面待恢复' : '待导入').width(80).height(100).textAlign(TextAlign.Center).fontColor(Theme.muted).backgroundColor(Theme.tint).borderRadius(14) }
       Column({ space: 7 }) {
-        Text(plan.name).fontSize(18).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(plan.event + ' · ' + (plan.date || '日期待定')).fontSize(14).fontColor(Theme.muted)
-        Text(plan.total + ' 张 · 成片 ' + plan.counts[4] + ' · 归档 ' + plan.counts[5]).fontSize(14).fontColor(Theme.accent)
-        Text(PHOTO_STAGE_LABELS.slice(0, 4).map((label: string, index: number) => label + ' ' + plan.counts[index]).join(' · ')).fontSize(14).fontColor(Theme.muted)
+        Text(displayName(plan.name)).fontSize(18).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(displayName(plan.event)).fontSize(14).fontColor(Theme.muted).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        ContextRow({ label: '日期', text: plan.date || '日期待定' })
+        Flex({ wrap: FlexWrap.Wrap }) {
+          StatusPill({ label: plan.total + ' 张' }).margin({ right: 8 })
+          if (plan.counts[4]) { StatusPill({ label: '成片 ' + plan.counts[4] }).margin({ right: 8 }) }
+          if (plan.counts[5]) { StatusPill({ label: '归档 ' + plan.counts[5] }) }
+        }.width('100%')
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }.width('100%').alignItems(VerticalAlign.Top)
   }
@@ -112,7 +122,7 @@ export struct AlbumPage {
             .value((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS)[this.route.byPlan.portfolio ? [0, 7].indexOf(this.route.byPlan.filter) : this.route.byPlan.filter]).constraintSize({ minHeight: 48 })
             .enabled(!this.state.busy).onSelect((filter: number): void => { this.route.byPlan.setFilter(this.route.byPlan.portfolio ? [0, 7][filter] : filter); this.route.groupOffset = 0; this.restoreOffset(); }).accessibilityText('场次照片状态筛选')
           if (this.route.byPlan.feedback) { Text(this.route.byPlan.feedback).fontSize(14).fontColor(Theme.accent) }
-          Text('全仓照片 ' + this.state.albumSummary.total + ' 张 · 成片 ' + this.state.albumSummary.counts[4] + ' · 归档 ' + this.state.albumSummary.counts[5]).fontSize(14).fontColor(Theme.muted)
+          ContextRow({ label: '全仓照片', text: this.state.albumSummary.total + ' 张' })
           ForEach(this.groups(), (plan: AlbumPlan) => {
             InteractiveCard({ label: '打开相册计划 ' + plan.name, hint: '双击查看本场照片', effects: this.state.settings.effects,
               action: (): void => { this.route.groupOffset = this.scroller.currentOffset().yOffset; this.route.byPlan.setPlan(plan.id); }, content: (): void => { this.planCard(plan); } }).id('album-plan:' + plan.id)

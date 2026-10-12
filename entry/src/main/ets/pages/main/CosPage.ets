@@ -10,7 +10,7 @@ import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
 import { Character, CosProject, ProjectStatus } from '../../model/Entities';
 import { ProjectCard } from '../../component/ProjectCard';
-import { InteractiveCard, EmptyState, SectionHeading } from '../../component/Surfaces';
+import { InteractiveCard, EmptyState, SectionHeading, StatusPill } from '../../component/Surfaces';
 import { startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 
 @ComponentV2
@@ -96,8 +96,10 @@ export struct CosPage {
       Column({ space: 6 }) {
         Text(character.name + (character.favorite ? ' ★' : '')).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
         Text(character.workName || '所属作品待补充').fontSize(13).fontColor(Theme.muted)
-        Text('版本 ' + this.state.characterSummary(character.id).variants.length + ' 个 · 关联计划 ' + this.state.characterSummary(character.id).planCount + ' 份').fontSize(14).fontColor(Theme.muted)
-        if (this.state.characterSummary(character.id).variants.length) { Text(this.state.characterSummary(character.id).variants.join(' / ')).fontSize(14).fontColor(Theme.muted).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }) }
+        Row({ space: 8 }) {
+          StatusPill({ label: this.state.characterSummary(character.id).variants.length + ' 个版本' })
+          StatusPill({ label: this.state.characterSummary(character.id).planCount + ' 份计划' })
+        }
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       Text('›').fontColor(Theme.muted).fontSize(26).accessibilityLevel('no')
     }.width('100%')
@@ -114,25 +116,27 @@ export struct CosPage {
               label: this.projects ? '搜索计划' : '搜索角色',
               changed: (v: string): void => { this.route.query = v; this.resetPosition(); }
             })
-            SectionHeading({
-              title: this.projects ? ['进行中计划', '已完成计划', '全部计划'][this.route.section] : '角色库',
-              trailing: this.projects ? `${this.plans().length} 份计划` : `${this.characters().length} 位角色`
-            })
+            if (this.projects) {
+              Row({ space: 12 }) {
+                Text(this.plans().length + ' 份计划').fontSize(14).fontColor(Theme.muted).layoutWeight(1)
+                Button('角色库 ›').constraintSize({ minHeight: 48 }).fontSize(14).fontColor(Theme.muted)
+                  .backgroundColor(Color.Transparent).id('plan-role-library').onClick((): void => { this.open('characters', 'all'); }).accessibilityText('打开角色库')
+              }.width('100%')
+            } else { SectionHeading({ title: '角色库', trailing: this.characters().length + ' 位角色' }) }
           }.
         width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 12 }) {
           if (this.projects) {
-            Button('角色库 · ' + this.state.characters.length + ' 位角色').width('100%').constraintSize({ minHeight: 48 })
-              .fontColor(Theme.accent).backgroundColor(Theme.tint).id('plan-role-library')
-              .onClick((): void => { this.open('characters', 'all'); }).accessibilityText('打开角色库')
-            Select(this.statusOptions())
-              .value(this.route.status ? PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.route.status as ProjectStatus)] : '全部状态')
-              .onSelect((index: number): void => { this.route.status = index === 0 ? '' : this.statuses()[index - 1]; this.resetPosition(); })
-              .accessibilityText('计划具体状态筛选')
-            Select([{ value: '全部日期' }, { value: '日期待定' }, { value: '日期已过' }, { value: '今天' }, { value: '未来七天' }, { value: '今天及以后' }])
-              .value(['全部日期', '日期待定', '日期已过', '今天', '未来七天', '今天及以后'][['all', 'undated', 'overdue', 'today', 'week', 'future'].indexOf(this.route.dateRange)])
-              .onSelect((index: number): void => { this.route.dateRange = ['all', 'undated', 'overdue', 'today', 'week', 'future'][index]; this.resetPosition(); })
-              .accessibilityText('计划日期筛选')
+            Flex({ wrap: FlexWrap.Wrap }) {
+              Select(this.statusOptions())
+                .value(this.route.status ? PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.route.status as ProjectStatus)] : '全部状态')
+                .onSelect((index: number): void => { this.route.status = index === 0 ? '' : this.statuses()[index - 1]; this.resetPosition(); })
+                .accessibilityText('计划具体状态筛选').margin({ right: 12, bottom: 8 })
+              Select([{ value: '全部日期' }, { value: '日期待定' }, { value: '日期已过' }, { value: '今天' }, { value: '未来七天' }, { value: '今天及以后' }])
+                .value(['全部日期', '日期待定', '日期已过', '今天', '未来七天', '今天及以后'][['all', 'undated', 'overdue', 'today', 'week', 'future'].indexOf(this.route.dateRange)])
+                .onSelect((index: number): void => { this.route.dateRange = ['all', 'undated', 'overdue', 'today', 'week', 'future'][index]; this.resetPosition(); })
+                .accessibilityText('计划日期筛选').margin({ bottom: 8 })
+            }.width('100%')
             if (this.filtered()) { Button('清除筛选').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.clearFilters(); }) }
             ForEach(this.plans(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)
             if (this.plans().length === 0) { EmptyState({

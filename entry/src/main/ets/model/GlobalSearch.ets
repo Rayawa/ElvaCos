@@ -25,6 +25,9 @@ export class SearchHit {
   variantId: string = '';
   entryKind: string = '';
   constructor(kind: string, id: string, title: string, detail: string) { this.kind = kind; this.id = id; this.title = title; this.detail = detail; }
+  get label(): string {
+    return this.kind === 'project' ? '计划' : this.kind === 'character' ? '角色' : this.kind === 'event' ? '活动' : this.kind === 'asset' ? '装备' : this.kind === 'photo' ? '照片' : '收录';
+  }
   key(): string { return this.kind + ':' + this.id; }
 }
 export class SearchSummary {
@@ -75,7 +78,7 @@ export function globalSearch(data: SearchData, query: string): SearchSummary {
     const character = characters.get(project.characterId);
     const variant = (variants.get(project.characterId) || []).find((value: CharacterVariant) => value.id === project.variantId);
     const event = events.get(project.eventId);
-    const detail = [character?.name || '角色已不存在', variant?.name || '', event?.name || '', planDate(project, data.events) || '日期待定', project.shootingTime || ''].filter((value: string) => !!value).join(' · ');
+    const detail = [character?.name || '角色已不存在', variant?.name || '', event?.name || '', planDate(project, data.events) || '日期待定', project.shootingTime || ''].filter((value: string) => !!value).join('，');
     if (matches(project.name + ' ' + detail + ' ' + project.notes + ' ' + (character?.workName || ''))) { summary.sections[0].push(new SearchHit('project', project.id, project.name, detail)); }
   }
   for (const character of data.characters) {
@@ -83,30 +86,30 @@ export function globalSearch(data: SearchData, query: string): SearchSummary {
     const base = character.name + ' ' + character.workName + ' ' + character.description;
     const variantText = group.map((value: CharacterVariant) => value.name + ' ' + value.notes).join(' ');
     if (!matches(base + ' ' + variantText)) { continue; }
-    const hit = new SearchHit('character', character.id, character.name, [character.workName, group.map((value: CharacterVariant) => value.name).join(' / ')].filter((value: string) => !!value).join(' · ') || '角色资料');
+    const hit = new SearchHit('character', character.id, character.name, [character.workName, group.map((value: CharacterVariant) => value.name).join(' / ')].filter((value: string) => !!value).join('，') || '角色资料');
     const matched = group.filter((value: CharacterVariant) => matches(base + ' ' + value.name + ' ' + value.notes));
     if (!matches(base) && matched.length === 1) { hit.variantId = matched[0].id; }
     summary.sections[1].push(hit);
   }
   for (const event of data.events) {
-    const detail = [event.dateMode === 'pending' ? '日期待定' : event.date, event.city, event.venue, event.eventType].filter((value: string) => !!value).join(' · ');
+    const detail = [event.dateMode === 'pending' ? '日期待定' : event.date, event.city, event.venue, event.eventType].filter((value: string) => !!value).join('，');
     if (matches(event.name + ' ' + detail + ' ' + event.notes)) { summary.sections[2].push(new SearchHit('event', event.id, event.name, detail)); }
   }
   for (const asset of data.assets) {
-    if (matches([asset.name, asset.location, asset.brand, asset.size, asset.notes].join(' '))) { summary.sections[3].push(new SearchHit('asset', asset.id, asset.name, '装备 · ' + (asset.location || '位置待补充'))); }
+    if (matches([asset.name, asset.location, asset.brand, asset.size, asset.notes].join(' '))) { summary.sections[3].push(new SearchHit('asset', asset.id, asset.name, asset.location || '位置待补充')); }
   }
   for (const photo of data.photos) {
     const project = projects.get(photo.projectId); if (!project) { continue; }
     const character = characters.get(project.characterId);
     if (!matches([photo.caption, project.name, character?.name || '', character?.workName || ''].join(' '))) { continue; }
-    const hit = new SearchHit('photo', photo.id, photo.caption || project.name + '的照片', '照片 · ' + project.name + ' · ' + photoStatusLabel(photo.status));
+    const hit = new SearchHit('photo', photo.id, photo.caption || project.name + '的照片', project.name + '，' + photoStatusLabel(photo.status));
     hit.ownerKind = 'project'; hit.ownerId = project.id; summary.sections[3].push(hit);
   }
   for (const entry of data.entries) {
     const owner = entry.scopeKind === 'project' ? projects.get(entry.scopeId)?.name : entry.scopeKind === 'character' ? characters.get(entry.scopeId)?.name : entry.scopeKind === 'event' ? events.get(entry.scopeId)?.name : entry.scopeKind === 'asset' ? assets.get(entry.scopeId)?.name : '未归位';
     if (entry.scopeKind !== 'global' && !owner) { continue; }
     if (!matches([entry.title, entry.text, entry.url, owner || ''].join(' '))) { continue; }
-    const hit = new SearchHit('entry', entry.id, entryTitle(entry).slice(0, 80), '收录 · ' + owner + ' · 查看所属收录');
+    const hit = new SearchHit('entry', entry.id, entryTitle(entry).slice(0, 80), owner || '未归位');
     hit.ownerKind = entry.scopeKind; hit.ownerId = entry.scopeId; hit.entryKind = entry.kind; summary.sections[3].push(hit);
   }
   summary.sections.forEach((hits: SearchHit[]): void => { hits.sort((a: SearchHit, b: SearchHit) => a.title.localeCompare(b.title) || a.key().localeCompare(b.key())); });

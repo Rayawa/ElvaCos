@@ -1,3 +1,5 @@
+import { ContextRow } from '../../component/ContextRow';
+import { displayName } from '../../common/format';
 import { AppState } from '../../model/ApplicationState';
 import { TaskRoute, TaskQueueItem, filterTaskQueue } from '../../model/TaskQueue';
 import { CosProject } from '../../model/Entities';
@@ -57,8 +59,8 @@ export struct TasksPage {
           Button() {
             Row({ space: 12 }) {
               Column({ space: 6 }) {
-                Text(this.groupLabel(item) + ' · ' + item.title).fontSize(17).fontColor(item.group === 'overdue' ? Theme.accent : Theme.ink)
-                Text(item.projectName + ' · ' + item.detail).fontSize(14).fontColor(Theme.muted)
+                ContextRow({ label: this.groupLabel(item), text: displayName(item.title), prominent: true })
+                Text(displayName(item.projectName)).fontSize(14).fontColor(Theme.muted).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
               Text('›').fontSize(22).fontColor(Theme.muted).accessibilityLevel('no')
             }.width('100%').padding(16)

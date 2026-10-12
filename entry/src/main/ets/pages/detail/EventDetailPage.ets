@@ -1,3 +1,5 @@
+import { ContextRow } from '../../component/ContextRow';
+import { displayName } from '../../common/format';
 import { ProjectShot } from '../../model/Shot';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -9,7 +11,7 @@ import { CosEvent, CosProject, ChecklistItem } from '../../model/Entities';
 import { TeamMember } from '../../model/Planning';
 import { CollectedEntry, entryTitle } from '../../model/CollectedEntry';
 import { eventDateLabel, eventTimeLabel } from '../../model/Schedule';
-import { DayModule, DayTimelineItem, eventTimeline, planShootingLabel, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState } from '../../model/DayMode';
+import { DayModule, DayTimelineItem, eventTimeline, planShootingLabel, hasEventShots, dayTitle, dayNumber, availableDayModules, assembledDayModules, orderedDayModules, reminderState, dayContext } from '../../model/DayMode';
 import { StaggerEntrance } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
 import { confirm } from '../../common/Confirm';
@@ -157,7 +159,7 @@ export struct EventDetail {
   }
   @Builder recordSheet() {
     Column({ space: 16 }) {
-      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: this.recordKind === 0 ? '记一笔 · 选择计划' : this.recordKind === 1 ? '收录一条' : '传照片 · 选择计划', close: (): void => { this.requestClose(); } })
+      SheetHeader({ haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, closeSize: this.route.dayMode ? 64 : 48, title: this.recordKind === 0 ? '选择记账计划' : this.recordKind === 1 ? '收录一条' : '选择照片所属计划', close: (): void => { this.requestClose(); } })
       Scroll() {
         Column({ space: 12 }) {
           if (this.recordKind === 1) {
@@ -192,7 +194,6 @@ export struct EventDetail {
   }
   @Builder overview() {
     Column({ space: 14 }) {
-      Text(this.event.name).fontSize(24).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
       StatusPill({ label: this.event.ticketPurchased ? '门票已准备' : '门票待确认' })
       FactRow({ label: '类型', value: this.event.eventType })
       FactRow({ label: '日期', value: eventDateLabel(this.event) })
@@ -230,44 +231,51 @@ export struct EventDetail {
     Column({ space: 10 }) {
       Row({ space: 10 }) {
         Button('返回').constraintSize({ minHeight: 64, minWidth: 64 }).onClick((): void => { this.back(); }).accessibilityText('返回来源页面')
-        Text(dayTitle(this.event, this.state.clockTime)).id('day-title').fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink).layoutWeight(1)
+        Row({ space: 8 }) {
+          StatusPill({ label: dayContext(this.event, this.state.clockTime) })
+          Text(displayName(this.event.name)).id('day-title').fontSize(21).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+        }.layoutWeight(1)
         Select([{ value: '记一笔' }, { value: '收录一条' }, { value: '传照片' }]).value('记').height(64).constraintSize({ minWidth: 64 })
           .onSelect((index: number): void => { this.recordKind = index; this.recordError = ''; this.recording = true; }).accessibilityText('记一笔、收录一条或传照片')
       }.width('100%')
-      Text(eventDateLabel(this.event) + ' · ' + eventTimeLabel(this.event) + (dayNumber(this.event, this.state.clockTime) ? ' · ' + dayNumber(this.event, this.state.clockTime) : '')).id('day-date-time').fontSize(15).fontColor(Theme.muted).width('100%')
-      Text(this.event.venue || this.event.city || '地点待定').id('day-location').fontSize(15).fontColor(Theme.muted).width('100%')
+      Row({ space: 8 }) {
+        Text(eventDateLabel(this.event)).id('day-date-time').fontSize(15).fontColor(Theme.muted)
+        if (dayNumber(this.event, this.state.clockTime)) { StatusPill({ label: dayNumber(this.event, this.state.clockTime) }) }
+      }.width('100%')
+      ContextRow({ label: '时间', text: eventTimeLabel(this.event) }).id('day-time')
+      ContextRow({ label: '地点', text: this.event.venue || this.event.city || '地点待定' }).id('day-location')
     }.padding({ top: 16, left: Theme.pagePadding, right: Theme.pagePadding, bottom: 12 }).width('100%').backgroundColor(Theme.bg)
   }
   @Builder packing(project: CosProject) {
     Column({ space: 10 }) {
-      Text(project.name).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+      Text(displayName(project.name)).fontSize(18).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
       Text('已装包 ' + this.state.readiness(project.id).pack.packed + ' / ' + this.state.readiness(project.id).pack.total + ' 件').fontSize(14).fontColor(Theme.muted)
       if (!this.state.checklist.some((item: ChecklistItem) => item.projectId === project.id)) {
         Button('建立打包清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('packing', project.id); })
       }
       ForEach(this.state.checklist.filter((item: ChecklistItem) => item.projectId === project.id).sort((a: ChecklistItem, b: ChecklistItem) => a.sortOrder - b.sortOrder), (item: ChecklistItem) => {
-        Button((item.done ? '✓ 已装包 · ' : '○ 未装包 · ') + item.label).width('100%').constraintSize({ minHeight: 64 }).fontSize(18)
+        Button() { ContextRow({ label: item.done ? '已装包' : '未装包', text: item.label, prominent: true }) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 }).fontSize(18)
           .fontColor(item.done ? Theme.muted : Theme.ink).backgroundColor(Theme.surface).enabled(!this.state.busy && !this.state.staleScopes.length)
           .onClick((): void => { void this.togglePacking(item); }).accessibilityText(item.label + (item.done ? '，已装包，点击改为未装包' : '，未装包，点击确认装包'))
-        if (item.assetId) { Button((this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置') + ' · ' + (this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在')).fontColor(Theme.muted).fontSize(14).constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openAsset(item.assetId, project.id); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
+        if (item.assetId) { Button() { ContextRow({ label: this.state.assets.find((asset) => asset.id === item.assetId)?.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.state.assets.find((asset) => asset.id === item.assetId)!.status)] : '装备已不存在', text: this.state.assets.find((asset) => asset.id === item.assetId)?.location || '未记录位置' }) }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(Theme.muted).fontSize(14).constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openAsset(item.assetId, project.id); }).accessibilityText('查看 ' + item.label + ' 的装备位置与状态') }
       }, (item: ChecklistItem) => item.id)
       Button('打开出门清单').constraintSize({ minHeight: 64 }).onClick((): void => { this.open('outing', project.id); })
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   private async togglePacking(item: ChecklistItem): Promise<void> {
     this.packingError = '';
-    if (!await this.state.toggleChecklist(item)) { this.packingError = this.state.projectName(item.projectId) + ' · ' + item.label + '：' + (this.state.error || '装包确认未保存，请重试'); }
+    if (!await this.state.toggleChecklist(item)) { this.packingError = this.state.projectName(item.projectId) + '，' + item.label + '：' + (this.state.error || '装包确认未保存，请重试'); }
   }
   private async toggleShot(shot: ProjectShot): Promise<void> {
     this.shotError = ''; const result = await this.state.toggleShot(shot.id, shot.projectId, shot.done);
     if (!operationCommitted(result)) { this.shotError = this.state.error || '拍摄勾选未保存，请重试'; }
   }
   @Builder shots(project: CosProject) {
-    Button(project.name + ' · 已拍 ' + this.state.readiness(project.id).shots.done + ' / ' + this.state.readiness(project.id).shots.total + ' 项').constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
+    Button() { ContextRow({ label: '已拍 ' + this.state.readiness(project.id).shots.done + ' / ' + this.state.readiness(project.id).shots.total, text: displayName(project.name), prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
       .onClick((): void => { this.openShot(project.id, ''); })
     ForEach(this.state.readiness(project.id).shots.items, (shot: ProjectShot) => {
       Column({ space: 8 }) {
-        Button((shot.done ? '✓ 已拍 · ' : '拍摄后勾选 · ') + shot.title).constraintSize({ minHeight: 64 }).width('100%').fontSize(18).enabled(!this.state.busy && !this.state.staleScopes.length)
+        Button() { ContextRow({ label: shot.done ? '已拍' : '待拍', text: shot.title, prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 64 }).width('100%').fontSize(18).enabled(!this.state.busy && !this.state.staleScopes.length)
           .onClick((): void => { void this.toggleShot(shot); }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
         if (shot.referenceId) { Button('查看这条拍摄参考').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.open('reference', shot.referenceId); }) }
         Button('查看所属计划拍摄事项').constraintSize({ minHeight: 64 }).width('100%').onClick((): void => { this.openShot(project.id, shot.id); }).accessibilityText('在计划照片中查看 ' + shot.title)
@@ -293,23 +301,26 @@ export struct EventDetail {
       } else if (module.id === 'people') {
         ForEach(this.projects(), (project: CosProject) => {
           ForEach(this.state.team.filter((member: TeamMember) => member.projectId === project.id), (member: TeamMember) => {
-            Text(project.name + ' · ' + member.role + ' · ' + member.name).fontSize(18).fontColor(Theme.ink)
+            Column({ space: 6 }) {
+              ContextRow({ label: member.role, text: member.name, prominent: true })
+              Text(displayName(project.name)).fontSize(14).fontColor(Theme.muted)
+            }.width('100%').alignItems(HorizontalAlign.Start)
             if (member.notes) { Text(member.notes).fontColor(Theme.muted).copyOption(CopyOptions.LocalDevice)
               Button('复制备注 / 联系方式').constraintSize({ minHeight: 64 }).onClick((): void => { this.copyContact(member); }) }
           }, (member: TeamMember) => member.id)
         }, (project: CosProject) => project.id)
       } else if (module.id === 'plans') {
         ForEach(this.projects(), (project: CosProject) => {
-          Button(project.name + ' · ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)] + '\n' + planShootingLabel(project, this.state.events)).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
+          Button() { Column({ space: 6 }) { ContextRow({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: displayName(project.name), prominent: true }); Text(planShootingLabel(project, this.state.events)).fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start) }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 64 }).fontSize(18).onClick((): void => { this.open('project', project.id); })
         }, (project: CosProject) => project.id)
       } else if (module.id === 'shots') {
         if (this.shotError) { Text(this.shotError).fontSize(17).fontColor(Theme.danger) }
         ForEach(this.projects().filter((project: CosProject) => this.state.readiness(project.id).shots.total > 0), (project: CosProject) => { this.shots(project) }, (project: CosProject) => project.id)
       } else if (module.id === 'timeline') {
         ForEach(eventTimeline(this.event, this.state.projects), (item: DayTimelineItem) => {
-          if (item.projectId) { Button((item.date || '日期待定') + ' · ' + item.time + ' · ' + item.label).id('day-timeline:' + item.id).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
+          if (item.projectId) { Button() { Column({ space: 6 }) { ContextRow({ label: item.time, text: displayName(item.label), prominent: true }); Text(item.date || '日期待定').fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start) }.type(ButtonType.Normal).id('day-timeline:' + item.id).constraintSize({ minHeight: 64 }).width('100%').fontSize(18)
             .onClick((): void => { this.open('project', item.projectId); }).accessibilityText('查看计划，' + (item.date || '日期待定') + '，' + item.time + '，' + item.label) }
-          else { Text(item.date + ' · ' + item.time + ' · ' + item.label).id('day-timeline:' + item.id).fontSize(18).fontColor(Theme.ink) }
+          else { Column({ space: 6 }) { ContextRow({ label: item.time, text: displayName(item.label), prominent: true }); Text(item.date || '日期待定').fontSize(14).fontColor(Theme.muted) }.width('100%').alignItems(HorizontalAlign.Start).id('day-timeline:' + item.id) }
         }, (item: DayTimelineItem) => item.id)
       }
       else if (module.id === 'wrapup') { Text('今天结束了？选好所属计划后导入照片。').fontSize(18).fontColor(Theme.ink)

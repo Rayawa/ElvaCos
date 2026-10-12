@@ -1,3 +1,4 @@
+import { ContextRow } from '../component/ContextRow';
 import { SearchPage } from './more/SearchPage';
 import { SearchRoute, SearchHit, globalSearch, searchRows, SEARCH_SECTIONS } from '../model/GlobalSearch';
 import { ProjectPhotoHeader } from '../component/ProjectPhotoHeader';
@@ -12,10 +13,10 @@ import { EventRoute, EventReturnPath } from '../model/EventRoute';
 import { TaskRoute, TaskQueueItem } from '../model/TaskQueue';
 import { LedgerRoute } from '../model/LedgerRoute';
 import { ScheduleRoute } from '../model/ScheduleRoute';
-import { today } from '../common/format';
+import { today, displayName } from '../common/format';
 import { PlanListRoute } from '../model/PlanListRoute';
 import { TasksPage } from './more/TasksPage';
-import { dayTitle } from '../model/DayMode';
+import { dayTitle, dayContext } from '../model/DayMode';
 import { InboxPage } from './more/InboxPage';
 import { InboxRoute } from '../model/CollectedEntry';
 import { AppLogPage } from './more/AppLogPage';
@@ -82,6 +83,7 @@ import { EmptyState } from '../component/Surfaces';
   private pageScrollers: Scroller[] = [new Scroller(), new Scroller(), new Scroller(), new Scroller(), new Scroller()];
   private tabsController: HdsTabsController = new HdsTabsController();
   @Local tab: number = 0;
+  @Local rootPagesVisible: boolean[] = [true, true, true, true, true];
   @Local planListRoute: PlanListRoute = new PlanListRoute();
   @Local wardrobeRoute: WardrobeRoute = new WardrobeRoute();
   @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
@@ -645,7 +647,7 @@ import { EmptyState } from '../component/Surfaces';
 
   private inboxTitle(route: InboxRoute): string {
     if (route.scopeKind === 'global') { return '收录箱'; }
-    return this.destinationTitle(route.scopeKind, route.scopeId) + ' · 收录';
+    return this.destinationTitle(route.scopeKind, route.scopeId) + '收录';
   }
 
   private destinationTitle(kind: string, id: string): string {
@@ -867,7 +869,7 @@ import { EmptyState } from '../component/Surfaces';
         if (this.state.photoImport.phase === 'importing') {
           Column({ space: 14 }) {
             LoadingProgress().width(40).height(40).color(Theme.brand)
-            Text('正在导入 · ' + this.state.projectName(this.state.photoImport.projectId)).fontSize(16).fontColor(Theme.ink)
+            ContextRow({ label: '正在导入', text: displayName(this.state.projectName(this.state.photoImport.projectId)), prominent: true })
             Text('已处理 ' + this.state.photoImport.processed + ' / ' + this.state.photoImport.total + ' 张').fontSize(16).fontColor(Theme.ink)
             Button(this.state.photoImport.stopRequested ? '正在停止…' : '停止剩余导入').constraintSize({ minHeight: 48 }).enabled(!this.state.photoImport.stopRequested)
               .onClick((): void => { this.state.photoImport.cancel(); })
@@ -985,7 +987,7 @@ import { EmptyState } from '../component/Surfaces';
       .hideToolBar(true)
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .width('100%').height('100%').backgroundColor(Theme.bg)
-      .onNavBarStateChange((_visible: boolean): void => { this.syncDaySnack(); })
+      .onNavBarStateChange((visible: boolean): void => { this.rootPagesVisible[index] = visible; this.syncDaySnack(); })
   }
 
   @Builder mainTabs() {
@@ -1001,8 +1003,8 @@ import { EmptyState } from '../component/Surfaces';
       TabContent() { this.mainNavigation(4) }
         .tabBar(new BottomTabBarStyle(Icons.importPhoto, '相册')).accessibilityText('相册标签页')
     }.id('main-tabs')
-      .barPosition(BarPosition.End).barHeight(Theme.mainTabsHeight)
-      .barWidth(Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)))
+      .barPosition(BarPosition.End).barHeight(this.rootPagesVisible[this.tab] ? Theme.mainTabsHeight : 0)
+      .barWidth(this.rootPagesVisible[this.tab] ? Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)) : 0)
       .cachedMaxCount(5, TabsCacheMode.CACHE_LATEST_SWITCHED)
       .scrollable(false).vertical(false).barOverlap(true)
       .blurStrategy(this.state.settings.effects ? BlurStrategy.ENABLE : BlurStrategy.DISABLE)
@@ -1060,7 +1062,7 @@ import { EmptyState } from '../component/Surfaces';
       if (!this.daySnackBar) { this.daySnackBar = new HdsSnackBar(this.getUIContext()); }
       this.daySnackBar.show(
         { icon: Icons.event },
-        { title: title, content: remaining ? '还有 ' + remaining + ' 场活动 · 查看今天模式' : '出发前与现场事项' },
+        { title: displayName(event.name), content: remaining ? '还有 ' + remaining + ' 场活动，查看今天模式' : '查看' + dayContext(event, this.state.clockTime) + '的出发前与现场事项' },
         { operationType: SnackBarOperationType.TEXT_WITH_CLOSE, content: '进入', textButtonId: 'day-entry-bar', cancelButtonId: 'day-entry-close',
           contentAccessibilityText: '进入' + title + '的今天模式', closeButtonAccessibilityText: '今天不再显示这场活动的入口',
           onContentClick: (): void => { this.hideDaySnack(); this.open('dayEvent', event.id); },

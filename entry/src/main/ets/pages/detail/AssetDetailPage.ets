@@ -1,3 +1,5 @@
+import { displayName } from '../../common/format';
+import { ContextRow } from '../../component/ContextRow';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, ASSET_TYPES, ASSET_TYPE_LABELS, PROJECT_STATUSES, PROJECT_LABELS } from '../../common/constants';
 import { StaggerEntrance, pageTransition } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
@@ -54,15 +56,15 @@ export struct AssetDetail {
     if (!(await this.state.unlinkAsset(project.id, this.asset.id, ids))) { this.actionError = this.state.error || '关联未解除，请重试'; }
   }
   @Builder heading() {
-    Text(this.asset.name).fontSize(22).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+
     Row({ space: 10 }) {
       Text(ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.asset.type)]).fontSize(14).fontColor(Theme.muted)
       StatusPill({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.asset.status)] })
     }
     if (this.asset.status !== AssetStatus.OWNED) {
-      Text('当前不可用 · 影响 ' + this.state.assetUsage(this.asset.id).activeProjects.length + ' 份进行中计划，全部使用计划 ' + this.state.assetUsage(this.asset.id).projects.length + ' 份').fontSize(14).fontColor(Theme.accent)
+      ContextRow({ label: '当前不可用', text: '影响 ' + this.state.assetUsage(this.asset.id).activeProjects.length + ' 份进行中计划' })
     }
-    if (this.route.from === 'project' || this.route.from === 'day') { Text(this.state.projects.some((project: CosProject) => project.id === this.route.projectId) ? '来自 ' + this.state.projectName(this.route.projectId) + (this.route.from === 'day' ? ' · 今天模式' : '') : '来源计划已不存在，返回最近有效页面').fontSize(14).fontColor(Theme.muted) }
+    if (this.route.from === 'project' || this.route.from === 'day') { ContextRow({ label: this.route.from === 'day' ? '今天模式' : '来自计划', text: this.state.projects.some((project: CosProject) => project.id === this.route.projectId) ? displayName(this.state.projectName(this.route.projectId)) : '来源计划已不存在，返回最近有效页面' }) }
     if (this.actionError || this.state.error) { Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger) }
   }
   @Builder facts() {
@@ -73,7 +75,7 @@ export struct AssetDetail {
     FactRow({ label: '资料价格', value: '¥' + (this.asset.priceCents / 100).toFixed(2) + '（未计入花费）' })
     if (this.asset.purchaseUrl) { FactRow({ label: '购买链接', value: this.asset.purchaseUrl, copyable: true }) }
     if (this.asset.notes) { FactRow({ label: '备注', value: this.asset.notes }) }
-    Button('收录 · ' + this.state.assetUsage(this.asset.id).entryIds.length + ' 条').constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'asset|' + this.asset.id); })
+    Button() { ContextRow({ label: '收录', text: this.state.assetUsage(this.asset.id).entryIds.length + ' 条' }) }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('inbox', 'asset|' + this.asset.id); })
   }
   @Builder uses() {
     SectionHeading({ title: '使用计划', trailing: this.state.assetUsage(this.asset.id).projects.length + ' 份' })
@@ -82,8 +84,8 @@ export struct AssetDetail {
       .onClick((): void => { this.actionError = ''; this.route.projectQuery = ''; this.route.linking = true; })
     ForEach(this.state.assetUsage(this.asset.id).projects, (project: CosProject) => {
       Column({ space: 8 }) {
-        Button('打开计划 · ' + project.name).constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('project', project.id); })
-        Text(PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)] + ' · ' + (this.state.readiness(project.id).date || '日期待定')).fontSize(14).fontColor(Theme.muted)
+        Button() { ContextRow({ label: '计划', text: displayName(project.name), prominent: true }) }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.open('project', project.id); })
+        ContextRow({ label: PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: this.state.readiness(project.id).date || '日期待定' })
         Button('解除本计划关联').constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length).onClick((): void => { void this.unlink(project); }).accessibilityText('解除 ' + project.name + ' 的装备关联')
       }.width('100%').alignItems(HorizontalAlign.Start)
     }, (project: CosProject) => project.id)
@@ -91,14 +93,14 @@ export struct AssetDetail {
   }
   @Builder planSheet() {
     Column({ space: 14 }) {
-      SheetHeader({ title: '选择计划加入装备', hint: this.asset.name + ' · ' + ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.asset.status)], close: (): void => { if (!this.state.busy) { this.route.linking = false; } } })
+      SheetHeader({ title: '选择计划加入装备', hint: displayName(this.asset.name), close: (): void => { if (!this.state.busy) { this.route.linking = false; } } })
       if (this.asset.status !== AssetStatus.OWNED) { Text('加入后仍保留当前不可用状态，相关计划会显示装备问题。').fontSize(14).fontColor(Theme.accent) }
       DashboardSearch({ value: this.route.projectQuery, label: '查找要加入的计划', placeholder: '搜索计划 / 角色', changed: (value: string): void => { this.route.projectQuery = value; } })
       if (this.actionError || this.state.error) { Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger) }
       List({ space: 10 }) {
         ForEach(this.projectsToChoose(), (project: CosProject) => {
           ListItem() {
-            Button(project.name + ' · ' + (this.linked(project.id) ? '已加入' : PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)]))
+            Button() { ContextRow({ label: this.linked(project.id) ? '已加入' : PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: displayName(project.name), prominent: true }) }.type(ButtonType.Normal)
               .constraintSize({ minHeight: 48 }).width('100%').enabled(!this.state.busy && !this.state.staleScopes.length && !this.linked(project.id)).onClick((): void => { void this.join(project); }).accessibilityText('将装备加入计划 ' + project.name)
           }
         }, (project: CosProject) => project.id)

@@ -18,7 +18,7 @@ export class EventReminderService {
       reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_CALENDAR,
       dateTime: { year: time.getFullYear(), month: time.getMonth() + 1, day: time.getDate(), hour: time.getHours(), minute: time.getMinutes(), second: 0 },
       title: event.name,
-      content: eventDateLabel(event) + ' · ' + eventTimeLabel(event) + (event.venue ? ' · ' + event.venue : ''),
+      content: eventDateLabel(event) + '，' + eventTimeLabel(event) + (event.venue ? '，' + event.venue : ''),
       expiredContent: '活动提醒已结束',
       ringDuration: 0, snoozeTimes: 0,
       actionButton: [{ title: '关闭', type: reminderAgentManager.ActionButtonType.ACTION_BUTTON_TYPE_CLOSE }],

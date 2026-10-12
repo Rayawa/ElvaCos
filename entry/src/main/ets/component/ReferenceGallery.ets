@@ -34,7 +34,7 @@ export struct ReferenceGallery {
             Button() {
               Column({ space: 6 }) {
                 ManagedImage({ sourcePath: r.thumbnailPath, label: r.caption || '准备参考图', ratio: 1, radius: 16 }).width(128).height(128)
-                Text(r.caption || (r.localPath ? '查看参考图' : '图片缺失 · 重新导入'))
+                Text(r.caption || (r.localPath ? '查看参考图' : '图片缺失，请重新导入'))
                   .fontSize(12)
                   .fontColor(Theme.muted)
                   .maxLines(2)

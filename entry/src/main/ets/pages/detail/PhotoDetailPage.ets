@@ -1,3 +1,5 @@
+import { displayName } from '../../common/format';
+import { ContextRow } from '../../component/ContextRow';
 import { photoStatusLabel } from '../../model/PhotoStages';
 import { PHOTO_LABELS, PHOTO_STATUSES } from '../../common/constants';
 import { PressFeedback } from '../../common/pressFeedback';
@@ -93,7 +95,7 @@ export struct PhotoDetail {
             .visualEffect(this.feedback.effect('select-1'))
             .compositingFilter(this.feedback.filter('select-1'))
             .attributeModifier(this.feedback.control('select-1'))
-          Button('所属计划 · ' + this.state.projectName(this.photo.projectId))
+          Button() { ContextRow({ label: '所属计划', text: displayName(this.state.projectName(this.photo.projectId)) }) }.type(ButtonType.Normal)
             .width('100%')
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)

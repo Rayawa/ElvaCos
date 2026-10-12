@@ -1,3 +1,4 @@
+import { ContextRow } from './ContextRow';
 import { AppState } from '../model/ApplicationState';
 import { BackupObjectCount } from '../model/MetadataBackupPreview';
 import { Theme } from '../common/Theme';
@@ -29,7 +30,7 @@ export struct BackupRestoreSheet {
       Scroll() {
         Column({ space: 14 }) {
           if (this.state.restorePreview) {
-            Text('元数据版本 v' + this.state.restorePreview.version + ' · 导出于 ' + formatTimestamp(this.state.restorePreview.exportedAt)).fontSize(16).fontColor(Theme.ink)
+            ContextRow({ label: '元数据 v' + this.state.restorePreview.version, text: formatTimestamp(this.state.restorePreview.exportedAt) })
             Text('完整替换所有本地业务记录，不合并；设置与系统相册原图保留。本地表单草稿将清理。旧版本未包含的对象类型也会清空。').fontSize(14).fontColor(Theme.muted)
             Text('JSON 不含照片文件。仅复用匹配的本机媒体路径；' + this.state.restorePreview.mediaWithoutLocalPath + ' 条图片记录没有可复用路径，恢复后需重新导入。现有路径对应的文件仍需打开时核对；照片版本的渲染图不恢复。活动提醒需在本机重新开启。').fontSize(14).fontColor(Theme.muted)
             Row() {

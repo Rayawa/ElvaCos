@@ -1,3 +1,5 @@
+import { displayName } from '../../common/format';
+import { ContextRow } from '../../component/ContextRow';
 import { AppState } from '../../model/ApplicationState';
 import { SearchRoute, SearchHit, SearchSummary, globalSearch, searchRows, SEARCH_SECTIONS, SEARCH_RESOURCE_KINDS, SEARCH_RESOURCE_LABELS } from '../../model/GlobalSearch';
 import { DashboardSearch } from '../../component/DashboardSearch';
@@ -41,7 +43,7 @@ export struct SearchPage {
               .id('search-resource-filter').value(SEARCH_RESOURCE_LABELS[SEARCH_RESOURCE_KINDS.indexOf(this.route.resourceKind)]).constraintSize({ minHeight: 48 })
               .onSelect((index: number): void => { this.route.setResourceKind(SEARCH_RESOURCE_KINDS[index]); }).accessibilityText('搜索资源类型')
           }
-          Text('本机搜索 · ' + SEARCH_SECTIONS[this.route.section] + ' · ' + this.rows.length + ' 条结果').id('search-result-count').fontSize(16).fontColor(Theme.muted)
+          ContextRow({ label: SEARCH_SECTIONS[this.route.section], text: this.rows.length + ' 条结果' }).id('search-result-count')
           if (this.route.section === 1 || !this.route.query.trim()) { Button('打开角色库').id('search-role-library').width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent).onClick(this.library) }
           if (this.route.feedback) { Text(this.route.feedback).fontSize(16).fontColor(Theme.accent) }
         }.width('100%').alignItems(HorizontalAlign.Start)
@@ -50,8 +52,8 @@ export struct SearchPage {
         ListItem() {
           Button() {
             Column({ space: 8 }) {
-              Text(hit.title).fontSize(18).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(hit.detail).fontSize(14).fontColor(Theme.muted)
+              Text(displayName(hit.title)).fontSize(18).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+              ContextRow({ label: hit.label, text: displayName(hit.detail) })
             }.width('100%').alignItems(HorizontalAlign.Start).padding(14)
           }.id('search-result:' + hit.key()).width('100%').constraintSize({ minHeight: 64 }).type(ButtonType.Normal).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
             .onClick((): void => { this.route.anchorKey = hit.key(); this.open(hit); }).accessibilityText('打开' + hit.title + '，' + hit.detail)

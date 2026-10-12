@@ -1,3 +1,5 @@
+import { displayName } from '../../common/format';
+import { ContextRow } from '../../component/ContextRow';
 import { LedgerRoute } from '../../model/LedgerRoute';
 import { LedgerSummary, LedgerCategory, buildLedgerSummary } from '../../model/LedgerSummary';
 import { DateField } from '../../component/DateField';
@@ -9,7 +11,7 @@ import { vibration } from '../../common/vibration';
 import { scrollByAxis } from '../../common/scroll';
 import { CosProject } from '../../model/Entities';
 import { Expense } from '../../model/Planning';
-import { SectionHeading, EmptyState } from '../../component/Surfaces';
+import { StatusPill, SectionHeading, EmptyState } from '../../component/Surfaces';
 import { pageTransition, StaggerEntrance } from '../../common/motion';
 import { InteractiveLineChart, ChartViewportState } from '../../component/charts/InteractiveLineChart';
 
@@ -73,7 +75,7 @@ export struct ExpenseSummary {
   private sourceLabel(): string {
     if (!this.route.sourceProjectId) { return '从全局花费统计进入'; }
     const project = this.state.projects.find((item: CosProject) => item.id === this.route.sourceProjectId);
-    return project ? '来源计划 · ' + project.name + '（进入时为全部日期）' : '来源计划已不存在';
+    return project ? '来源计划：' + displayName(project.name) + '（进入时为全部日期）' : '来源计划已不存在';
   }
   @Builder rangeControls() {
     Text(this.sourceLabel()).fontSize(14).fontColor(Theme.muted)
@@ -91,8 +93,7 @@ export struct ExpenseSummary {
     Select(this.categoryOptions()).id('expense-category-filter').value(this.route.category || '全部分类')
       .onSelect((index: number): void => { this.route.category = index === 0 ? '' : this.categoryNames[index - 1]; })
       .accessibilityText('花费分类筛选')
-    Text(this.summary.range.label + ' · ' + (this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划') + ' · ' + (this.route.category || '全部分类'))
-      .fontSize(14).fontColor(Theme.ink).id('expense-scope')
+    ContextRow({ label: this.route.category || '全部分类', text: (this.route.projectId ? displayName(this.state.projectName(this.route.projectId)) : '全部计划') + '，' + this.summary.range.label }).id('expense-scope')
   }
   @Builder moneySummary() {
     Column({ space: 8 }) {
@@ -100,11 +101,9 @@ export struct ExpenseSummary {
         .accessibilityText('当前范围已记录支出 ' + (this.summary.totalCents / 100).toFixed(2) + ' 元')
       Text(this.summary.budgetText).fontSize(14).fontColor(Theme.muted)
       if (this.summary.canCompareBudget) {
-        Text('明确预算的 ' + this.summary.budgetCount + ' 份计划累计支出 ¥' + (this.summary.budgetSpentCents / 100).toFixed(2) +
-          (this.summary.budgetSpentCents > this.summary.budgetCents ? ' · 超出预算 ¥' + ((this.summary.budgetSpentCents - this.summary.budgetCents) / 100).toFixed(2) : ' · 剩余预算 ¥' + ((this.summary.budgetCents - this.summary.budgetSpentCents) / 100).toFixed(2)))
-          .fontSize(14).fontColor(Theme.ink)
+        ContextRow({ label: this.summary.budgetSpentCents > this.summary.budgetCents ? '超出预算' : '剩余预算', text: '¥' + (Math.abs(this.summary.budgetCents - this.summary.budgetSpentCents) / 100).toFixed(2) })
       } else if (this.summary.budgetCount) { Text('预算属于计划整体；查看全部日期和全部分类可比较累计支出。').fontSize(14).fontColor(Theme.muted) }
-      Text('按费用记录日期统计；复用衣柜装备不会自动计费。').fontSize(14).fontColor(Theme.muted)
+
     }.padding(18).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius).alignItems(HorizontalAlign.Start)
   }
 
@@ -114,8 +113,10 @@ export struct ExpenseSummary {
       Column({ space: 8 }) {
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween, alignItems: ItemAlign.Center }) {
           Text(category.name).fontColor(Theme.ink)
-          Text('¥' + (category.amount / 100).toFixed(2) + ' · ' + category.percent.toFixed(1) + '%')
-            .fontSize(14).fontColor(Theme.accent)
+          Row({ space: 8 }) {
+            StatusPill({ label: category.percent.toFixed(1) + '%' })
+            Text('¥' + (category.amount / 100).toFixed(2)).fontSize(14).fontColor(Theme.ink)
+          }
         }.width('100%')
         Progress({ value: category.percent, total: 100, type: ProgressType.Linear })
           .width('100%').color(Theme.brand).backgroundColor(Theme.tint).accessibilityLevel('no')
@@ -143,9 +144,11 @@ export struct ExpenseSummary {
     ForEach(this.summary.records, (expense: Expense) => {
       Row({ space: 8 }) {
         Column({ space: 5 }) {
-          Text(expense.name + ' · ¥' + (expense.amountCents / 100).toFixed(2)).fontColor(Theme.ink)
-          Text(expense.date + ' · ' + expense.category + ' · ' + this.state.projectName(expense.projectId))
-            .fontSize(14).fontColor(Theme.muted)
+          Row({ space: 8 }) {
+            Text(expense.name).fontSize(16).fontColor(Theme.ink).layoutWeight(1)
+            Text('¥' + (expense.amountCents / 100).toFixed(2)).fontSize(16).fontColor(Theme.ink)
+          }.width('100%')
+          ContextRow({ label: expense.category, text: expense.date + '，' + displayName(this.state.projectName(expense.projectId)) })
         }.layoutWeight(1).constraintSize({ minHeight: 48 }).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Start).enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.edit('expense', expense.id, expense.projectId); })
           .accessibilityGroup(true).accessibilityRole(AccessibilityRoleType.BUTTON)
@@ -183,7 +186,7 @@ export struct ExpenseSummary {
             this.categoryChart()
             this.expenseRecords()
             if (this.summary.months.length) {
-              InteractiveLineChart({ title: '当前范围 · 有记录月份支出', unit: '元', points: this.summary.months,
+              InteractiveLineChart({ title: '有记录月份支出', unit: '元', points: this.summary.months,
                 viewport: { zoom: this.route.chartZoom, panRatio: this.route.chartPan },
                 onViewportChange: (value: ChartViewportState): void => { this.route.chartZoom = value.zoom; this.route.chartPan = value.panRatio; },
                 lineColor: Theme.brand, paletteId: Theme.paletteId, chartHeight: 220, responsiveAxisFont: true })

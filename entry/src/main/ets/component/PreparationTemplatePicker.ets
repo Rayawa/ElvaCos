@@ -13,8 +13,8 @@ export struct PreparationTemplatePicker {
   @Event change: (keys: string[], mode: number) => void = () => {};
   build() {
     Column({ space: 12 }) {
-      Select([{ value: '空白计划' }, { value: '常用准备模板' }, { value: '复用装备 · 不生成购买任务' }])
-        .value(['空白计划', '常用准备模板', '复用装备 · 不生成购买任务'][this.mode])
+      Select([{ value: '空白计划' }, { value: '常用准备模板' }, { value: '复用装备（不生成购买任务）' }])
+        .value(['空白计划', '常用准备模板', '复用装备（不生成购买任务）'][this.mode])
         .onSelect((index: number): void => { vibration.dotVibration(); this.change(preparationKeys(index), index); })
           .accessibilityText('准备模板')
           .visualEffect(this.feedback.effect('select-1'))
@@ -33,7 +33,7 @@ export struct PreparationTemplatePicker {
                     this.change(checked ? this.keys.filter((key: string) => key !== task.key)
                       .concat(task.key) : this.keys.filter((key: string) => key !== task.key), this.mode);
                   })
-                    .accessibilityText(category.name + ' · ' + task.label)
+                    .accessibilityText(category.name + '，' + task.label)
                     .visualEffect(this.feedback.effect('checkbox-3' + ":" + category.name + ":" + task.key))
                     .compositingFilter(this.feedback.filter('checkbox-3' + ":" + category.name + ":" + task.key))
                     .attributeModifier(this.feedback.control('checkbox-3' + ":" + category.name + ":" + task.key))

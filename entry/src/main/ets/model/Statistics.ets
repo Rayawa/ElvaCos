@@ -15,7 +15,7 @@ export function monthlyExpenses(records: Expense[], date: string, count: number 
     const key = String(cursor.getFullYear()) + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
     const matching = records.filter((record: Expense): boolean => record.date.slice(0, 7) === key);
     const cents = matching.reduce((sum: number, record: Expense): number => sum + record.amountCents, 0);
-    points.push({ label: key, value: cents / 100, detail: key + ' · ¥' + (cents / 100).toFixed(2) + ' · ' + matching.length + ' 笔' });
+    points.push({ label: key, value: cents / 100, detail: key + '，¥' + (cents / 100).toFixed(2) + '，' + matching.length + ' 笔' });
   }
   return points;
 }

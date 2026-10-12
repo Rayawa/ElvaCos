@@ -26,7 +26,8 @@ run_hdc shell aa force-stop top.rayawa.elvacos
 TASK_REPORT=$(mktemp)
 trap 'rm -f "$TASK_REPORT"' EXIT
 # Five roots, role library, global search, contextual plan views and settings; requires an unlocked screen.
+# Long collection coverage visits three owners with 32 rows each; keep its native calls serialized within one case.
 # Does not write business data; the system-calendar case opens its editor and cancels.
-run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyUITestRunner -s timeout 120000 > "$TASK_REPORT"
+run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyUITestRunner -s timeout 300000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
 rg 'Tests run: 15, Failure: 0, Error: 0, Pass: 15, Ignore: 0' "$TASK_REPORT"

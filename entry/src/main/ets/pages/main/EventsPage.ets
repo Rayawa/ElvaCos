@@ -1,3 +1,5 @@
+import { displayName } from '../../common/format';
+import { ContextRow } from '../../component/ContextRow';
 import { today, daysUntil } from '../../common/format';
 import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
@@ -75,12 +77,10 @@ export struct EventsPage {
         .fontSize(32)
         .fontWeight(FontWeight.Lighter)
         .fontColor(Theme.ink) }.width(55)
-      Column({ space: 6 }) { Text(e.name)
+      Column({ space: 6 }) { Text(displayName(e.name))
         .fontSize(20)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.ink); Text(eventDateLabel(e) + ' · ' + (e.city || e.venue || '地点待定'))
-        .fontSize(13)
-        .fontColor(Theme.muted); StatusPill({
+        .fontColor(Theme.ink); ContextRow({ label: eventDateLabel(e), text: e.city || e.venue || '地点待定' }); StatusPill({
           label: e.ticketPurchased ? '已购票' : e.dateMode === 'pending' ? '日期待定' : daysUntil(e.date) >= 0 ? daysUntil(e.date) + ' 天后' : eventEnd(e) >= today() ? '进行中' : '已结束'
         }) }.alignItems(HorizontalAlign.Start).layoutWeight(1)
     }.width('100%')
@@ -115,7 +115,7 @@ export struct EventsPage {
         width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0).translate({ y: this.animStep >= 1 ? 0 : 20 })
           Column({ space: 14 }) {
             if (this.view.pendingCount > 0 && (this.route.calendar || this.route.dateFocused)) {
-              Button('日期待定 · ' + this.view.pendingCount + ' 场活动').id('schedule-pending-entry').width('100%').constraintSize({ minHeight: 48 })
+              Button() { ContextRow({ label: '日期待定', text: this.view.pendingCount + ' 场活动' }) }.type(ButtonType.Normal).id('schedule-pending-entry').width('100%').constraintSize({ minHeight: 48 })
                 .backgroundColor(Theme.tint).fontColor(Theme.accent).onClick((): void => { this.route.showPending(); this.resetPosition(); })
             }
             if (this.route.eventType) { Text('活动类型筛选只影响活动，准备任务截止项仍按所选日期显示。').fontSize(14).fontColor(Theme.muted) }

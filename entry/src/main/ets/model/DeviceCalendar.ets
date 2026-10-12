@@ -24,7 +24,7 @@ export function deviceCalendarDraft(event: CosEvent): DeviceCalendarDraft {
   if (draft.isAllDay) { end.setDate(end.getDate() + 1); }
   else if (event.timeMode === 'start') { end.setHours(end.getHours() + 1); }
   draft.endTime = end.getTime();
-  draft.location = [event.city, event.venue].filter((value: string) => !!value).join(' · ');
+  draft.location = [event.city, event.venue].filter((value: string) => !!value).join('，');
   draft.description = [event.notes, event.url].filter((value: string) => !!value).join('\n');
   draft.reminderTime = [event.reminderMinutes >= 0 ? event.reminderMinutes : 30];
   return draft;

@@ -237,11 +237,11 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const { eventTimeline, planShootingLabel, availableDayModules }=day;
     const expo=Object.assign(new CosEvent(),{id:'shoot-event',dateMode:'multiple',date:'2026-10-08',endDate:'2026-10-10',timeMode:'range',startTime:'10:00',endTime:'18:00'});
     const plans=[Object.assign(new CosProject(),{id:'first',name:'第一套',eventId:expo.id,shootingTime:'11:00'}),Object.assign(new CosProject(),{id:'later',name:'第二套',eventId:expo.id,targetDate:'2026-10-09',shootingTime:'09:30'}),Object.assign(new CosProject(),{id:'foreign',eventId:'other',shootingTime:'08:00'})];
-    const before=JSON.stringify(plans); assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-08 · 11:00'); assert.equal(planShootingLabel(plans[1],[expo]),'2026-10-09 · 09:30');
+    const before=JSON.stringify(plans); assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-08 11:00'); assert.equal(planShootingLabel(plans[1],[expo]),'2026-10-09 09:30');
     assert.deepEqual(eventTimeline(expo,plans).map(item=>[item.id,item.date,item.time]),[['event-start','2026-10-08','10:00'],['project:first','2026-10-08','11:00'],['project:later','2026-10-09','09:30'],['event-end','2026-10-10','18:00']]); assert.equal(JSON.stringify(plans),before);
-    expo.date='2026-10-09'; assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-09 · 11:00');
+    expo.date='2026-10-09'; assert.equal(planShootingLabel(plans[0],[expo]),'2026-10-09 11:00');
     expo.dateMode='pending'; expo.date=''; expo.endDate=''; expo.timeMode='none'; expo.startTime=''; expo.endTime='';
-    assert.equal(planShootingLabel(plans[0],[expo]),'日期待定 · 11:00'); assert.equal(eventTimeline(expo,plans).at(-1).date,'');
+    assert.equal(planShootingLabel(plans[0],[expo]),'日期待定 11:00'); assert.equal(eventTimeline(expo,plans).at(-1).date,'');
     assert.equal(availableDayModules(expo,plans,[],[],Date.now()).includes('timeline'),true); plans[0].shootingTime=''; plans[1].shootingTime='';
     assert.equal(eventTimeline(expo,plans).length,0); assert.equal(availableDayModules(expo,plans,[],[],Date.now()).includes('timeline'),false); assert.equal(planShootingLabel(plans[0],[expo]),'拍摄时间未设置');
   });
@@ -288,7 +288,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(day.dayWindow(dayEvent, time('2026-10-10T23:59:59')), true);
     assert.equal(day.dayWindow(dayEvent, time('2026-10-11T00:00:00')), false);
     assert.equal(day.dayWindow(Object.assign(new CosEvent(), { dateMode: 'pending' }), time('2026-10-08T12:00:00')), false);
-    assert.equal(day.dayTitle(dayEvent, time('2026-10-07T20:00:00')), '明天 · ' + dayEvent.name);
+    assert.equal(day.dayTitle(dayEvent, time('2026-10-07T20:00:00')), '明天 ' + dayEvent.name);
     assert.equal(day.dayNumber(dayEvent, time('2026-10-09T12:00:00')), '第 2 天');
     const newYear = Object.assign(new CosEvent(), { date: '2027-01-01' });
     assert.equal(day.dayWindow(newYear, time('2026-12-31T20:00:00')), true);
@@ -300,7 +300,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.deepEqual(day.dayEntries([dayEvent, another], { day: '2026-10-08' }, time('2026-10-09T12:00:00')).map(e => e.id), ['day']);
     assert.equal(day.dayEntries([tomorrow, dayEvent], {}, time('2026-10-08T21:00:00'))[0].id, 'day');
     assert.deepEqual(day.dayEntries([dayEvent], {}, time('2026-10-11T00:00:00')), []);
-    assert.equal(day.dayTitle(dayEvent, time('2026-10-11T00:00:00')), '2026-10-08 · ' + dayEvent.name);
+    assert.equal(day.dayTitle(dayEvent, time('2026-10-11T00:00:00')), '2026-10-08 ' + dayEvent.name);
   });
   await test('multi-event strip prioritizes the next start before elapsed starts and tomorrow', () => {
     const make = (id, date, startTime) => Object.assign(new CosEvent(), { id, date, timeMode: 'start', startTime });
@@ -396,6 +396,10 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const r = read(); assert.equal(r.prep.done, 1); assert.equal(r.prep.total, 8); assert.equal(r.prep.waiting, 2);
     assert.equal(r.pack.packed, 1); assert.equal(r.equipment.available, 0); assert.equal(r.equipment.total, 1);
     assert.equal(r.money.spentCents, 1234); assert.equal(r.date, event.date); assert.equal(r.dateFromEvent, true);
+    assert.deepEqual({ label: r.hint.label, text: r.hint.text }, { label: '在途', text: 'waiting' });
+    const unavailable = Object.assign(new Asset(), { id: asset.id, name: '备用道具', status: AssetStatus.REPAIR });
+    const equipmentOnly = buildPlanReadiness(project, [], [], [unavailable], [link], [], [], [event], '2026-12-31');
+    assert.deepEqual({ label: equipmentOnly.hint.label, text: equipmentOnly.hint.text }, { label: '装备不可用', text: '备用道具' });
   });
   await test('waiting and undated tasks never become overdue; week crosses year', () => {
     const r = read(); assert.deepEqual(r.prep.overdue.map(t => t.id), ['overdue']); assert.deepEqual(r.prep.today.map(t => t.id), ['today']);
@@ -824,7 +828,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(card.value.spentCents, summary.money.spentCents); assert.equal(card.value.spentCents, 12345);
     assert.equal(card.value.reusedEquipmentCount, summary.equipment.total); assert.equal(card.value.equipmentValueCents, 50000);
     assert.equal(card.value.variant, '冬装'); assert.equal(card.value.event, '漫展'); assert.equal(card.value.date, '2026-10-01'); assert.equal(card.value.dateFromEvent, true);
-    assert.deepEqual(card.value.credits, ['摄影 · 伙伴']); assert.equal(card.value.coverPhotoId, 'published'); assert.equal(card.coverPath, '/local/published');
+    assert.deepEqual(card.value.credits, ['摄影：伙伴']); assert.equal(card.value.coverPhotoId, 'published'); assert.equal(card.coverPath, '/local/published');
     assert.equal(card.value.characterId, 'role'); assert.equal(state.references.length, 1); assert.equal(state.photos.length, 5);
     state.projects[0].targetDate = '2026-09-30'; assert.equal(state.projectWork('finished').value.date, '2026-09-30'); assert.equal(state.projectWork('finished').value.dateFromEvent, false);
     state.photos = state.photos.filter(photo => !['final', 'published'].includes(photo.id)); const empty = state.projectWork('finished');
@@ -861,7 +865,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   await test('structured sharing reuses the work card payload, excludes local paths and reports missing context or rejected native share', async () => {
     const { ShareService } = require(root + '/common/ShareService.ets'), { projectShareText } = require(root + '/model/ProjectWork.ets'), state = workFixture();
     const card = state.projectWork('finished'); assert.equal(ShareService.object(card), card.value); const text = projectShareText(card.value);
-    assert.match(text, /冬装/); assert.match(text, /摄影 · 伙伴/); assert.match(text, /123.45/); assert.match(text, /未计入支出/);
+    assert.match(text, /冬装/); assert.match(text, /摄影：伙伴/); assert.match(text, /123.45/); assert.match(text, /未计入支出/);
     state.context = {}; shareControl = {}; assert.equal(await state.shareProject('finished'), true);
     assert.deepEqual(JSON.parse(shareControl.data.extraData.payload), card.value); assert.equal(shareControl.data.content, text); assert.equal(shareControl.data.extraData.schemaVersion, 2);
     assert.equal(shareControl.data.extraData.payload.includes('/local/'), false); assert.equal(shareControl.data.content.includes('/local/'), false);
@@ -1102,7 +1106,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       await state.variantRepo.save(Object.assign(new entities.CharacterVariant(), { id: 'winter', characterId: 'role', name: '冬装' }));
       state.refresh = async () => { state.characters = await state.characterRepo.list(); state.variants = await state.variantRepo.list(); state.projects = await state.projectRepo.list(); state.diary = await state.diaryRepo.list(); state.preparationCategories = await state.preparationRepo.categories(); state.preparationTasks = await state.preparationRepo.tasks(); };
       await state.refresh(); const source = state.variants[0], draft = EditDraft.make(state, 'project', '', 'role', 'winter');
-      db.failSql = 'INSERT INTO projects'; assert.equal(await draft.save(state), false); assert.equal(draft.id, ''); assert.equal(draft.variantId, 'winter'); assert.equal(draft.name, '角色 · 计划'); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 3);
+      db.failSql = 'INSERT INTO projects'; assert.equal(await draft.save(state), false); assert.equal(draft.id, ''); assert.equal(draft.variantId, 'winter'); assert.equal(draft.name, '角色计划'); assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 3);
       db.failSql = ''; assert.equal(await draft.save(state), true); const saved = (await db.sql('SELECT character_id,variant_id FROM projects WHERE id=?', [draft.creationId])).rows[0]; assert.deepEqual(saved, ['role', 'winter']);
       assert.equal(source.name, '冬装'); assert.equal(state.projects.find(project => project.id === draft.creationId).variantId, 'winter'); assert.equal(state.projectWork(draft.creationId).value.variant, '冬装');
       assert.equal((await db.sql('SELECT count(*) FROM characters')).rows[0][0], 1); assert.equal((await db.sql('SELECT count(*) FROM variants')).rows[0][0], 1);

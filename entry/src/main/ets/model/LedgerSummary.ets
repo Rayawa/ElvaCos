@@ -45,7 +45,7 @@ export function ledgerRange(route: LedgerRoute, today: string): LedgerRange {
       result.end = today.slice(0, 7) + '-' + String(last).padStart(2, '0'); result.label = '本月';
     }
   } else { result.error = '当前日期暂不可用，请选择自定义日期或全部日期'; }
-  if (!result.error) { result.label += ' · ' + result.start + ' 至 ' + result.end; }
+  if (!result.error) { result.label += '，' + result.start + ' 至 ' + result.end; }
   return result;
 }
 
@@ -71,7 +71,7 @@ export function buildLedgerSummary(expenses: Expense[], plans: PlanReadiness[], 
   for (const category of result.categories) { category.percent = result.totalCents ? category.amount * 100 / result.totalCents : 0; }
   result.categories.sort((a: LedgerCategory, b: LedgerCategory) => b.amount - a.amount || a.name.localeCompare(b.name));
   result.months = months.sort((a: LedgerCategory, b: LedgerCategory) => a.name.localeCompare(b.name))
-    .map((month: LedgerCategory): MonthlyExpensePoint => ({ label: month.name, value: month.amount / 100, detail: month.name + ' · ¥' + (month.amount / 100).toFixed(2) + ' · ' + month.count + ' 笔' }));
+    .map((month: LedgerCategory): MonthlyExpensePoint => ({ label: month.name, value: month.amount / 100, detail: month.name + '，¥' + (month.amount / 100).toFixed(2) + '，' + month.count + ' 笔' }));
   const scopedPlans = plans.filter((plan: PlanReadiness) => !route.projectId || plan.id === route.projectId);
   const budgeted = scopedPlans.filter((plan: PlanReadiness) => plan.money.budgetConfigured === true);
   result.budgetCount = budgeted.length;
@@ -79,6 +79,6 @@ export function buildLedgerSummary(expenses: Expense[], plans: PlanReadiness[], 
   result.budgetSpentCents = budgeted.reduce((sum: number, plan: PlanReadiness) => sum + plan.money.spentCents, 0);
   result.canCompareBudget = route.range === 'all' && !route.category && result.budgetCount > 0;
   result.budgetText = route.projectId && scopedPlans.length ? '计划' + budgetLabel(scopedPlans[0].money.budgetConfigured, scopedPlans[0].money.budgetCents) :
-    result.budgetCount ? '计划总预算 ¥' + (result.budgetCents / 100).toFixed(2) + ' · 覆盖 ' + result.budgetCount + ' 份计划' : '当前计划范围无明确预算';
+    result.budgetCount ? '计划总预算 ¥' + (result.budgetCents / 100).toFixed(2) + '，覆盖 ' + result.budgetCount + ' 份计划' : '当前计划范围无明确预算';
   return result;
 }

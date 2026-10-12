@@ -1,3 +1,6 @@
+import { ContextRow } from './ContextRow';
+import { displayName } from '../common/format';
+import { StatusPill } from './Surfaces';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { AppState } from '../model/ApplicationState';
@@ -206,7 +209,7 @@ export struct EntryCollection {
       if (this.route.scopeKind === 'global') {
         Select([{ value: '未归位' }, { value: '全部收录' }]).value(this.route.untriagedOnly ? '未归位' : '全部收录').id('entry-scope-filter')
           .onSelect((index: number): void => { this.route.setUntriagedOnly(index === 0); })
-        Text('未归位 ' + this.state.untriagedEntries.length + ' 条 · 归位可稍后处理').fontSize(13).fontColor(Theme.muted)
+        ContextRow({ label: '未归位', text: this.state.untriagedEntries.length + ' 条' })
       }
       Select(new Array<SelectOption>({ value: '所有类型' }).concat(ENTRY_KIND_LABELS.map((label: string): SelectOption => ({ value: label }))))
         .value(this.route.kind ? ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.route.kind)] : '所有类型').id('entry-kind-filter')
@@ -217,8 +220,11 @@ export struct EntryCollection {
           Row({ space: 12 }) {
             if (entry.thumbnailPath) { ManagedImage({ sourcePath: entry.thumbnailPath, label: entryTitle(entry) }).width(56).height(56) }
             Column({ space: 6 }) {
-              Text((entry.pinned ? '置顶 · ' : '') + entryTitle(entry)).fontSize(16).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(entry.kind)] + ' · ' + this.ownerName(entry)).fontSize(12).fontColor(Theme.muted)
+              Row({ space: 8 }) {
+                if (entry.pinned) { StatusPill({ label: '置顶' }) }
+                Text(displayName(entryTitle(entry))).fontSize(16).fontColor(Theme.ink).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+              }.width('100%')
+              ContextRow({ label: ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(entry.kind)], text: displayName(this.ownerName(entry)) })
             }.layoutWeight(1).alignItems(HorizontalAlign.Start)
             Text('›').fontColor(Theme.muted)
           }.width('100%').padding(14)

@@ -1,3 +1,4 @@
+import { ContextRow } from '../ContextRow';
 import { common } from '@kit.AbilityKit';
 import { Theme } from '../../common/Theme';
 import { PressFeedback } from '../../common/pressFeedback';
@@ -38,7 +39,7 @@ export struct DistributionChart {
   }
   private summary(): string {
     const item = this.items[this.selected];
-    return item ? item.label + ' · ' + item.value + ' 张 · ' + (this.total() > 0 ? item.value * 100 / this.total() : 0).toFixed(1) + '%' : '暂无照片';
+    return item ? item.label + '，' + item.value + ' 张，占比 ' + (this.total() > 0 ? item.value * 100 / this.total() : 0).toFixed(1) + '%' : '暂无照片';
   }
   @Monitor('items')
   private dataChanged(): void { this.selected = Math.max(0, this.items.findIndex((item: PhotoDistributionItem): boolean => item.value > 0)); this.animate(); }
@@ -121,7 +122,7 @@ export struct DistributionChart {
           .attributeModifier(this.feedback.control('distribution-canvas', true))
           .accessibilityText(this.title + '环形图，' + this.summary())
           .accessibilityDescription('点击扇区或下方图例查看数量与占比')
-        Text(this.summary()).fontSize(13).fontColor(Theme.muted).width('100%')
+        ContextRow({ label: this.items[this.selected]?.label || '照片', text: (this.items[this.selected]?.value || 0) + ' 张，占比 ' + (this.total() > 0 ? (this.items[this.selected]?.value || 0) * 100 / this.total() : 0).toFixed(1) + '%' })
         GridRow({ columns: 2, gutter: { x: 8, y: 8 } }) {
           ForEach(this.items, (item: PhotoDistributionItem, index: number) => {
             GridCol() {

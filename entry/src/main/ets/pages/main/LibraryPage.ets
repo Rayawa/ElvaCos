@@ -1,3 +1,5 @@
+import { ContextRow } from '../../component/ContextRow';
+import { displayName } from '../../common/format';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, ASSET_TYPES, ASSET_TYPE_LABELS } from '../../common/constants';
 import { MainEntranceSession, startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
@@ -56,18 +58,20 @@ export struct LibraryPage {
     if (this.route.locationMode === 'named' && !values.includes(this.route.location)) { values.push(this.route.location); }
     return values;
   }
-  private locationLabels(): string[] { return ['全部位置', '未记录位置'].concat(this.locations().map((value: string) => '存放位置 · ' + value)); }
+  private locationLabels(): string[] { return ['全部位置', '未记录位置'].concat(this.locations().map((value: string) => '存放位置：' + value)); }
   private locationIndex(): number { return this.route.locationMode === 'all' ? 0 : this.route.locationMode === 'unrecorded' ? 1 : this.locations().indexOf(this.route.location) + 2; }
   @Builder controls() {
     DashboardSearch({ value: this.route.query, placeholder: '搜索装备 / 存放位置', label: '搜索衣柜', changed: (value: string): void => { this.route.query = value; this.route.changed(); } })
-    Select(['全部类型'].concat(ASSET_TYPE_LABELS).map((label: string): SelectOption => { return { value: label }; }))
-      .value(this.route.type ? ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.route.type as AssetType)] : '全部类型').constraintSize({ minHeight: 48 })
-      .onSelect((index: number): void => { this.route.type = index ? ASSET_TYPES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备类型筛选')
-    Select(['全部状态'].concat(ASSET_STATUS_LABELS).map((label: string): SelectOption => { return { value: label }; }))
-      .value(this.route.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.route.status as AssetStatus)] : '全部状态').constraintSize({ minHeight: 48 })
-      .onSelect((index: number): void => { this.route.status = index ? ASSET_STATUSES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备状态筛选')
-    Select(this.locationLabels().map((label: string): SelectOption => { return { value: label }; })).value(this.locationLabels()[this.locationIndex()]).constraintSize({ minHeight: 48 })
-      .onSelect((index: number): void => { this.route.locationMode = index === 0 ? 'all' : index === 1 ? 'unrecorded' : 'named'; this.route.location = index > 1 ? this.locations()[index - 2] : ''; this.route.changed(); }).accessibilityText('衣柜存放位置筛选')
+    Flex({ wrap: FlexWrap.Wrap }) {
+      Select(['全部类型'].concat(ASSET_TYPE_LABELS).map((label: string): SelectOption => { return { value: label }; }))
+        .value(this.route.type ? ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.route.type as AssetType)] : '全部类型').constraintSize({ minHeight: 48 })
+        .onSelect((index: number): void => { this.route.type = index ? ASSET_TYPES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备类型筛选').margin({ right: 12, bottom: 8 })
+      Select(['全部状态'].concat(ASSET_STATUS_LABELS).map((label: string): SelectOption => { return { value: label }; }))
+        .value(this.route.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.route.status as AssetStatus)] : '全部状态').constraintSize({ minHeight: 48 })
+        .onSelect((index: number): void => { this.route.status = index ? ASSET_STATUSES[index - 1] : ''; this.route.changed(); }).accessibilityText('衣柜装备状态筛选').margin({ right: 12, bottom: 8 })
+      Select(this.locationLabels().map((label: string): SelectOption => { return { value: label }; })).value(this.locationLabels()[this.locationIndex()]).constraintSize({ minHeight: 48 })
+        .onSelect((index: number): void => { this.route.locationMode = index === 0 ? 'all' : index === 1 ? 'unrecorded' : 'named'; this.route.location = index > 1 ? this.locations()[index - 2] : ''; this.route.changed(); }).accessibilityText('衣柜存放位置筛选').margin({ bottom: 8 })
+    }.width('100%')
     if (this.route.filtered) { Button('清除衣柜筛选').constraintSize({ minHeight: 48 }).onClick((): void => { this.route.clear(); }) }
     if (this.route.feedback) { Text(this.route.feedback).fontSize(14).fontColor(Theme.accent) }
     SectionHeading({ title: '我的衣柜', trailing: this.assets().length + ' 件装备' })
@@ -75,12 +79,12 @@ export struct LibraryPage {
   @Builder assetContent(asset: Asset) {
     Column({ space: 8 }) {
       Row({ space: 12 }) {
-        Text(asset.name).fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+        Text(displayName(asset.name)).fontSize(19).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
         StatusPill({ label: ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(asset.status)] })
       }.width('100%')
-      Text(ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(asset.type)] + ' · ' + (asset.location.trim() || '未记录位置')).fontSize(14).fontColor(Theme.muted)
-      Text('使用计划 ' + this.state.assetUsage(asset.id).projects.length + ' 份' + (this.state.assetUsage(asset.id).projects.length ? ' · ' + this.state.assetUsage(asset.id).projects.slice(0, 2).map((project) => project.name).join(' / ') : '')).fontSize(14).fontColor(Theme.muted)
-      if (asset.status !== AssetStatus.OWNED) { Text('当前不可用 · 影响 ' + this.state.assetUsage(asset.id).activeProjects.length + ' 份进行中计划').fontSize(14).fontColor(Theme.accent) }
+      ContextRow({ label: ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(asset.type)], text: asset.location.trim() || '未记录位置' })
+      Text('使用计划 ' + this.state.assetUsage(asset.id).projects.length + ' 份').fontSize(14).fontColor(Theme.muted)
+      if (asset.status !== AssetStatus.OWNED && this.state.assetUsage(asset.id).activeProjects.length > 0) { Text('影响 ' + this.state.assetUsage(asset.id).activeProjects.length + ' 份进行中计划').fontSize(14).fontColor(Theme.muted) }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
   build() {
