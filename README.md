@@ -97,6 +97,7 @@ UI → ApplicationState/领域规则 → Repository → RDB。`common/appState.e
 | [架构](docs/ARCHITECTURE.md) | 状态、数据库、媒体、生命周期 |
 | [能力矩阵](docs/CAPABILITIES.md) | API / SysCap / 权限与降级 |
 | [界面参考](docs/UI_STYLE.md) | Dashboard 来源、交互、响应式与反馈 |
+| [UI/UX 审计](docs/UI_UX_AUDIT.md) | 现有界面的 P0/P1/P2 问题、设计系统处方与整改批次 |
 | [主题](docs/THEMES.md) | 五组资源、持久化与可读性 |
 | [示例数据](docs/DEMO_DATA.md) | 数据数量、来源、加载规则与隔离测试 |
 | [华为账号](docs/HUAWEI_ACCOUNT_SETUP.md) | 公开 ID、证书、登录问题与云空间边界 |

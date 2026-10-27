@@ -14,6 +14,8 @@
 /build-profile.json5
 # 本机真机截图/布局 dump 与调试脚本，不入库
 /.shots
+# 本机 UI/UX 审计原始报告（结论已整理进 docs/UI_UX_AUDIT.md）
+/.audit
 
 # macOS Finder 元数据
 .DS_Store
