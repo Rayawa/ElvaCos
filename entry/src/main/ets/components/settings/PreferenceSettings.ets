@@ -22,7 +22,7 @@ export struct PreferenceSettings {
         })
     }
 
-    @Builder appearanceControl() {
+    @LocalBuilder appearanceControl() {
         SettingsChoiceSlider({
             index: Math.max(0, APPEARANCE_VALUES.indexOf(this.appearance)),
             labels: APPEARANCE_LABELS,
@@ -32,7 +32,7 @@ export struct PreferenceSettings {
         })
     }
 
-    @Builder handControl() {
+    @LocalBuilder handControl() {
         SettingsChoiceSlider({
             index: Math.max(0, HAND_VALUES.indexOf(this.hand)),
             labels: HAND_LABELS,
@@ -50,9 +50,9 @@ export struct PreferenceSettings {
         Column() {
             SettingsPreferenceRow({ label: '主题配色', icon: Icons.theme, control: this.themeControl })
             this.divider()
-            SettingsPreferenceRow({ label: '应用外观', icon: Icons.light, control: this.appearanceControl.bind(this) })
+            SettingsPreferenceRow({ label: '应用外观', icon: Icons.light, control: this.appearanceControl })
             this.divider()
-            SettingsPreferenceRow({ label: '操作模式', icon: Icons.hand, control: this.handControl.bind(this) })
+            SettingsPreferenceRow({ label: '操作模式', icon: Icons.hand, control: this.handControl })
             this.divider()
         }.width('100%')
     }

@@ -9,7 +9,8 @@ import { ManagedImage } from '../common/ManagedImage';
 import { AppState } from '../../state/ApplicationState';
 import { Theme } from '../../ui/theme/Theme';
 import { ArrayDataSource } from '../../models/ArrayDataSource';
-import { groupPhotoRows } from '../../domain/photos/PhotoRows';
+import { photoColumnCount } from '../../config/responsive';
+import { groupPhotoRows, indexPhotoRows, changedPhotoRows } from '../../domain/photos/PhotoRows';
 import { PhotoAsset, PhotoStatus } from '../../models/Entities';
 import { vibration } from '../../ui/feedback/vibration';
 
@@ -38,8 +39,9 @@ export struct PhotoGrid {
     @Builder emptyHeader() {
     }
 
-    @Local viewportWidth: number = 360;
+    @Local columnCount: number = 2;
     private rowsSource: ArrayDataSource<PhotoAsset[]> = new ArrayDataSource<PhotoAsset[]>([]);
+    private rowIndexes: Map<string, number> = new Map<string, number>();
     private restoreTimer: number = -1;
     private restoring: boolean = false;
     private restored: boolean = false;
@@ -59,9 +61,10 @@ export struct PhotoGrid {
         }
     }
 
-    @Monitor('photos', 'route', 'route.filter', 'route.portfolio', 'route.queue', 'route.planId', 'viewportWidth')
+    @Monitor('photos', 'route', 'route.filter', 'route.portfolio', 'route.queue', 'route.planId', 'columnCount')
     private refreshRows(): void {
         this.rowsSource.replace(this.photoRows);
+        this.rowIndexes = indexPhotoRows(this.photoRows);
         this.previousSelection = new Set<string>(this.route.selectedIds);
         this.previousSelecting = this.route.selecting;
     }
@@ -70,11 +73,15 @@ export struct PhotoGrid {
     @Monitor('route.selecting', 'route.selectedIds')
     private selectionChanged(): void {
         const next = this.selectedPhotoIds;
-        this.photoRows.forEach((row: PhotoAsset[], index: number): void => {
-            if (this.previousSelecting !== this.route.selecting || row.some((photo: PhotoAsset) => this.previousSelection.has(photo.id) !== next.has(photo.id))) {
+        if (this.previousSelecting !== this.route.selecting) {
+            for (let index = 0; index < this.rowsSource.totalCount(); index++) {
                 this.rowsSource.changed(index);
             }
-        });
+        } else {
+            changedPhotoRows(this.rowIndexes, this.previousSelection, next).forEach((index: number): void => {
+                this.rowsSource.changed(index);
+            });
+        }
         this.previousSelection = new Set<string>(this.route.selectedIds);
         this.previousSelecting = this.route.selecting;
     }
@@ -220,7 +227,7 @@ export struct PhotoGrid {
     }
 
     private columns(): number {
-        return this.viewportWidth >= 720 ? 4 : this.viewportWidth >= 520 ? 3 : 2;
+        return this.columnCount;
     }
 
     build() {
@@ -287,7 +294,10 @@ export struct PhotoGrid {
             .height('100%')
             .padding({ left: this.sidePadding, right: this.sidePadding }).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
             .onAreaChange((_old: Area, area: Area): void => {
-                this.viewportWidth = Number(area.width);
+                const count = photoColumnCount(Number(area.width));
+                if (count !== this.columnCount) {
+                    this.columnCount = count;
+                }
                 this.viewportHeight = Number(area.height);
                 if (!this.restored && this.viewportHeight > 0) {
                     this.restoreOffset();

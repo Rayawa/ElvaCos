@@ -54,7 +54,7 @@ export struct DetailDestination {
         return options;
     }
 
-    private onBackPress(): boolean {
+    onBackPress(): boolean {
         if (handleSheetBack()) { return true; }
         this.back();
         return true;

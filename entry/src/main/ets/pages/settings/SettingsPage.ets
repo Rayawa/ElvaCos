@@ -278,7 +278,7 @@ export struct SettingsPage {
         }.width('100%').opacity(this.entrance.step >= 4 ? 1 : 0).translate({ y: this.entrance.step >= 4 ? 0 : 20 })
     }
 
-    @Builder
+    @LocalBuilder
     private preferenceItems(): void {
         PreferenceSettings({
             isEnabled: !this.state.busy,
@@ -291,7 +291,7 @@ export struct SettingsPage {
             if (this.section === 0) {
                 Column({ space: Theme.sectionContentGap }) {
                     this.groupTitle('偏好与交互')
-                    SettingsPanel({ active: true, additionalSettings: this.preferenceItems.bind(this),
+                    SettingsPanel({ active: true, additionalSettings: this.preferenceItems,
                         onSettingsChanged: (): void => { this.state.reloadSettings(); } })
                     if (this.state.settingsBusy) { Text('正在保存设置…').fontSize(12).fontColor(Theme.muted) }
                 }.width('100%')

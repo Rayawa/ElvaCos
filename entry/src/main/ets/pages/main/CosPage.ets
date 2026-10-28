@@ -1,4 +1,5 @@
 import { ArrayDataSource } from '../../models/ArrayDataSource';
+import { cardColumnCount } from '../../config/responsive';
 import { filterCharacters } from '../../domain/characters/CharacterLibrary';
 import { PressFeedback } from '../../ui/feedback/pressFeedback';
 import { MainEntranceSession, startStaggerEnterAnimation, cancelStaggerEnterAnimation } from '../../ui/animation/motion';
@@ -183,7 +184,7 @@ export struct CosPage {
         this.characterSource.replace(this.visibleCharacters);
     }
 
-    @Builder controls() {
+    @LocalBuilder controls() {
         Column({ space: 12 }) {
             Blank().height(this.topInset).width('100%')
             DashboardSearch({ value: this.route.query, placeholder: this.projects ? '搜索计划 / 角色' : '搜索角色 / 作品',
@@ -260,7 +261,7 @@ export struct CosPage {
 
     build() {
         List({ space: Theme.cardSpacing, scroller: this.scroller }) {
-            ListItemGroup({ header: this.controls.bind(this), space: Theme.cardSpacing }) {
+            ListItemGroup({ header: this.controls, space: Theme.cardSpacing }) {
                 if (this.projects) {
                     LazyForEach(this.planSource, (project: CosProject) => {
                         ListItem() {
@@ -297,13 +298,15 @@ export struct CosPage {
                 }
             }
             ListItem() {
-                Blank().height(this.bottomInset).width('100%')
+                Column() {
+                    Blank().height(this.bottomInset).width('100%')
+                }.width('100%')
             }
         }.width('100%').height('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
             .lanes(this.columns, 12).cachedCount(4).padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             .scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
             .onAreaChange((_, area: Area): void => {
-                const columns = Number(area.width) >= 720 ? 2 : 1;
+                const columns = cardColumnCount(Number(area.width));
                 if (this.columns !== columns) {
                     this.columns = columns;
                 }

@@ -110,7 +110,7 @@ export struct AppLogPage {
             .attributeModifier(this.feedback.control('release-' + release.version, true))
     }
 
-    @Builder
+    @LocalBuilder
     private logContent(entrance: StaggerEntrance): void {
         Scroll(this.scroller) {
             Column({ space: Theme.sectionSpacing }) {
@@ -142,7 +142,7 @@ export struct AppLogPage {
             titleOptions: SystemCapability.titleBar('更新日志', this.effects, this.materialLevel,
                 undefined, this.menus(), false, this.back),
             back: this.back,
-            content: this.logContent.bind(this),
+            content: this.logContent,
         })
     }
 }

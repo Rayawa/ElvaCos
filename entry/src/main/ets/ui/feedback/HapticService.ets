@@ -12,8 +12,8 @@ export class HapticService {
 
     static back(enabled: boolean, level: number = 1): void {
         const now = Date.now();
-        if (enabled && now - this.lastBack > 220) {
-            this.lastBack = now;
+        if (enabled && now - HapticService.lastBack > 220) {
+            HapticService.lastBack = now;
             vibration.backVibration();
         }
     }

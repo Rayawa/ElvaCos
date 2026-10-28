@@ -7,7 +7,7 @@ import { CharacterRoute } from '../models/CharacterRoute';
 import { AssetRoute } from '../models/AssetRoute';
 import { WardrobeRoute, assetUsesSegments } from '../domain/wardrobe/Wardrobe';
 import { AlbumRoute } from '../models/AlbumRoute';
-import { PhotoCollectionRoute, PhotoViewerRoute, returnToPhotoCollection } from '../models/PhotoCollection';
+import { PhotoCollectionRoute, PhotoViewerRoute, returnToPhotoCollection, selectPhotoCollection } from '../models/PhotoCollection';
 import { AlbumPage } from './main/AlbumPage';
 import { BackupRestoreSheet } from '../components/backup/BackupRestoreSheet';
 import { EventRoute, EventReturnPath } from '../models/EventRoute';
@@ -63,6 +63,7 @@ import { FormSession } from '../state/forms/FormSession';
 import { formDraftStore } from '../state/forms/formDrafts';
 import { FormEditor } from '../components/forms/FormEditor';
 import { EmptyState } from '../components/common/Surfaces';
+import { AppShortcut, resolveAppShortcut } from '../ui/input/shortcuts';
 
 @Entry
 @ComponentV2
@@ -233,6 +234,59 @@ struct Dashboard {
         }
         HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
         return false;
+    }
+
+    private onShortcut(event: KeyEvent): boolean {
+        if (event.type !== KeyType.Down) {
+            return false;
+        }
+        let shortcut: AppShortcut = AppShortcut.NONE;
+        try {
+            shortcut = resolveAppShortcut(event.keyCode, event.getModifierKeyState?.(['Ctrl']) === true,
+                event.getModifierKeyState?.(['Alt']) === true, event.getModifierKeyState?.(['Shift']) === true,
+                event.metaKey !== 0);
+        } catch (_error) {
+            return false;
+        }
+        if (shortcut === AppShortcut.NONE) {
+            return false;
+        }
+        if (shortcut === AppShortcut.BACK) {
+            const canReturn = this.formOpen || this.importOpen || this.restoreOpen || this.detailStack.size() > 0 || this.stacks[this.tab].size() > 0;
+            return canReturn ? this.onBackPress() : false;
+        }
+        if (!this.state.ready || this.state.busy || this.state.staleScopes.length || this.formOpen || this.importOpen || this.restoreOpen) {
+            return false;
+        }
+        if (shortcut === AppShortcut.SEARCH && this.detailStack.getAllPathName()[this.detailStack.size() - 1] === 'search') {
+            try {
+                this.getUIContext().getFocusController().requestFocus('global-search-input');
+                return true;
+            } catch (_error) {
+                return false;
+            }
+        }
+        if (!this.rootVisible || !this.rootPagesVisible[this.tab]) {
+            return false;
+        }
+        if (shortcut >= AppShortcut.HOME && shortcut <= AppShortcut.ALBUM) {
+            if (this.tab !== shortcut) {
+                this.tabsController.changeIndex(shortcut);
+            }
+            return true;
+        }
+        if (shortcut === AppShortcut.SEARCH) {
+            this.open('search', 'all');
+        } else if (shortcut === AppShortcut.SETTINGS) {
+            this.open('settings', 'settings');
+        } else if (shortcut === AppShortcut.CREATE) {
+            if (this.tab === AppShortcut.ALBUM) {
+                this.chooseImport(this.albumRoute.collection.planId);
+            } else {
+                this.edit(this.tab === AppShortcut.SCHEDULE ? 'event' : this.tab === AppShortcut.WARDROBE ? 'asset' : 'project');
+            }
+        }
+        return true;
     }
     /** 二级页面返回：Dashboard AppDetailPage 的 closePage 语义 + 显式返回振动。 */
 
@@ -561,7 +615,9 @@ struct Dashboard {
                     this.closeEvent(param as EventRoute);
                 }, shown: (): void => {
                     (param as EventRoute).restoreVersion++;
-                }, content: this.eventContent.bind(this, param as EventRoute) })
+                }, content: (entrance: StaggerEntrance): void => {
+                    this.eventContent(param as EventRoute, entrance);
+                } })
         }
     }
     /** 开发者选项入口：设置页连点版本号五次，按需求不振动。 */
@@ -776,7 +832,7 @@ struct Dashboard {
         if (this.rootSheetKind === 'form') {
             options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
             options.onWillDismiss = (action: DismissSheetAction): void => {
-                void dismissSheet(action, this.allowFormClose.bind(this));
+                void dismissSheet(action, (): Promise<boolean> => this.allowFormClose());
             };
         }
         if (this.rootSheetKind === 'restore') {
@@ -1070,7 +1126,9 @@ struct Dashboard {
                 changed: (index: number): void => {
                     this.changeView(kind, param, index);
                 },
-                content: this.destinationPage.bind(this, kind, param, entrance) })
+                content: (): void => {
+                    this.destinationPage(kind, param, entrance);
+                } })
         } else {
             this.destinationPage(kind, param, entrance)
         }
@@ -1216,7 +1274,9 @@ struct Dashboard {
                 hidden: (): void => {
                     this.state.suspend();
                 },
-                content: this.destinationBody.bind(this, kind, param),
+                content: (entrance: StaggerEntrance): void => {
+                    this.destinationBody(kind, param, entrance);
+                },
             })
         }
     }
@@ -1633,7 +1693,7 @@ struct Dashboard {
                 componentId: 'secondary-segment-' + index,
                 items: this.buildSegmentItems(this.segmentLabels(index)),
                 selectedIndexes: [this.segmentSelection(index)],
-                experimentalWidth: index === 1 ? '72%' : Theme.titleSegmentWidth,
+                experimentalWidth: Theme.titleSegmentWidth,
                 onSelectedIndexChanged: (selected: number): void => {
                     if (index === 1) {
                         this.planListRoute.status = '';
@@ -1987,6 +2047,7 @@ struct Dashboard {
                 .width('100%').height(LayoutPolicy.matchParent)
                 .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
                 .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
+                .onKeyEvent((event: KeyEvent): boolean => this.onShortcut(event))
                 .bindSheet(this.importOpen || this.formOpen || this.restoreOpen, this.rootSheet(), this.rootSheetOptions())
         }
     }

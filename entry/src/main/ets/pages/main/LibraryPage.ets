@@ -1,4 +1,5 @@
 import { ArrayDataSource } from '../../models/ArrayDataSource';
+import { cardColumnCount } from '../../config/responsive';
 import { ContextRow } from '../../components/common/ContextRow';
 import { displayName } from '../../utils/format/format';
 import { ASSET_STATUSES, ASSET_STATUS_LABELS, ASSET_TYPES, ASSET_TYPE_LABELS } from '../../config/constants';
@@ -23,6 +24,7 @@ export struct LibraryPage {
     @Param entranceSession: MainEntranceSession = new MainEntranceSession();
     @Param active: boolean = false;
     @Local animStep: number = 0;
+    @Local columns: number = 1;
     private enterPlayed: boolean = false;
     private enterTimers: number[] = [];
     private measured: boolean = false;
@@ -179,40 +181,44 @@ export struct LibraryPage {
         }.width('100%').alignItems(HorizontalAlign.Start)
     }
 
+    @LocalBuilder listHeader() {
+        Column({ space: 12 }) {
+            Blank().height(this.topInset).width('100%')
+            this.controls()
+        }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0)
+            .padding({ bottom: Theme.cardSpacing })
+    }
+
     build() {
         List({ space: 12, scroller: this.scroller }) {
-            ListItem() {
-                Column({ space: 12 }) {
-                    Blank().height(this.topInset).width('100%');
-                    this.controls()
-                }.width('100%').alignItems(HorizontalAlign.Start).opacity(this.animStep >= 1 ? 1 : 0)
-            }
-            LazyForEach(this.source, (asset: Asset) => {
-                ListItem() {
-                    Button() {
-                        this.assetContent(asset)
-                    }.id('wardrobe-asset:' + asset.id)
-                        .width('100%')
-                        .constraintSize({ minHeight: 56 })
-                        .padding(16)
-                        .backgroundColor(Theme.surface)
-                        .borderRadius(12)
-                        .onClick((): void => {
-                            this.route.anchorId = asset.id;
-                            this.open('asset', asset.id);
-                        }).accessibilityText('打开装备 ' + asset.name)
-                }.opacity(this.animStep >= 2 ? 1 : 0)
-            }, (asset: Asset) => asset.id)
-            if (!this.visibleAssets.length) {
-                ListItem() {
-                    EmptyState({ title: this.route.filtered ? '没有匹配的装备' : '让每一件装备有归处', message: this.route.filtered ? '名称、类型、状态与位置共同限定当前结果。' : '记录位置和真实状态，再复用到计划。', button: this.route.filtered ? '清除筛选' : '添加装备', action: (): void => {
-                            if (this.route.filtered) {
-                                this.route.clear();
-                            } else {
-                                this.add('asset', '');
+            ListItemGroup({ header: this.listHeader, space: Theme.cardSpacing }) {
+                LazyForEach(this.source, (asset: Asset) => {
+                    ListItem() {
+                        Button() {
+                            this.assetContent(asset)
+                        }.id('wardrobe-asset:' + asset.id)
+                            .width('100%')
+                            .constraintSize({ minHeight: 56 })
+                            .padding(16)
+                            .backgroundColor(Theme.surface)
+                            .borderRadius(12)
+                            .onClick((): void => {
+                                this.route.anchorId = asset.id;
+                                this.open('asset', asset.id);
+                            }).accessibilityText('打开装备 ' + asset.name).accessibilityDescription('双击打开装备详情')
+                    }.opacity(this.animStep >= 2 ? 1 : 0)
+                }, (asset: Asset) => asset.id)
+                if (!this.visibleAssets.length) {
+                    ListItem() {
+                        EmptyState({ title: this.route.filtered ? '没有匹配的装备' : '让每一件装备有归处', message: this.route.filtered ? '名称、类型、状态与位置共同限定当前结果。' : '记录位置和真实状态，再复用到计划。', button: this.route.filtered ? '清除筛选' : '添加装备', action: (): void => {
+                                if (this.route.filtered) {
+                                    this.route.clear();
+                                } else {
+                                    this.add('asset', '');
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
                 }
             }
             ListItem() {
@@ -225,9 +231,15 @@ export struct LibraryPage {
             .height('100%')
             .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             .cachedCount(4)
+            .lanes(this.columns, Theme.cardSpacing)
+            .constraintSize({ maxWidth: Theme.contentMaxWidth })
             .scrollBar(BarState.Off)
             .align(Alignment.Top)
             .onAreaChange((_old: Area, area: Area): void => {
+                const columns = cardColumnCount(Number(area.width));
+                if (this.columns !== columns) {
+                    this.columns = columns;
+                }
                 if (!this.measured && Number(area.height) > 0) {
                     this.measured = true;
                     this.restoreOffset();

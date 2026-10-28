@@ -27,7 +27,7 @@ export struct EntryCollection {
     private editorChanged(): void {
         this.editingChanged(this.editing);
         if (this.embedded && this.editing) {
-            registerInlineSheetBack(this.backOwner, this.closeEditor.bind(this));
+            registerInlineSheetBack(this.backOwner, (): Promise<void> => this.closeEditor());
             this.sheetEntrance.play(this.getUIContext(), 3);
         } else {
             releaseInlineSheetBack(this.backOwner);
@@ -187,11 +187,11 @@ export struct EntryCollection {
     private sheetOptions(): SheetOptions {
         const options = appSheetOptions((): void => {
             this.editing = false;
-        }, this.sheetEntrance, this.getUIContext(), SheetSize.LARGE, this.canClose.bind(this), (): void => {
+        }, this.sheetEntrance, this.getUIContext(), SheetSize.LARGE, (): Promise<boolean> => this.canClose(), (): void => {
             this.editing = false;
         });
         options.onWillDismiss = (action: DismissSheetAction): void => {
-            void dismissSheet(action, this.canClose.bind(this));
+            void dismissSheet(action, (): Promise<boolean> => this.canClose());
         };
         return options;
     }

@@ -1,4 +1,5 @@
 import { ContextRow } from '../../components/common/ContextRow';
+import { RESPONSIVE_BREAKPOINT_MEDIUM, RESPONSIVE_BREAKPOINT_LARGE } from '../../config/responsive';
 import { StatusPill, SectionHeading, EmptyState } from '../../components/common/Surfaces';
 import { WorkCard } from '../../components/plans/WorkCard';
 import { ProjectWork, recentWork } from '../../domain/plans/ProjectWork';
@@ -357,9 +358,12 @@ export struct HomePage {
                         }).accessibilityText('打开全局搜索')
                     }
                 } else {
-                    GridRow({ columns: 12, gutter: 24, breakpoints: { value: ['840vp'] } }) {
-                        GridCol({ span: { xs: 12, sm: 7 } }) { this.next() }
-                        GridCol({ span: { xs: 12, sm: 5 } }) {
+                    GridRow({ columns: 12, gutter: 24, breakpoints: {
+                        value: [RESPONSIVE_BREAKPOINT_MEDIUM, RESPONSIVE_BREAKPOINT_LARGE],
+                        reference: BreakpointsReference.WindowSize,
+                    } }) {
+                        GridCol({ span: { xs: 12, sm: 12, md: 7 } }) { this.next() }
+                        GridCol({ span: { xs: 12, sm: 12, md: 5 } }) {
                             Column({ space: Theme.sectionSpacing }) { this.tasks(); this.recentSection() }.width('100%')
                         }
                     }.width('100%')

@@ -1,6 +1,7 @@
 import { PressFeedback } from '../../ui/feedback/pressFeedback';
 import { AppState } from '../../state/ApplicationState';
 import { Theme } from '../../ui/theme/Theme';
+import { RESPONSIVE_BREAKPOINT_MEDIUM, RESPONSIVE_BREAKPOINT_LARGE } from '../../config/responsive';
 import { vibration } from '../../ui/feedback/vibration';
 import { ScheduleRoute } from '../../models/ScheduleRoute';
 import { ScheduleView, ScheduleDayCell } from '../../domain/schedule/ScheduleView';
@@ -128,9 +129,12 @@ export struct EventCalendar {
 
     }
     build() {
-        GridRow({ columns: 12, gutter: 24, breakpoints: { value: ['840vp'] } }) {
-            GridCol({ span: { xs: 12, sm: 7 } }) { this.month() }
-            GridCol({ span: { xs: 12, sm: 5 } }) { this.selectedDay() }
+        GridRow({ columns: 12, gutter: 24, breakpoints: {
+            value: [RESPONSIVE_BREAKPOINT_MEDIUM, RESPONSIVE_BREAKPOINT_LARGE],
+            reference: BreakpointsReference.WindowSize,
+        } }) {
+            GridCol({ span: { xs: 12, sm: 12, md: 7 } }) { this.month() }
+            GridCol({ span: { xs: 12, sm: 12, md: 5 } }) { this.selectedDay() }
         }.width('100%')
     }
 }

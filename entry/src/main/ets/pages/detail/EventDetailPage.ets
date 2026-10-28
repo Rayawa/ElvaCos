@@ -233,9 +233,10 @@ export struct EventDetail {
     private sheetOptions(): SheetOptions {
         const options = appSheetOptions((): void => {
             this.closeSheets();
-        }, this.sheetEntrance, this.getUIContext(), this.locationOpen ? SheetSize.MEDIUM : SheetSize.LARGE, this.canCloseSheet.bind(this), this.closeSheets.bind(this));
+        }, this.sheetEntrance, this.getUIContext(), this.locationOpen ? SheetSize.MEDIUM : SheetSize.LARGE,
+        (): Promise<boolean> => this.canCloseSheet(), (): void => this.closeSheets());
         options.onWillDismiss = (action: DismissSheetAction): void => {
-            void dismissSheet(action, this.canCloseSheet.bind(this));
+            void dismissSheet(action, (): Promise<boolean> => this.canCloseSheet());
         };
         return options;
     }

@@ -1,6 +1,6 @@
 import { SUPPORTS_API_23, HDS_MATERIAL_ADAPTIVE, HDS_MATERIAL_NONE } from './platformCompatibility';
 import { displayName } from '../utils/format/format';
-import { HdsNavigationTitleBarOptions, HdsNavigationMenuItemOptions, HdsTabsFloatingStyle, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
+import { HdsNavigationTitleBarOptions, HdsNavigationMenuItemOptions, HdsTabsFloatingStyle, HdsTabsAttribute, BlurStrategy, ScrollEffectType } from '@kit.UIDesignKit';
 import { LengthMetrics } from '@kit.ArkUI';
 import { Theme } from '../ui/theme/Theme';
 import { HDS_TITLE_SIZE_SMALL, SUPPORTS_HARMONY_API_23 } from './constants';
@@ -84,13 +84,9 @@ export class SystemCapability {
         };
     }
 }
-interface FloatingTabsAttribute extends TabsAttribute {
-    barFloatingStyle(style: HdsTabsFloatingStyle): FloatingTabsAttribute;
-    blurStrategy(strategy: BlurStrategy): FloatingTabsAttribute;
-}
 /** Resolve newer native methods only after checking the runtime, as in Dashboard. */
 
-export class CompatibleTabsStyle implements AttributeModifier<TabsAttribute> {
+export class CompatibleTabsStyle implements AttributeModifier<HdsTabsAttribute> {
     private enabled: boolean;
     private level: number;
 
@@ -99,15 +95,14 @@ export class CompatibleTabsStyle implements AttributeModifier<TabsAttribute> {
         this.level = level;
     }
 
-    applyNormalAttribute(instance: TabsAttribute): void {
+    applyNormalAttribute(instance: HdsTabsAttribute): void {
         if (!SUPPORTS_API_23) {
             return;
         }
         const style = SystemCapability.tabs(this.enabled, this.level);
         if (style) {
-            const tabs = instance as FloatingTabsAttribute;
-            tabs.blurStrategy(this.enabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE);
-            tabs.barFloatingStyle(style);
+            instance.blurStrategy(this.enabled ? BlurStrategy.ENABLE : BlurStrategy.DISABLE);
+            instance.barFloatingStyle(style);
         }
     }
 }

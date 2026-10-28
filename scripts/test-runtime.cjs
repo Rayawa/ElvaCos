@@ -21,6 +21,7 @@ const originalLoad = Module._load;
 Module._load = function(id, parent, isMain) {
     if (id === '@kit.BasicServicesKit') return { deviceInfo: { sdkApiVersion: api, distributionOSApiVersion: api >= 23 ? 60100 : 60000 } };
     if (id === '@kit.ArkUI') return { LengthMetrics: { vp: value => value } };
+    if (id === '@kit.InputKit') return { KeyCode: { KEYCODE_1: 2001, KEYCODE_5: 2005, KEYCODE_F: 2022, KEYCODE_N: 2030, KEYCODE_COMMA: 2043, KEYCODE_ESCAPE: 2070 } };
     if (id === '@kit.ArkGraphics2D') return { uiEffect: { createFilter: () => ({ hdrBrightnessRatio(value) { assert(api >= 24); return { hdr: value }; } }) } };
     if (id === '@kit.UIDesignKit') {
         const effect = {};
@@ -34,6 +35,8 @@ Module._load = function(id, parent, isMain) {
     if (id.endsWith('/Theme')) return { Theme: new Proxy({}, { get: (_target, key) => key }) };
     if (id.endsWith('/constants')) return { STORAGE_KEY_VISUAL_EFFECTS: 'effects', DEFAULT_LIGHT_FIELD_LEVEL: 1, STORAGE_KEY_LIGHT_FIELD_LEVEL: 'light', STORAGE_KEY_VIBRATION_LEVEL: 'vibrationLevel', HDS_TITLE_SIZE_SMALL: 0 };
     if (id.endsWith('/format')) return { displayName: value => value };
+    // PhotoRows uses entity imports only as types; native model decorators are outside these host checks.
+    if (id.endsWith('/Entities')) return {};
     if (id.endsWith('/motion')) return {};
     if (id.endsWith('/HapticService')) return { HapticService: { confirm: enabled => { if (enabled) haptic.open++; }, back: enabled => { if (enabled) haptic.back++; } } };
     return originalLoad.call(this, id, parent, isMain);
@@ -110,4 +113,31 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
     for (const record of records) assert.equal(index.get(record.id), record);
     assert.equal(index.get('missing'), undefined);
     console.log('PASS relation indexes preserve record identity, ordering and query results for 10,000 records');
+    const responsive = fresh('config/responsive.ets');
+    for (const [width, photos, cards] of [[320, 2, 1], [599, 2, 1], [600, 3, 2], [839, 3, 2], [840, 4, 2], [1440, 4, 2], [599, 2, 1]]) {
+        assert.equal(responsive.photoColumnCount(width), photos);
+        assert.equal(responsive.cardColumnCount(width), cards);
+    }
+    assert.equal(responsive.RESPONSIVE_BREAKPOINT_MEDIUM, '600vp');
+    assert.equal(responsive.RESPONSIVE_BREAKPOINT_LARGE, '840vp');
+    console.log('PASS dashboard breakpoint boundaries and shrink-back layouts at 320/599/600/839/840/1440vp');
+    const { AppShortcut, resolveAppShortcut } = fresh('ui/input/shortcuts.ets');
+    for (let index = 0; index < 5; index++) assert.equal(resolveAppShortcut(2001 + index, true, false, false, false), index);
+    assert.equal(resolveAppShortcut(2022, true, false, false, false), AppShortcut.SEARCH);
+    assert.equal(resolveAppShortcut(2030, true, false, false, false), AppShortcut.CREATE);
+    assert.equal(resolveAppShortcut(2043, true, false, false, false), AppShortcut.SETTINGS);
+    assert.equal(resolveAppShortcut(2070, false, false, false, false), AppShortcut.BACK);
+    for (const code of [2001, 2022, 2030, 2043, 2049, 2050]) assert.equal(resolveAppShortcut(code, false, false, false, false), AppShortcut.NONE, 'ordinary input belongs to native controls');
+    for (const modifiers of [[true, true, false, false], [true, false, true, false], [true, false, false, true]]) assert.equal(resolveAppShortcut(2022, ...modifiers), AppShortcut.NONE);
+    console.log('PASS keyboard commands preserve ordinary input and modified system combinations');
+    const { groupPhotoRows, indexPhotoRows, changedPhotoRows } = fresh('domain/photos/PhotoRows.ets');
+    const photos = Array.from({ length: 10000 }, (_, index) => ({ id: String(index) }));
+    for (const columns of [2, 3, 4]) {
+        const rows = groupPhotoRows(photos, columns), positions = indexPhotoRows(rows);
+        const changed = changedPhotoRows(positions, new Set(['1', '2', '9999']), new Set(['2', '3', 'missing']));
+        const expected = [...new Set([Math.floor(1 / columns), Math.floor(3 / columns), Math.floor(9999 / columns)])];
+        assert.deepEqual(changed.sort((a, b) => a - b), expected.sort((a, b) => a - b));
+        assert.deepEqual(changedPhotoRows(positions, new Set(['2']), new Set(['2'])), []);
+    }
+    console.log('PASS selecting photos only invalidates changed rows across all three responsive column counts');
 })().catch(error => { console.error(error); process.exitCode = 1; });

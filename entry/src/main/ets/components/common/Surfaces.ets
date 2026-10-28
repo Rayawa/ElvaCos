@@ -27,10 +27,6 @@ export struct InteractiveCard {
         return light;
     }
 
-    aboutToDisappear(): void {
-        this.feedback.dispose();
-    }
-
     build() {
         Column() {
             this.content()

@@ -21,7 +21,7 @@ HarmonyOS 原生、离线优先的 Coser 个人管理应用。从角色灵感、
 
 ## 构建与打包
 
-本机工具链：DevEco Studio 26.0.0，内置 Release SDK 26.0.0.105；ArkTS / ArkUI / Stage。无业务第三方依赖，Hypium / Hamock 仅用于测试。
+工具链：DevEco Studio 26.0.0，或 Command Line Tools 26.0.0.821；Release SDK 26.0.0.105，ArkTS / ArkUI / Stage。无业务第三方依赖，Hypium / Hamock 仅用于测试。
 
 新检出先复制 `build-profile.example.json5` 为 `build-profile.json5`。示例不含签名引用，可用于未签名构建；需要设备安装或发行时，通过 DevEco 配置自己的签名。`build-profile.json5`、证书、私钥及密码保持在版本控制之外。
 
@@ -38,6 +38,8 @@ HarmonyOS 原生、离线优先的 Coser 个人管理应用。从角色灵感、
 ```
 
 脚本参数为 `[task] [target] [debug|release]`；assembleApp 使用工程模式，其余任务使用模块模式。默认 DevEco 在 `~/Applications/DevEco-Studio.app`，`DEVECO_HOME` 可指向 app 或 Contents。
+
+Linux 命令行构建可将 `HARMONYOS_COMMAND_LINE_TOOLS` 指向 `command-line-tools` 目录，使用系统 JDK 21。先通过工具包的 `bin/ohpm install --all` 安装测试依赖，再运行同一个 `scripts/build.sh`。可用 `HVIGOR_USER_HOME` 与 `npm_config_cache` 将构建缓存放到可写目录，无需改动用户 HOME。
 
 HAP 输出到 `entry/build/default/outputs/default/`，APP 输出到 `build/outputs/default/`。此次交付副本与 SHA-256 清单在 `build/releases/1.0.0-beta.1/`（构建目录不入库）。**Release 编译模式与发行签名是两回事**，勿将自动调试签名包当作市场发行包。
 
@@ -68,6 +70,10 @@ python3 scripts/check_release.py --hap build/releases/1.0.0-beta.1/ElvaCos-1.0.0
 设备脚本串行执行（`device_test_lock.py` 排队等待），Hypium 以 Pass / Failure / Error / Ignore 判断；脚本里硬编码的 `Tests run: N` 是当前用例数，数字不匹配时先确认是期望值过时还是真的失败，不要反复重跑。领域与示例测试使用独立加密数据库及媒体目录，布局/主题宿主使用内存数据或独立 Preferences。测试不清空用户 `personal.db`。多数脚本生成调试主包，若需要恢复本次 Release HAP，安装已保存的交付副本；最终打包检查使用 Release 主包复测，结果见 [验证记录](docs/VALIDATION.md)。
 
 手机中的宽屏画布只验证组件布局，不代替真实 Tablet / 2in1、多窗、折叠及系统安全区验证。API20～26 真机、系统字号/读屏人工体验、系统跨设备完整备份、提醒实际后台送达及部分硬件能力仍缺少完整证据。
+
+响应式断点沿用 dashboard 的 600vp / 840vp，首页与日历网格按窗口宽度切换，照片和列表按实际内容宽度切换。键盘提供 Ctrl+1～5 切换根页、Ctrl+F 搜索、Ctrl+, 设置、Ctrl+N 新建当前类型，以及 Esc 返回；普通输入与原生焦点操作保留。
+
+手机、平板、2in1 分别运行 `HDC_TARGET_ID=<设备地址> EXPECTED_DEVICE_TYPE=phone|tablet|2in1 ./scripts/responsive-test.sh`（选择一个实际设备类型）。套件核对真实设备类型、点击、键盘导航与搜索输入，并保存五个根页截图；2in1 额外以可调整窗口检查 599/600/839/840vp 和缩回单列。需要本机开发签名，2in1 需要允许自由窗口。Linux 模拟器需要可用的 `/dev/kvm`；缺少虚拟化或设备时，编译成功不能作为界面与性能验收结果。
 
 ## 结构与数据
 
