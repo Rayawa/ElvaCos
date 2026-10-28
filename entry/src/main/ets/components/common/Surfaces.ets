@@ -1,0 +1,211 @@
+import { PressFeedback } from '../../ui/feedback/pressFeedback';
+import { SystemCapability } from '../../config/SystemCapability';
+import { Theme } from '../../ui/theme/Theme';
+import { curves } from '@kit.ArkUI';
+import { vibration } from '../../ui/feedback/vibration';
+import { pressVisualEffect, pressLightFieldFilter } from '../../ui/feedback/visualEffects';
+/** 可点击卡片：统一按压缩放、点光源、HDR 按压增强与短振动。 */
+
+@ComponentV2
+export struct InteractiveCard {
+    @Param label: string = '';
+    @Param hint: string = '双击打开详情';
+    @Param effects: boolean = true;
+    @Param contentPadding: number = 14;
+    @Event action: () => void = () => {};
+    @BuilderParam content: () => void = this.defaultContent;
+    @Local pressed: boolean = false;
+    @Builder defaultContent() {
+        Text(this.label)
+    }
+
+    private effect(): VisualEffect | undefined {
+        if (!this.effects || !SystemCapability.effects()) {
+            return undefined;
+        }
+        const light = pressVisualEffect(this.pressed, true);
+        return light;
+    }
+
+    aboutToDisappear(): void {
+        this.feedback.dispose();
+    }
+
+    build() {
+        Column() {
+            this.content()
+        }.width('100%').padding(this.contentPadding).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+            .border({ width: 0.5, color: Theme.line })
+            .scale({ x: this.pressed ? 0.985 : 1, y: this.pressed ? 0.985 : 1 })
+            .animation({ duration: 130, curve: curves.springMotion(0.35, 0.9) })
+            .visualEffect(this.effect())
+            .compositingFilter(pressLightFieldFilter(this.effects && this.pressed))
+            .onTouch((event: TouchEvent) => {
+                if (event.type === TouchType.Down) {
+                    this.pressed = true;
+                } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                    this.pressed = false;
+                }
+            })
+            .onClick((): void => {
+                vibration.dotVibration();
+                this.action();
+            }).focusable(true)
+            .accessibilityRole(AccessibilityRoleType.BUTTON)
+            .accessibilityText(this.label).accessibilityDescription(this.hint).accessibilityLevel('yes')
+    }
+}
+/** 单一分区标题：通过字重与组间留白建立层级，不堆叠副标题。 */
+
+@ComponentV2
+export struct SectionHeading {
+    @Param title: string = '';
+    @Param trailing: string = '';
+    build() {
+        Row({ space: 8 }) {
+            Text(this.title).fontSize(Theme.sectionTitleSize).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
+            if (this.trailing) {
+                Text(this.trailing).fontSize(12).fontColor(Theme.muted)
+            }
+        }.width('100%')
+            .alignItems(VerticalAlign.Center)
+            .padding({ top: 12, bottom: 4 })
+            .accessibilityGroup(true)
+            .accessibilityText(this.title + (this.trailing ? '，' + this.trailing : ''))
+    }
+}
+
+@ComponentV2
+export struct EmptyState {
+    private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+    @Param title: string = '';
+    @Param message: string = '';
+    @Param button: string = '';
+    @Event action: () => void = () => {};
+
+    build() {
+        Column({ space: 10 }) {
+            Text(this.title).fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink).textAlign(TextAlign.Center)
+            Text(this.message).fontSize(13).fontColor(Theme.muted).textAlign(TextAlign.Center)
+            if (this.button) {
+                Button(this.button)
+                    .backgroundColor(Theme.brand)
+                    .fontColor(Theme.onAccent)
+                    .fontSize(14)
+                    .constraintSize({ minHeight: 40 })
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        this.action();
+                    })
+                    .accessibilityText(this.button)
+                    .visualEffect(this.feedback.effect('button-2'))
+                    .compositingFilter(this.feedback.filter('button-2'))
+                    .attributeModifier(this.feedback.control('button-2'))
+            }
+        }.width('100%')
+            .padding(20)
+            .backgroundColor(Theme.surface)
+            .borderRadius(Theme.cardRadius)
+            .border({ width: 0.5, color: Theme.line })
+            .visualEffect(this.feedback.effect('column-1', true))
+            .compositingFilter(this.feedback.filter('column-1', true))
+            .attributeModifier(this.feedback.control('column-1', true))
+    }
+}
+
+@ComponentV2
+export struct StatusPill {
+    private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+    @Param label: string = '';
+    build() {
+        Text(this.label)
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Theme.accent)
+            .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+            .backgroundColor(Theme.tint)
+            .borderRadius(12)
+            .visualEffect(this.feedback.effect('status'))
+            .compositingFilter(this.feedback.filter('status'))
+            .attributeModifier(this.feedback.control('status'))
+    }
+}
+/** 详情页事实行：左标签右取值，替代大段标题 + 说明文字。 */
+
+@ComponentV2
+export struct FactRow {
+    @Param label: string = '';
+    @Param value: string = '';
+    @Param copyable: boolean = false;
+    build() {
+        Row({ space: 12 }) {
+            Text(this.label).fontSize(13).fontColor(Theme.muted).width(76)
+            if (this.copyable) {
+                Text(this.value || '未记录')
+                    .fontSize(14)
+                    .fontColor(Theme.ink)
+                    .layoutWeight(1)
+                    .copyOption(CopyOptions.LocalDevice)
+                    .accessibilityDescription('长按复制' + this.label)
+            } else {
+                Text(this.value || '未记录').fontSize(14).fontColor(Theme.ink).layoutWeight(1)
+            }
+        }.width('100%')
+            .alignItems(VerticalAlign.Center)
+    }
+}
+
+@ComponentV2
+export struct Field {
+    @Param multilineLimit: number = 2000;
+    private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+    @Param label: string = '';
+    @Param componentId: string = '';
+    @Param error: string = '';
+    @Event focused: () => void = () => {};
+    @Event area: (value: Area) => void = () => {};
+    @Param value: string = '';
+    @Param placeholder: string = '';
+    @Param multiline: boolean = false;
+    @Event change: (value: string) => void = () => {};
+
+    build() {
+        Column({ space: 8 }) {
+            Text(this.label).fontSize(13).fontColor(Theme.muted)
+            if (this.multiline) {
+                TextArea({ text: this.value, placeholder: this.placeholder })
+                    .height(100)
+                    .maxLength(this.multilineLimit)
+                    .backgroundColor(Theme.bg)
+                    .fontColor(Theme.ink)
+                    .id(this.componentId).onFocus((): void => {
+                        this.focused();
+                    })
+                    .onChange((value: string) => this.change(value))
+                    .accessibilityText(this.label)
+                    .visualEffect(this.feedback.effect('textarea-3'))
+                    .compositingFilter(this.feedback.filter('textarea-3'))
+                    .attributeModifier(this.feedback.control('textarea-3'))
+            } else {
+                TextInput({ text: this.value, placeholder: this.placeholder })
+                    .constraintSize({ minHeight: 48 })
+                    .maxLength(1000)
+                    .backgroundColor(Theme.bg)
+                    .fontColor(Theme.ink)
+                    .id(this.componentId).onFocus((): void => {
+                        this.focused();
+                    })
+                    .onChange((value: string) => this.change(value))
+                    .accessibilityText(this.label)
+                    .visualEffect(this.feedback.effect('textinput-4'))
+                    .compositingFilter(this.feedback.filter('textinput-4'))
+                    .attributeModifier(this.feedback.control('textinput-4'))
+            }
+            if (this.error) {
+                Text(this.error).fontSize(14).fontColor(Theme.danger).accessibilityText(this.label + '，' + this.error)
+            }
+        }.width('100%').alignItems(HorizontalAlign.Start).onAreaChange((_, value: Area): void => {
+            this.area(value);
+        })
+    }
+}

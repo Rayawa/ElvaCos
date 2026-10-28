@@ -5,7 +5,7 @@ import re
 import sqlite3
 import unittest
 
-SOURCE = Path('entry/src/main/ets/data/database/Schema.ets').read_text()
+SOURCE = Path('entry/src/main/ets/services/storage/database/Schema.ets').read_text()
 SQL = re.findall(r'`([^`]+)`', SOURCE)
 V1 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_2')[0])
 V2 = re.findall(r'`([^`]+)`', SOURCE.split('const MIGRATION_2')[1].split('const MIGRATION_3')[0])

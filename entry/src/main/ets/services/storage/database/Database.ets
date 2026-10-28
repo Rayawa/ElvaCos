@@ -1,0 +1,134 @@
+import { SCHEMA_VERSION } from '../../../config/constants';
+import { common } from '@kit.AbilityKit';
+import { relationalStore } from '@kit.ArkData';
+import { baseSchema, migration2, migration3, migration4, migration5, migration6, migration7, migration8 } from './Schema';
+// Use the store's writer connection: createTransaction() uses a separate
+// connection whose PRAGMA foreign_keys setting is not inherited.
+
+export class WriteTransaction {
+    private store: relationalStore.RdbStore;
+
+    constructor(store: relationalStore.RdbStore) {
+        this.store = store;
+    }
+
+    execute(sql: string, args?: relationalStore.ValueType[]): Promise<void> {
+        return this.store.executeSql(sql, args);
+    }
+
+    insert(table: string, row: relationalStore.ValuesBucket): Promise<number> {
+        return this.store.insert(table, row);
+    }
+}
+
+export class Database {
+    private store?: relationalStore.RdbStore;
+    private inTransaction: boolean = false;
+    private name: string;
+
+    constructor(name: string = 'personal.db') {
+        this.name = name;
+    }
+
+    async open(context: common.Context): Promise<void> {
+        if (this.store) {
+            return;
+        }
+        const store = await relationalStore.getRdbStore(context, { name: this.name, securityLevel: relationalStore.SecurityLevel.S3, encrypt: true });
+        try {
+            await store.executeSql('PRAGMA foreign_keys = ON');
+            if (store.version > SCHEMA_VERSION) {
+                throw new Error('此数据由更新版本创建，请升级应用');
+            }
+            if (store.version < SCHEMA_VERSION) {
+                store.beginTransaction();
+                try {
+                    const version = store.version;
+                    if (version < 1) {
+                        for (const sql of baseSchema()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 2) {
+                        for (const sql of migration2()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 3) {
+                        for (const sql of migration3()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 4) {
+                        for (const sql of migration4()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 5) {
+                        for (const sql of migration5()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 6) {
+                        for (const sql of migration6()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 7) {
+                        for (const sql of migration7()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    if (version < 8) {
+                        for (const sql of migration8()) {
+                            await store.executeSql(sql);
+                        }
+                    }
+                    await store.executeSql('PRAGMA user_version = ' + SCHEMA_VERSION);
+                    store.commit();
+                } catch (error) {
+                    store.rollBack();
+                    throw error as Error;
+                }
+            }
+            this.store = store;
+        } catch (error) {
+            await store.close();
+            throw error as Error;
+        }
+    }
+
+    getStore(): relationalStore.RdbStore {
+        if (!this.store) {
+            throw new Error('数据库尚未初始化');
+        }
+        return this.store;
+    }
+    // AppState serializes writes. Reject accidental nested/concurrent transactions.
+
+    async transaction(action: (tx: WriteTransaction) => Promise<void>): Promise<void> {
+        if (this.inTransaction) {
+            throw new Error('已有数据操作进行中');
+        }
+        const store = this.getStore();
+        store.beginTransaction();
+        this.inTransaction = true;
+        try {
+            await action(new WriteTransaction(store));
+            store.commit();
+        } catch (error) {
+            store.rollBack();
+            throw error as Error;
+        } finally {
+            this.inTransaction = false;
+        }
+    }
+
+    async close(): Promise<void> {
+        const store = this.store;
+        this.store = undefined;
+        if (store) {
+            await store.close();
+        }
+    }
+}

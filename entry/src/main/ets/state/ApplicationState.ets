@@ -1,0 +1,1589 @@
+import { indexById, groupBy } from '../models/RecordIndex';
+import { SearchData } from '../domain/search/GlobalSearch';
+import { RemovalData, RemovalImpact, removalImpact } from '../domain/operations/RemovalImpact';
+import { ProjectShot } from '../models/Shot';
+import { ShotRepository } from '../services/storage/repositories/ShotRepository';
+import { CharacterSummary, buildCharacterSummaries } from '../domain/characters/CharacterLibrary';
+import { ProjectWork, buildProjectWork, workHistory } from '../domain/plans/ProjectWork';
+import { PhotoImportJob, PhotoImportPorts } from '../models/PhotoImport';
+import { AssetUsage, buildAssetUsage } from '../domain/wardrobe/Wardrobe';
+import { AlbumSummary, buildAlbumSummary } from '../domain/photos/AlbumSummary';
+import { MetadataBackupPreview } from '../models/MetadataBackupPreview';
+import { LedgerSummary, buildLedgerSummary } from '../domain/ledger/LedgerSummary';
+import { LedgerRoute } from '../models/LedgerRoute';
+import { PreparationUndo, usablePreparationUndo } from '../domain/home/HomeSummary';
+import { formDraftStore } from './forms/formDrafts';
+import { CollectedEntry, entryFromText } from '../models/CollectedEntry';
+import { EntryRepository } from '../services/storage/repositories/EntryRepository';
+import { today } from '../utils/format/format';
+import { buildTaskQueue, TaskQueueItem, taskNeedsAction } from '../domain/tasks/TaskQueue';
+import { DayModulePreferences, dayEntries, localDay, DAY_MODULES, orderedDayModules } from '../domain/schedule/DayMode';
+import { getDayModules, setDayModules, getDayDismissals, setDayDismissals, getLastMetadataExport, setLastMetadataExport, clearStoredAccount, getStoredAccount, setStoredAccount, StoredAccount } from '../services/settings/storage';
+import { PlanReadiness, buildPlanReadiness } from '../domain/plans/PlanReadiness';
+import { OperationResult, executeOperation, operationCommitted } from '../domain/operations/OperationResult';
+import { PROJECT_LABELS, PROJECT_STATUSES } from '../config/constants';
+import { DemoDataRepository } from '../services/storage/repositories/DemoDataRepository';
+import { DeviceCalendarService } from '../services/calendar/DeviceCalendarService';
+import { EventSaveCoordinator } from '../services/calendar/EventSaveCoordinator';
+import { EventReminderService } from '../services/calendar/EventReminderService';
+import { checkSchedule } from '../domain/schedule/Schedule';
+import { TeamMember, Expense, ReferenceImage } from '../models/Planning';
+import { PlanningRepository } from '../services/storage/repositories/PlanningRepository';
+import { PreparationCategory, PreparationTask, PreparationBundle, makePreparation } from '../models/Preparation';
+import { PreparationRepository } from '../services/storage/repositories/PreparationRepository';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { common } from '@kit.AbilityKit';
+import { Database } from '../services/storage/database/Database';
+import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, CosEventRepository, ChecklistItemRepository, PhotoAssetRepository, DiaryEntryRepository, RelationRepository } from '../services/storage/repositories/Repositories';
+import { Character, CharacterVariant, CosProject, Asset, CosEvent, ChecklistItem, PhotoAsset, DiaryEntry, ProjectAsset, AppSettings, HuaweiAccount, ProjectStatus, PhotoStatus } from '../models/Entities';
+import { requiredName, safeUrl, checkProjectDate } from '../domain/plans/Rules';
+import { MediaRepository, MediaAvailability } from '../services/media/MediaRepository';
+import { SettingsService } from '../services/settings/SettingsService';
+import { AccountService, AccountResult } from '../services/account/AccountService';
+import { HapticService } from '../ui/feedback/HapticService';
+import { GripService } from '../services/device/GripService';
+import { ShareService } from '../services/share/ShareService';
+import { BackupService } from '../services/backup/BackupService';
+import BuildProfile from 'BuildProfile';
+
+export interface SettingsSelection {
+    appearance?: string;
+    themeColor?: string;
+    hand?: string;
+}
+class DataSnapshot {
+    entries: CollectedEntry[] = [];
+    team: TeamMember[] = [];
+    expenses: Expense[] = [];
+    references: ReferenceImage[] = [];
+    shots: ProjectShot[] = [];
+    characters: Character[] = [];
+    variants: CharacterVariant[] = [];
+    projects: CosProject[] = [];
+    assets: Asset[] = [];
+    preparationCategories: PreparationCategory[] = [];
+    preparationTasks: PreparationTask[] = [];
+    events: CosEvent[] = [];
+    checklist: ChecklistItem[] = [];
+    photos: PhotoAsset[] = [];
+    links: ProjectAsset[] = [];
+    diary: DiaryEntry[] = [];
+}
+const DATA_SCOPES: string[] = ['entries', 'team', 'expenses', 'references', 'characters', 'variants', 'projects', 'assets', 'preparationCategories', 'preparationTasks', 'events', 'checklist', 'photos', 'links', 'diary', 'shots'];
+
+@ObservedV2
+export class AppState implements SearchData, RemovalData {
+    @Trace operationScope: string = '';
+    @Trace lastOperation: OperationResult = { status: 'ok' };
+    @Trace staleScopes: string[] = [];
+    @Trace localDate: string = today();
+    @Trace clockTime: number = Date.now();
+    @Trace dayModules: DayModulePreferences = {};
+    @Trace dayDismissals: Record<string, string> = {};
+    @Trace pendingEventId: string = '';
+    @Trace photoImport: PhotoImportJob = new PhotoImportJob();
+    @Trace lastMetadataExport: number = 0;
+    @Trace restorePreview?: MetadataBackupPreview;
+    private restoreInput: string = '';
+    @Trace ready: boolean = false;
+    @Trace busy: boolean = false;
+    @Trace settingsBusy: boolean = false;
+    @Trace error: string = '';
+    @Trace notice: string = '';
+    @Trace feedbackVersion: number = 0;
+    @Trace entries: CollectedEntry[] = [];
+    @Trace characters: Character[] = [];
+    @Trace variants: CharacterVariant[] = [];
+    @Trace projects: CosProject[] = [];
+    @Trace assets: Asset[] = [];
+    @Trace events: CosEvent[] = [];
+    @Trace preparationCategories: PreparationCategory[] = [];
+    @Trace preparationTasks: PreparationTask[] = [];
+    @Trace preparationUndos: PreparationUndo[] = [];
+    @Trace checklist: ChecklistItem[] = [];
+    @Trace photos: PhotoAsset[] = [];
+    @Trace team: TeamMember[] = [];
+    @Trace expenses: Expense[] = [];
+    @Trace references: ReferenceImage[] = [];
+    @Trace shots: ProjectShot[] = [];
+    @Trace diary: DiaryEntry[] = [];
+    @Trace links: ProjectAsset[] = [];
+    @Trace settings: AppSettings = new AppSettings();
+    @Trace account: HuaweiAccount = new HuaweiAccount();
+    @Trace accountBusy: boolean = false;
+    @Trace sensedHand: string = 'auto';
+    private db: Database = new Database();
+    private entryRepo = new EntryRepository(this.db);
+    private characterRepo = new CharacterRepository(this.db);
+    private variantRepo = new CharacterVariantRepository(this.db);
+    private projectRepo = new CosProjectRepository(this.db);
+    private assetRepo = new AssetRepository(this.db);
+    private eventRepo = new CosEventRepository(this.db);
+    private shotRepo = new ShotRepository(this.db);
+    private planningRepo = new PlanningRepository(this.db);
+    private preparationRepo = new PreparationRepository(this.db);
+    private checklistRepo = new ChecklistItemRepository(this.db);
+    private photoRepo = new PhotoAssetRepository(this.db);
+    private diaryRepo = new DiaryEntryRepository(this.db);
+    private relations = new RelationRepository(this.db);
+    private reminder = new EventReminderService();
+    private preference = new SettingsService();
+    private settingsQueue: Promise<void> = Promise.resolve();
+    private pendingSettings: number = 0;
+    private grip = new GripService();
+    private context?: common.UIAbilityContext;
+    private media?: MediaRepository;
+    private startTask?: Promise<void>;
+    private operationPartial: boolean = false;
+    private operationRefreshNeeded: boolean = true;
+    private reloadTask?: Promise<boolean>;
+    private operationTask?: Promise<OperationResult>;
+    private disposeTask?: Promise<void>;
+    private preferencesTask?: Promise<void>;
+
+    loadPreferences(context: common.UIAbilityContext): Promise<void> {
+        this.context = context;
+        if (!this.preferencesTask) {
+            this.preferencesTask = this.preference.load(context).then(async (settings: AppSettings): Promise<void> => {
+                this.settings = settings;
+                this.dayModules = await getDayModules();
+                this.dayDismissals = await getDayDismissals();
+                this.lastMetadataExport = await getLastMetadataExport();
+                this.tickClock();
+            }).catch((error: Error): void => {
+                this.preferencesTask = undefined;
+                throw error;
+            });
+        }
+        return this.preferencesTask;
+    }
+
+    start(context: common.UIAbilityContext): Promise<void> {
+        if (this.disposeTask) {
+            return this.disposeTask.then((): Promise<void> => this.start(context));
+        }
+        if (this.ready) {
+            return Promise.resolve();
+        }
+        if (!this.startTask) {
+            this.startTask = this.initialize(context).finally((): void => {
+                this.startTask = undefined;
+            });
+        }
+        return this.startTask;
+    }
+
+    private async initialize(context: common.UIAbilityContext): Promise<void> {
+        this.context = context;
+        this.media = new MediaRepository(context);
+        await this.perform(async () => {
+            await this.db.open(context);
+            await this.loadPreferences(context);
+            this.account = this.toAccount(await getStoredAccount());
+            if (BuildProfile.DEBUG && this.media) {
+                try {
+                    if (await new DemoDataRepository(this.db, context, this.media).load(true)) {
+                        this.reportNotice('已载入原神与绝区零示例数据，可直接编辑和调试');
+                    }
+                } catch (error) {
+                    this.reportNotice('示例数据载入未完成，可在开发者选项中重试');
+                }
+            }
+            await this.refresh();
+            this.ready = true;
+        }, false);
+    }
+
+    async maintain(): Promise<void> {
+        if (!this.ready || this.busy) {
+            return;
+        }
+        await this.perform(async () => {
+            await this.media?.collect(this.photos, this.references, this.entries, (await this.photoRepo.renderedPaths()).concat(this.characters.map((character: Character) => character.cover)));
+            try {
+                await this.reminder.reconcile(this.events);
+            } catch (error) {
+                this.reportNotice('系统提醒暂未核对，可重新打开应用后重试');
+            }
+        }, false);
+    }
+
+    dispose(): Promise<void> {
+        if (!this.disposeTask) {
+            this.suspend();
+            this.disposeTask = this.closeAfterTasks().finally((): void => {
+                this.disposeTask = undefined;
+            });
+        }
+        return this.disposeTask;
+    }
+
+    private async closeAfterTasks(): Promise<void> {
+        // 初始化、写入和偏好保存完成后再关闭，避免销毁期间切断事务或重新置 ready。
+        try {
+            await this.startTask;
+            await this.operationTask;
+            await this.reloadTask;
+            await this.settingsQueue;
+            await this.preferencesTask;
+        } catch (error) {
+            this.reportError('结束应用任务时发生错误，下次启动将重新加载');
+        } finally {
+            try {
+                await this.db.close();
+            } catch (error) {
+                this.reportError('数据库关闭未完成，下次启动将重新加载');
+            }
+            this.ready = false;
+            this.staleScopes = [];
+            this.lastOperation = { status: 'ok' };
+            this.context = undefined;
+            this.media = undefined;
+            this.preferencesTask = undefined;
+        }
+    }
+
+    private toAccount(stored: StoredAccount): HuaweiAccount {
+        const account = new HuaweiAccount();
+        account.signedIn = stored.openId.length > 0;
+        account.openId = stored.openId;
+        account.unionId = stored.unionId;
+        account.displayName = stored.name;
+        account.signedAt = stored.signedAt;
+        return account;
+    }
+    /** 华为账号登录入口；云同步尚未开放，登录态当前只用于本机身份展示。 */
+
+    async signInHuawei(): Promise<boolean> {
+        if (!this.context) {
+            return false;
+        }
+        if (this.busy) {
+            return false;
+        }
+        this.busy = true;
+        this.accountBusy = true;
+        this.error = '';
+        this.notice = '';
+        try {
+            const result: AccountResult = await new AccountService().signIn(this.context);
+            if (result.ok) {
+                await setStoredAccount({ openId: result.account.openId, unionId: result.account.unionId, name: result.account.displayName, signedAt: result.account.signedAt });
+                this.account = result.account;
+            }
+            this.reportNotice(result.message);
+            return result.ok;
+        } catch (error) {
+            this.reportError((error as Error).message || '华为账号登录失败，请重试');
+            return false;
+        } finally {
+            this.busy = false;
+            this.accountBusy = false;
+        }
+    }
+
+    async signOutHuawei(): Promise<boolean> {
+        if (!this.context) {
+            return false;
+        }
+        if (this.busy) {
+            return false;
+        }
+        this.busy = true;
+        this.accountBusy = true;
+        this.error = '';
+        this.notice = '';
+        try {
+            const result: AccountResult = await new AccountService().signOut(this.context);
+            if (result.ok) {
+                await clearStoredAccount();
+                this.account = new HuaweiAccount();
+            }
+            this.reportNotice(result.message);
+            return result.ok;
+        } catch (error) {
+            this.reportError((error as Error).message || '退出登录失败，请重试');
+            return false;
+        } finally {
+            this.busy = false;
+            this.accountBusy = false;
+        }
+    }
+
+    async refresh(scopes: string[] = DATA_SCOPES): Promise<void> {
+        const snapshot = new DataSnapshot();
+        if (scopes.includes('entries')) {
+            snapshot.entries = await this.entryRepo.list();
+        }
+        if (scopes.includes('team')) {
+            snapshot.team = await this.planningRepo.team();
+        }
+        if (scopes.includes('expenses')) {
+            snapshot.expenses = await this.planningRepo.expenses();
+        }
+        if (scopes.includes('shots')) {
+            snapshot.shots = await this.shotRepo.list();
+        }
+        if (scopes.includes('references')) {
+            snapshot.references = await this.planningRepo.references();
+        }
+        if (scopes.includes('characters')) {
+            snapshot.characters = await this.characterRepo.list();
+        }
+        if (scopes.includes('variants')) {
+            snapshot.variants = await this.variantRepo.list();
+        }
+        if (scopes.includes('projects')) {
+            snapshot.projects = await this.projectRepo.list();
+        }
+        if (scopes.includes('assets')) {
+            snapshot.assets = await this.assetRepo.list();
+        }
+        if (scopes.includes('preparationCategories')) {
+            snapshot.preparationCategories = await this.preparationRepo.categories();
+        }
+        if (scopes.includes('preparationTasks')) {
+            snapshot.preparationTasks = await this.preparationRepo.tasks();
+        }
+        if (scopes.includes('events')) {
+            snapshot.events = await this.eventRepo.list();
+        }
+        if (scopes.includes('checklist')) {
+            snapshot.checklist = await this.checklistRepo.list();
+        }
+        if (scopes.includes('photos')) {
+            snapshot.photos = await this.photoRepo.list();
+        }
+        if (scopes.includes('links')) {
+            snapshot.links = await this.relations.links();
+        }
+        if (scopes.includes('diary')) {
+            snapshot.diary = await this.diaryRepo.list();
+        }
+        // Publish a coherent snapshot only after all dependent reads succeed.
+        if (scopes.includes('team')) {
+            this.team = snapshot.team;
+        }
+        if (scopes.includes('expenses')) {
+            this.expenses = snapshot.expenses;
+        }
+        if (scopes.includes('shots')) {
+            this.shots = snapshot.shots;
+        }
+        if (scopes.includes('references')) {
+            this.references = snapshot.references;
+        }
+        if (scopes.includes('characters')) {
+            this.characters = snapshot.characters;
+        }
+        if (scopes.includes('variants')) {
+            this.variants = snapshot.variants;
+        }
+        if (scopes.includes('projects')) {
+            this.projects = snapshot.projects;
+        }
+        if (scopes.includes('assets')) {
+            this.assets = snapshot.assets;
+        }
+        if (scopes.includes('preparationCategories')) {
+            this.preparationCategories = snapshot.preparationCategories;
+        }
+        if (scopes.includes('preparationTasks')) {
+            this.preparationTasks = snapshot.preparationTasks;
+        }
+        if (scopes.includes('events')) {
+            this.events = snapshot.events;
+        }
+        if (scopes.includes('checklist')) {
+            this.checklist = snapshot.checklist;
+        }
+        if (scopes.includes('photos')) {
+            this.photos = snapshot.photos;
+        }
+        if (scopes.includes('links')) {
+            this.links = snapshot.links;
+        }
+        if (scopes.includes('diary')) {
+            this.diary = snapshot.diary;
+        }
+        if (scopes.includes('entries')) {
+            this.entries = snapshot.entries;
+        }
+        const date = today();
+        if (this.localDate !== date) {
+            this.localDate = date;
+        }
+    }
+
+    @Computed
+    get monthLedger(): LedgerSummary {
+        return buildLedgerSummary(this.expenses, this.readinessPlans, new LedgerRoute(), this.localDate);
+    }
+
+    @Computed
+    get monthSpendingCents(): number {
+        return this.monthLedger.totalCents;
+    }
+
+    @Computed
+    get charactersById(): Map<string, Character> {
+        return indexById(this.characters, (item: Character) => item.id);
+    }
+
+    @Computed
+    get projectsById(): Map<string, CosProject> {
+        return indexById(this.projects, (item: CosProject) => item.id);
+    }
+
+    @Computed
+    get assetsById(): Map<string, Asset> {
+        return indexById(this.assets, (item: Asset) => item.id);
+    }
+
+    @Computed
+    get eventsById(): Map<string, CosEvent> {
+        return indexById(this.events, (item: CosEvent) => item.id);
+    }
+
+    @Computed
+    get photosByProject(): Map<string, PhotoAsset[]> {
+        return groupBy(this.photos, (photo: PhotoAsset) => photo.projectId);
+    }
+
+    @Computed
+    get preparationByProject(): Map<string, PreparationTask[]> {
+        return groupBy(this.preparationTasks, (task: PreparationTask) => task.projectId);
+    }
+
+    @Computed
+    get checklistByProject(): Map<string, ChecklistItem[]> {
+        return groupBy(this.checklist, (item: ChecklistItem) => item.projectId);
+    }
+
+    @Computed
+    get linksByProject(): Map<string, ProjectAsset[]> {
+        return groupBy(this.links, (link: ProjectAsset) => link.projectId);
+    }
+
+    @Computed
+    get expensesByProject(): Map<string, Expense[]> {
+        return groupBy(this.expenses, (expense: Expense) => expense.projectId);
+    }
+
+    @Computed
+    get shotsByProject(): Map<string, ProjectShot[]> {
+        return groupBy(this.shots, (shot: ProjectShot) => shot.projectId);
+    }
+
+    @Computed
+    get readinessPlans(): PlanReadiness[] {
+        const preparation = this.preparationByProject;
+        const checklist = this.checklistByProject;
+        const links = this.linksByProject;
+        const expenses = this.expensesByProject;
+        const photos = this.photosByProject;
+        const shots = this.shotsByProject;
+        const assets = this.assetsById;
+        const events = this.eventsById;
+        return this.projects.map((project: CosProject): PlanReadiness => {
+            const projectLinks = links.get(project.id) || [];
+            const equipment: Asset[] = [];
+            for (const link of projectLinks) {
+                const asset = assets.get(link.assetId);
+                if (asset) {
+                    equipment.push(asset);
+                }
+            }
+            const event = events.get(project.eventId);
+            return buildPlanReadiness(project, preparation.get(project.id) || [], checklist.get(project.id) || [],
+                equipment, projectLinks, photos.get(project.id) || [], expenses.get(project.id) || [],
+                event ? [event] : [], this.localDate, shots.get(project.id) || []);
+        });
+    }
+
+    @Computed
+    get readinessById(): Map<string, PlanReadiness> {
+        return indexById(this.readinessPlans, (item: PlanReadiness) => item.id);
+    }
+
+    readiness(id: string): PlanReadiness {
+        return this.readinessById.get(id) || new PlanReadiness();
+    }
+
+    @Computed
+    get diaryByProject(): Map<string, DiaryEntry[]> {
+        const grouped = new Map<string, DiaryEntry[]>();
+        for (const entry of this.diary) {
+            if (!entry.projectId) {
+                continue;
+            }
+            const entries = grouped.get(entry.projectId) || [];
+            entries.push(entry);
+            grouped.set(entry.projectId, entries);
+        }
+        grouped.forEach((entries: DiaryEntry[]): void => {
+            entries.sort((a: DiaryEntry, b: DiaryEntry): number => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+        });
+        return grouped;
+    }
+
+    projectDiary(id: string): DiaryEntry[] {
+        return this.diaryByProject.get(id) || [];
+    }
+
+    @Computed
+    get workCards(): ProjectWork[] {
+        const readiness = this.readinessById;
+        return workHistory(this.projects.map((project: CosProject) => buildProjectWork(project,
+            readiness.get(project.id) || new PlanReadiness(),
+            this.charactersById.get(project.characterId),
+            this.variants.find((variant: CharacterVariant) => variant.id === project.variantId && variant.characterId === project.characterId),
+            this.eventsById.get(project.eventId), this.photos, this.team, this.projectAssets(project.id))));
+    }
+
+    @Computed
+    get characterSummaries(): CharacterSummary[] {
+        return buildCharacterSummaries(this.characters, this.variants, this.workCards);
+    }
+
+    characterSummary(id: string): CharacterSummary {
+        return this.characterSummaries.find((summary: CharacterSummary) => summary.id === id) || new CharacterSummary();
+    }
+
+    projectWork(id: string): ProjectWork | undefined {
+        return this.workCards.find((work: ProjectWork) => work.value.projectId === id);
+    }
+
+    @Computed
+    get albumSummary(): AlbumSummary {
+        return buildAlbumSummary(this.readinessPlans, this.projects, this.events, this.photos);
+    }
+
+    @Computed
+    get actionablePlans(): PlanReadiness[] {
+        return this.readinessPlans.filter((item: PlanReadiness) => item.active);
+    }
+
+    @Computed
+    get taskQueue(): TaskQueueItem[] {
+        return buildTaskQueue(this.readinessPlans, this.projects, this.localDate);
+    }
+
+    @Computed
+    get actionItems(): TaskQueueItem[] {
+        return this.taskQueue.filter(taskNeedsAction);
+    }
+
+    @Computed
+    get waitingItems(): TaskQueueItem[] {
+        return this.taskQueue.filter((item: TaskQueueItem) => item.kind === 'waiting');
+    }
+
+    @Computed
+    get todayEvents(): CosEvent[] {
+        return dayEntries(this.events, this.dayDismissals, this.clockTime);
+    }
+
+    tickClock(): void {
+        this.clockTime = Date.now();
+        const date = localDay(this.clockTime);
+        if (this.localDate !== date) {
+            this.localDate = date;
+        }
+    }
+
+    dismissDayEntry(id: string): Promise<boolean> {
+        return this.enqueueSettings(async (): Promise<void> => {
+            const dismissals: Record<string, string> = {};
+            const date = localDay(Date.now());
+            for (const key of Object.keys(this.dayDismissals)) {
+                if (this.dayDismissals[key] === date) {
+                    dismissals[key] = date;
+                }
+            }
+            dismissals[id] = date;
+            await setDayDismissals(dismissals);
+            this.dayDismissals = dismissals;
+        });
+    }
+
+    configureDayModule(id: string, enabled?: boolean, move: number = 0): Promise<boolean> {
+        return this.enqueueSettings(async (): Promise<void> => {
+            const module = DAY_MODULES.find((item) => item.id === id);
+            if (!module) {
+                return;
+            }
+            const preferences = JSON.parse(JSON.stringify(this.dayModules)) as DayModulePreferences;
+            const modules = orderedDayModules(preferences, module.section);
+            const index = modules.findIndex((item) => item.id === id);
+            if (move !== 0 && index + move >= 0 && index + move < modules.length) {
+                const other = modules[index + move];
+                modules[index + move] = modules[index];
+                modules[index] = other;
+            }
+            modules.forEach((item, order: number): void => {
+                preferences[item.id] = { enabled: item.id === id && enabled !== undefined ? enabled : preferences[item.id]?.enabled !== false, order: order };
+            });
+            await setDayModules(preferences);
+            this.dayModules = preferences;
+        });
+    }
+
+    reloadRecords(): Promise<boolean> {
+        if (this.reloadTask) {
+            return this.reloadTask;
+        }
+        if (this.busy || this.disposeTask) {
+            return Promise.resolve(false);
+        }
+        this.reloadTask = this.reloadSnapshot().finally((): void => {
+            this.reloadTask = undefined;
+        });
+        return this.reloadTask;
+    }
+
+    private async reloadSnapshot(): Promise<boolean> {
+        this.busy = true;
+        try {
+            await this.refresh(this.staleScopes.length ? this.staleScopes : DATA_SCOPES);
+            this.staleScopes = [];
+            this.error = '';
+            this.lastOperation = { status: 'ok' };
+            this.reportNotice('显示已更新');
+            return true;
+        } catch (error) {
+            this.reportError('重新加载失败，已保存的记录保留，请重试加载。');
+            return false;
+        } finally {
+            this.busy = false;
+        }
+    }
+
+    reportError(message: string): void {
+        this.error = message;
+        this.feedbackVersion++;
+    }
+
+    reportNotice(message: string): void {
+        this.notice = message;
+        this.feedbackVersion++;
+    }
+    // Existing boolean callers interpret true as committed, never as a refresh guarantee.
+
+    perform(action: () => Promise<void>, refresh: boolean = true, scopes: string[] = DATA_SCOPES): Promise<boolean> {
+        return this.performResult(action, refresh, scopes).then(operationCommitted);
+    }
+
+    performResult(action: () => Promise<void>, refresh: boolean = true, scopes: string[] = DATA_SCOPES): Promise<OperationResult> {
+        if (this.busy || this.disposeTask) {
+            return Promise.resolve<OperationResult>({ status: 'failed', detail: '已有数据操作进行中' });
+        }
+        if (this.staleScopes.length) {
+            const detail = '记录已保存，但显示尚未更新。请先重新加载，避免重复操作。';
+            this.reportError(detail);
+            return Promise.resolve<OperationResult>({ status: 'failed', detail: detail });
+        }
+        this.operationTask = this.runOperation(action, refresh, scopes).finally((): void => {
+            this.operationTask = undefined;
+        });
+        return this.operationTask;
+    }
+
+    private async runOperation(action: () => Promise<void>, refresh: boolean, scopes: string[]): Promise<OperationResult> {
+        this.busy = true;
+        this.operationScope = scopes.join(',');
+        this.error = '';
+        this.notice = '';
+        this.operationPartial = false;
+        this.operationRefreshNeeded = true;
+        try {
+            const result = await executeOperation(async (): Promise<void> => {
+                try {
+                    await action();
+                } catch (error) {
+                    const code = (error as BusinessError).code;
+                    throw new Error(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error).message || '操作失败，请重试');
+                }
+            }, async (): Promise<void> => {
+                if (refresh && this.operationRefreshNeeded) {
+                    await this.refresh(scopes);
+                }
+            });
+            if (result.status === 'ok' && this.operationPartial) {
+                result.status = 'partial';
+                result.detail = this.notice;
+            }
+            this.lastOperation = result;
+            if (result.status === 'savedNotRefreshed') {
+                this.staleScopes = scopes;
+                this.reportError(result.detail || '记录已保存，请重新加载');
+            } else if (result.status === 'failed') {
+                this.reportError(result.detail || '操作失败，请重试');
+            }
+            return result;
+        } finally {
+            this.busy = false;
+            this.operationScope = '';
+        }
+    }
+
+    @Computed
+    get untriagedEntries(): CollectedEntry[] {
+        return this.entries.filter((entry: CollectedEntry) => entry.scopeKind === 'global');
+    }
+
+    saveEntry(entry: CollectedEntry): Promise<OperationResult> {
+        return this.performResult(async () => {
+            await this.entryRepo.save(entry);
+        }, true, ['entries']);
+    }
+
+    captureEntry(text: string, scopeKind: string = 'global', scopeId: string = ''): Promise<OperationResult> {
+        return this.performResult(async () => {
+            await this.entryRepo.save(entryFromText(text, scopeKind, scopeId));
+        }, true, ['entries']);
+    }
+
+    captureEntryImage(scopeKind: string = 'global', scopeId: string = ''): Promise<OperationResult> {
+        return this.performResult(async () => {
+            if (!this.media) {
+                throw new Error('图片选择暂不可用，请重试');
+            }
+            const uris = await this.media.select(1);
+            if (!uris.length) {
+                this.operationRefreshNeeded = false;
+                return;
+            }
+            const media = await this.media.import(uris[0], '');
+            const entry = new CollectedEntry();
+            entry.id = media.id;
+            entry.kind = 'image';
+            entry.scopeKind = scopeKind;
+            entry.scopeId = scopeId;
+            entry.localPath = media.localPath;
+            entry.thumbnailPath = media.thumbnailPath;
+            try {
+                await this.entryRepo.save(entry);
+            } catch (error) {
+                await this.media.remove(media);
+                throw error as Error;
+            }
+        }, true, ['entries']);
+    }
+
+    async repairEntryImage(entry: CollectedEntry): Promise<boolean> {
+        let repaired = false;
+        const success = await this.perform(async () => {
+            if (!this.media || !this.entries.some((item: CollectedEntry) => item.id === entry.id)) {
+                throw new Error('收录已不存在，请重新加载');
+            }
+            const uris = await this.media.select(1);
+            if (!uris.length) {
+                this.operationRefreshNeeded = false;
+                return;
+            }
+            const media = await this.media.import(uris[0], '');
+            const copy = JSON.parse(JSON.stringify(entry)) as CollectedEntry;
+            copy.localPath = media.localPath;
+            copy.thumbnailPath = media.thumbnailPath;
+            try {
+                await this.entryRepo.save(copy);
+            } catch (error) {
+                await this.media.remove(media);
+                throw error as Error;
+            }
+            repaired = true;
+            await this.media.remove(entry);
+        }, true, ['entries']);
+        return success && repaired;
+    }
+
+    convertEntry(entry: CollectedEntry, kind: string, scopeKind: string, scopeId: string, amount: string, date: string): Promise<OperationResult> {
+        return this.performResult(async () => {
+            if (kind === 'reference' && (!this.media || !await this.media.exists(entry))) {
+                throw new Error('图片缺失，请先重新选图');
+            }
+            await this.entryRepo.convert(entry, kind, scopeKind, scopeId, amount, date);
+            // Task/expense conversions no longer retain the attachment's media.
+            if (kind !== 'reference') {
+                await this.media?.remove(entry);
+            }
+        }, true, ['entries', 'preparationCategories', 'preparationTasks', 'expenses', 'references']);
+    }
+
+    removeEntry(entry: CollectedEntry): Promise<OperationResult> {
+        return this.performResult(async () => {
+            await this.entryRepo.remove(entry.id);
+            await this.media?.remove(entry);
+        }, true, ['entries']);
+    }
+
+    async saveShot(shot: ProjectShot, create: boolean): Promise<boolean> {
+        return this.perform(async (): Promise<void> => {
+            await this.shotRepo.save(shot, create);
+        }, true, ['shots']);
+    }
+
+    async toggleShot(id: string, projectId: string, expected: boolean): Promise<OperationResult> {
+        return this.performResult(async (): Promise<void> => {
+            await this.shotRepo.setDone(id, projectId, !expected, expected);
+        }, true, ['shots']);
+    }
+
+    async removeShot(id: string, projectId: string): Promise<boolean> {
+        return this.perform(async (): Promise<void> => {
+            await this.shotRepo.remove(id, projectId);
+        }, true, ['shots']);
+    }
+
+    async saveCharacter(item: Character): Promise<boolean> {
+        return this.perform(async () => {
+            item.name = requiredName(item.name);
+            item.updatedAt = Date.now();
+            await this.characterRepo.save(item);
+        }, true, ['characters']);
+    }
+
+    async saveVariant(item: CharacterVariant): Promise<boolean> {
+        return this.perform(async () => {
+            item.name = requiredName(item.name);
+            if (!item.characterId) {
+                throw new Error('请先选择角色');
+            }
+            await this.variantRepo.save(item);
+        }, true, ['variants']);
+    }
+
+    async saveProject(item: CosProject, character?: Character, preparation?: PreparationBundle): Promise<boolean> {
+        return this.perform(async () => {
+            item.name = requiredName(item.name);
+            checkProjectDate(item);
+            if (character) {
+                character.name = requiredName(character.name);
+                item.characterId = character.id;
+            }
+            if (!item.characterId) {
+                throw new Error('请选择或填写角色');
+            }
+            const old = this.projects.find((p: CosProject) => p.id === item.id);
+            item.updatedAt = Date.now();
+            const text = !old ? '开始了「' + item.name + '」' : old.status !== item.status ? item.name + ' → ' + PROJECT_LABELS[PROJECT_STATUSES.indexOf(item.status)] : '';
+            await this.projectRepo.save(item, text, character, preparation);
+            if (item.status === ProjectStatus.READY || item.status === ProjectStatus.COMPLETED) {
+                void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+                });
+            }
+        }, true, ['projects', 'characters', 'diary', 'preparationCategories', 'preparationTasks', 'shots']);
+    }
+
+    removalImpact(kind: string, id: string): RemovalImpact | undefined {
+        return removalImpact(this, kind, id);
+    }
+
+    async archiveProject(id: string): Promise<boolean> {
+        const project = this.projects.find((item: CosProject) => item.id === id);
+        if (!project || project.status !== ProjectStatus.COMPLETED) {
+            this.reportError('计划已变化，请重新查看当前状态');
+            return false;
+        }
+        const copy = JSON.parse(JSON.stringify(project)) as CosProject;
+        copy.status = ProjectStatus.ARCHIVED;
+        return this.saveProject(copy);
+    }
+
+    async saveAsset(item: Asset, projectId: string = ''): Promise<boolean> {
+        return this.perform(async () => {
+            item.name = requiredName(item.name);
+            item.purchaseUrl = safeUrl(item.purchaseUrl);
+            await this.assetRepo.save(item, projectId);
+        }, true, ['assets', 'links', 'checklist']);
+    }
+
+    async openReminderSettings(): Promise<boolean> {
+        return this.perform(async () => {
+            if (this.context) {
+                await this.reminder.settings(this.context);
+            }
+        }, false);
+    }
+
+    async addEventToCalendar(item: CosEvent): Promise<boolean> {
+        return this.perform(async () => {
+            if (!this.context) {
+                throw new Error('日历暂不可用，请重新打开应用后重试');
+            }
+            const added = await new DeviceCalendarService().add(item, this.context);
+            this.reportNotice(added ? '已添加到设备日历，后续日期与提醒请在系统日历中管理' : '已取消添加日历，应用内活动保留');
+        }, false);
+    }
+
+    async saveEvent(item: CosEvent): Promise<boolean> {
+        return this.perform(async () => {
+            item.name = requiredName(item.name);
+            checkSchedule(item);
+            item.url = safeUrl(item.url);
+            const old = this.events.find((e: CosEvent) => e.id === item.id);
+            const coordinator = new EventSaveCoordinator(
+                async (event: CosEvent): Promise<void> => {
+                    await this.eventRepo.save(event);
+                },
+                async (event: CosEvent): Promise<number> => {
+                    if (!this.context) {
+                        throw new Error('活动已保存，提醒暂不可用，请重新打开应用后重试');
+                    }
+                    return this.reminder.publish(event, this.context);
+                },
+                async (id: number): Promise<void> => {
+                    await this.reminder.cancel(id);
+                });
+            const warning = await coordinator.save(item, old);
+            if (warning) {
+                this.operationPartial = true;
+                this.reportNotice(warning);
+            }
+        }, true, ['events']);
+    }
+
+    async saveTeam(item: TeamMember): Promise<boolean> {
+        return this.perform(async () => {
+            await this.planningRepo.saveTeam(item);
+        }, true, ['team']);
+    }
+
+    async saveExpense(item: Expense): Promise<boolean> {
+        return this.perform(async () => {
+            await this.planningRepo.saveExpense(item);
+        }, true, ['expenses']);
+    }
+
+    async saveReference(item: ReferenceImage): Promise<boolean> {
+        return this.perform(async () => {
+            await this.planningRepo.saveReference(item);
+        }, true, ['references']);
+    }
+
+    async importReferences(projectId: string = '', characterId: string = ''): Promise<boolean> {
+        return this.perform(async () => {
+            if (!this.media || (!projectId && !characterId) || (projectId && characterId)) {
+                throw new Error('请选择参考图所属计划或角色');
+            }
+            if (projectId && !this.projects.some((p: CosProject) => p.id === projectId)) {
+                throw new Error('计划已不存在');
+            }
+            if (characterId && !this.characters.some((c: Character) => c.id === characterId)) {
+                throw new Error('角色已不存在');
+            }
+            const uris = await this.media.select();
+            let count = 0;
+            let failed = 0;
+            let skipped = 0;
+            if (uris.length === 0) {
+                return;
+            }
+            const seen: string[] = [];
+            for (const uri of uris) {
+                if (seen.includes(uri)) {
+                    skipped++;
+                    continue;
+                }
+                seen.push(uri);
+                const old = this.references.find((r: ReferenceImage) => r.projectId === projectId && r.characterId === characterId && r.sourceUri === uri);
+                if (old && await this.media.exists(old)) {
+                    skipped++;
+                    continue;
+                }
+                let imported: ReferenceImage | undefined;
+                try {
+                    imported = await this.media.importReference(uri, projectId, characterId);
+                    if (old) {
+                        imported.id = old.id;
+                        imported.caption = old.caption;
+                    }
+                    await this.planningRepo.saveReference(imported);
+                    count++;
+                } catch (error) {
+                    if (imported) {
+                        await this.media.remove(imported);
+                    }
+                    failed++;
+                }
+            }
+            if (failed > 0 && count === 0) {
+                throw new Error('参考图未添加，' + failed + ' 张失败，跳过重复 ' + skipped + ' 张。请检查格式或空间后重试。');
+            }
+            this.operationPartial = failed > 0;
+            this.reportNotice((count ? '已添加 ' + count + ' 张参考图，' : '') + '跳过重复 ' + skipped + ' 张，失败 ' + failed + ' 张' + (failed ? '。可重试失败项。' : ''));
+        }, true, ['references']);
+    }
+
+    async referenceCover(item: ReferenceImage): Promise<boolean> {
+        return this.perform(async () => {
+            const characterId = item.characterId || this.projects.find((p: CosProject) => p.id === item.projectId)?.characterId || '';
+            if (!characterId || !item.thumbnailPath) {
+                throw new Error('参考图缺失，请重新导入');
+            }
+            await this.planningRepo.setReferenceCover(item, characterId);
+        }, true, ['characters']);
+    }
+
+    async savePreparationCategory(item: PreparationCategory): Promise<boolean> {
+        return this.perform(async () => {
+            await this.preparationRepo.saveCategory(item);
+        }, true, ['preparationCategories']);
+    }
+
+    async savePreparationTask(item: PreparationTask): Promise<boolean> {
+        return this.perform(async () => {
+            await this.preparationRepo.saveTask(item);
+        }, true, ['preparationTasks']);
+    }
+
+    async togglePreparation(item: PreparationTask): Promise<boolean> {
+        return this.perform(async () => {
+            await this.preparationRepo.setDone(item.id, !item.done);
+            this.preparationUndos = this.preparationUndos.filter((token: PreparationUndo) => token.taskId !== item.id);
+            if (!item.done) {
+                void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+                });
+            }
+        }, true, ['preparationTasks']);
+    }
+
+    completeHomePreparation(taskId: string, projectId: string): Promise<OperationResult> {
+        return this.performResult(async (): Promise<void> => {
+            const task = this.preparationTasks.find((item: PreparationTask) => item.id === taskId && item.projectId === projectId);
+            if (!task || task.done || !this.readiness(projectId).active || !this.projects.some((project: CosProject) => project.id === projectId)) {
+                throw new Error('任务已变更或不存在，请重新加载后继续');
+            }
+            await this.preparationRepo.setDone(task.id, true, projectId, false);
+            const now = Date.now();
+            this.preparationUndos = this.preparationUndos.filter((token: PreparationUndo) => token.taskId !== taskId && token.expiresAt > now)
+                .concat(new PreparationUndo(task, now));
+            this.reportNotice('准备任务已完成，可在首页短时撤销');
+            void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+            });
+        }, true, ['preparationTasks']);
+    }
+
+    async undoHomePreparation(id: string): Promise<OperationResult> {
+        const result = await this.performResult(async (): Promise<void> => {
+            const token = this.preparationUndos.find((item: PreparationUndo) => item.id === id);
+            if (!token || !usablePreparationUndo(token, this.preparationTasks, this.projects, Date.now())) {
+                this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id);
+                throw new Error('撤销时间已过，或任务已变更；可进入计划调整完成状态');
+            }
+            await this.preparationRepo.setDone(token.taskId, token.previousDone, token.projectId, token.expectedDone);
+            this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id);
+            this.reportNotice('已撤销完成');
+        }, true, ['preparationTasks']);
+        if (result.status === 'failed' && result.detail === '任务已变更或不存在，请重新加载后继续') {
+            this.preparationUndos = this.preparationUndos.filter((item: PreparationUndo) => item.id !== id);
+        }
+        return result;
+    }
+
+    async addPreparationTemplate(projectId: string, keys: string[]): Promise<boolean> {
+        return this.perform(async () => {
+            await this.preparationRepo.addTemplate(makePreparation(projectId, keys));
+            this.reportNotice('已补入所选模板任务，原有进度保留');
+        }, true, ['preparationCategories', 'preparationTasks']);
+    }
+
+    preparationPercent(projectId: string): number {
+        return this.readiness(projectId).prep.percent;
+    }
+
+    async addChecklist(projectId: string, label: string, id: string = ''): Promise<boolean> {
+        return this.perform(async () => {
+            const item = new ChecklistItem();
+            if (id) {
+                item.id = id;
+            }
+            item.projectId = projectId;
+            item.label = requiredName(label);
+            item.sortOrder = this.checklist.length;
+            await this.checklistRepo.save(item);
+        }, true, ['checklist']);
+    }
+
+    async toggleChecklist(item: ChecklistItem): Promise<boolean> {
+        return this.perform(async () => {
+            const done = !item.done;
+            await this.checklistRepo.setDone(item.id, item.projectId, done, item.done);
+            if (done) {
+                void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+                });
+            }
+        }, true, ['checklist']);
+    }
+
+    async linkAsset(projectId: string, asset: Asset): Promise<boolean> {
+        return this.perform(async () => {
+            await this.relations.link(projectId, asset);
+        }, true, ['links', 'checklist']);
+    }
+
+    async unlinkAsset(projectId: string, assetId: string, checklistIds?: string[]): Promise<boolean> {
+        return this.perform(async () => {
+            await this.relations.unlink(projectId, assetId, checklistIds);
+            this.reportNotice('已解除本计划关联，衣柜装备保留');
+        }, true, ['links', 'checklist']);
+    }
+
+    @Computed
+    get assetUsages(): AssetUsage[] {
+        const readiness = this.readinessPlans;
+        return this.assets.map((asset: Asset) => buildAssetUsage(asset.id, this.projects, this.links, this.checklist, this.entries, readiness));
+    }
+
+    assetUsage(id: string): AssetUsage {
+        return this.assetUsages.find((usage: AssetUsage) => usage.id === id) || new AssetUsage();
+    }
+
+    async removeAsset(id: string, removalKey: string): Promise<boolean> {
+        return this.perform(async () => {
+            await this.assetRepo.remove(id, removalKey);
+            this.reportNotice('装备已删除，打包项保留，关联收录回到未归位');
+        }, true, ['assets', 'links', 'checklist', 'entries']);
+    }
+
+    async generateChecklist(projectId: string): Promise<boolean> {
+        return this.perform(async () => {
+            await this.relations.generateChecklist(projectId, this.projectAssets(projectId), this.checklist);
+        }, true, ['checklist']);
+    }
+
+    async remove(kind: string, id: string): Promise<boolean> {
+        return this.perform(async () => {
+            if (kind === 'character') {
+                if (this.projects.some((p: CosProject) => p.characterId === id)) {
+                    throw new Error('请先删除此角色的计划，避免丢失计划关联');
+                }
+                const refs = this.references.filter((r: ReferenceImage) => r.characterId === id);
+                await this.characterRepo.remove(id);
+                for (const r of refs) {
+                    await this.media?.remove(r);
+                }
+            } else if (kind === 'project') {
+                const photos = this.photos.filter((p: PhotoAsset) => p.projectId === id);
+                const refs = this.references.filter((r: ReferenceImage) => r.projectId === id);
+                await this.projectRepo.remove(id);
+                for (const r of refs) {
+                    await this.media?.remove(r);
+                }
+                for (const photo of photos) {
+                    await this.media?.remove(photo);
+                }
+            } else if (kind === 'asset') {
+                await this.assetRepo.remove(id);
+            } else if (kind === 'event') {
+                const old = this.events.find((e: CosEvent) => e.id === id);
+                await this.eventRepo.remove(id);
+                if (old) {
+                    try {
+                        await this.reminder.cancel(old.reminderId);
+                    } catch (error) {
+                        this.reportNotice('活动已删除，提醒取消失败，重新打开应用后会再次清理');
+                    }
+                }
+            } else if (kind === 'variant') {
+                if (this.projects.some((p: CosProject) => p.variantId === id)) {
+                    throw new Error('请先在计划中取消此版本关联');
+                }
+                await this.variantRepo.remove(id);
+            } else if (kind === 'team') {
+                await this.planningRepo.removeTeam(id);
+            } else if (kind === 'expense') {
+                await this.planningRepo.removeExpense(id);
+            } else if (kind === 'reference') {
+                const r = this.references.find((r: ReferenceImage) => r.id === id);
+                if (r) {
+                    await this.planningRepo.removeReference(r);
+                    await this.media?.remove(r);
+                }
+            } else if (kind === 'preparation') {
+                await this.preparationRepo.removeTask(id);
+            } else if (kind === 'category') {
+                await this.preparationRepo.removeCategory(id);
+            } else if (kind === 'checklist') {
+                await this.checklistRepo.remove(id);
+            } else if (kind === 'photo') {
+                const photo = this.photos.find((p: PhotoAsset) => p.id === id);
+                await this.photoRepo.remove(id);
+                if (photo) {
+                    await this.media?.remove(photo);
+                }
+            }
+        });
+    }
+
+    private async runPhotoImport(uris: string[]): Promise<void> {
+        if (!this.media) {
+            throw new Error('照片选择暂不可用');
+        }
+        const media = this.media;
+        const ports: PhotoImportPorts = {
+            find: (id: string, uri: string): Promise<PhotoAsset | undefined> => this.photoRepo.findSource(id, uri),
+            exists: (photo: PhotoAsset): Promise<boolean> => media.exists(photo),
+            import: (uri: string, id: string): Promise<PhotoAsset> => media.import(uri, id),
+            add: (photo: PhotoAsset): Promise<void> => this.relations.addPhoto(photo),
+            replace: (old: PhotoAsset, photo: PhotoAsset): Promise<void> => this.photoRepo.replaceMedia(old.id, old.projectId, photo),
+            remove: (photo: PhotoAsset): Promise<void> => media.remove(photo)
+        };
+        await this.photoImport.run(uris, ports);
+        this.operationRefreshNeeded = this.photoImport.succeeded > 0;
+        this.operationPartial = this.photoImport.failures.length > 0 || this.photoImport.cancelled > 0;
+        if (this.photoImport.failures.length && !this.photoImport.succeeded) {
+            throw new Error('本次没有照片导入成功。' + this.photoImport.summary());
+        }
+        this.reportNotice(this.photoImport.summary());
+    }
+
+    async importPhotos(projectId: string): Promise<boolean> {
+        let selected = false;
+        const success = await this.perform(async () => {
+            if (!this.media || !this.projects.some((p: CosProject) => p.id === projectId)) {
+                throw new Error('请先选择照片所属计划');
+            }
+            // Keep the last result until selection succeeds; cancellation is quiet.
+            const uris = await this.media.select(500);
+            if (!uris.length) {
+                this.operationRefreshNeeded = false;
+                return;
+            }
+            selected = true;
+            this.photoImport.begin(projectId, 'importing');
+            await this.runPhotoImport(uris);
+        }, true, ['photos', 'characters']);
+        return success && selected;
+    }
+
+    async retryPhotoImport(): Promise<boolean> {
+        return this.perform(async () => {
+            const id = this.photoImport.projectId;
+            const uris = this.photoImport.failures.map((item) => item.uri);
+            if (!uris.length || !this.projects.some((p: CosProject) => p.id === id)) {
+                throw new Error('失败项或所属计划已不存在，请重新选择');
+            }
+            this.photoImport.begin(id, 'importing');
+            await this.runPhotoImport(uris);
+        }, true, ['photos', 'characters']);
+    }
+
+    async inspectPhoto(photo: PhotoAsset): Promise<MediaAvailability> {
+        return this.media ? this.media.inspect(photo) : { original: 'unreadable', thumbnail: 'unreadable' };
+    }
+
+    async repairPhoto(id: string, thumbnailOnly: boolean = false): Promise<boolean> {
+        let repaired = false;
+        const success = await this.perform(async () => {
+            const photo = this.photos.find((item: PhotoAsset) => item.id === id);
+            if (!photo || !this.media) {
+                throw new Error('照片记录已不存在或媒体尚未就绪');
+            }
+            const uris = thumbnailOnly ? [] : await this.media.select(1);
+            if (!thumbnailOnly && !uris.length) {
+                this.operationRefreshNeeded = false;
+                return;
+            }
+            const staged = thumbnailOnly ? await this.media.rebuildThumbnail(photo) : await this.media.import(uris[0], photo.projectId);
+            try {
+                await this.photoRepo.replaceMedia(photo.id, photo.projectId, staged);
+            } catch (error) {
+                await this.media.remove({ localPath: thumbnailOnly ? '' : staged.localPath, thumbnailPath: staged.thumbnailPath });
+                throw error as Error;
+            }
+            repaired = true;
+            this.reportNotice(thumbnailOnly ? '缩略图已重建，原图与照片记录保留' : '已补回这张照片的媒体，状态、说明与导入时间保留');
+            // Old files are collected later, after all photos/versions/covers are checked.
+        }, true, ['photos', 'characters']);
+        return success && repaired;
+    }
+
+    async setPhotoCaption(id: string, caption: string): Promise<boolean> {
+        return this.perform(async () => {
+            await this.photoRepo.setCaption(id, caption);
+        }, true, ['photos']);
+    }
+
+    async setPhotoStatus(photo: PhotoAsset, status: PhotoStatus): Promise<boolean> {
+        return this.perform(async () => {
+            await this.photoRepo.setStatuses([photo.id], status);
+            if (status === PhotoStatus.SELECTED) {
+                void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+                });
+            }
+        }, true, ['photos']);
+    }
+
+    async setPhotoStatuses(ids: string[], status: PhotoStatus): Promise<boolean> {
+        return this.perform(async () => {
+            await this.photoRepo.setStatuses(ids, status);
+            this.reportNotice('已更新 ' + ids.length + ' 张照片');
+            void HapticService.confirm(this.settings.haptic, this.settings.hapticLevel).catch((): void => {
+            });
+        }, true, ['photos']);
+    }
+
+    async setCover(photo: PhotoAsset): Promise<boolean> {
+        return this.perform(async () => {
+            const current = this.photos.find((item: PhotoAsset) => item.id === photo.id);
+            if (!current || !this.media || (await this.media.inspect(current)).thumbnail !== 'available') {
+                throw new Error('封面缩略图不可用，请先重建缩略图或补回媒体');
+            }
+            const project = this.projects.find((p: CosProject) => p.id === current.projectId);
+            const character = this.characters.find((c: Character) => c.id === project?.characterId);
+            if (!character) {
+                throw new Error('所属角色已不存在');
+            }
+            const copy = JSON.parse(JSON.stringify(character)) as Character;
+            copy.cover = current.thumbnailPath;
+            await this.characterRepo.save(copy);
+            this.reportNotice('已设为 ' + character.name + ' 的角色封面');
+        }, true, ['characters']);
+    }
+
+    async reloadSettings(): Promise<void> {
+        if (!this.context) {
+            return;
+        }
+        await this.enqueueSettings(async () => {
+            if (this.context) {
+                this.settings = await this.preference.load(this.context, false);
+            }
+        });
+    }
+    // 偏好单独排队，不能触发业务 loading，也不能丢弃连续松手提交。
+
+    private enqueueSettings(action: () => Promise<void>): Promise<boolean> {
+        this.pendingSettings++;
+        this.settingsBusy = true;
+        const result = this.settingsQueue.then(async (): Promise<boolean> => {
+            try {
+                await action();
+                return true;
+            } catch (error) {
+                this.reportError((error as Error).message || '保存设置失败，请重试');
+                return false;
+            } finally {
+                this.pendingSettings--;
+                this.settingsBusy = this.pendingSettings > 0;
+            }
+        });
+        this.settingsQueue = result.then((): void => {
+        });
+        return result;
+    }
+
+    async updateSettings(changes: SettingsSelection): Promise<boolean> {
+        if (!this.context) {
+            return false;
+        }
+        return this.enqueueSettings(async () => {
+            if (this.context) {
+                // 在队列执行时合并，避免一行的旧快照覆盖另一行刚保存的选择。
+                const settings = JSON.parse(JSON.stringify(this.settings)) as AppSettings;
+                if (changes.appearance !== undefined) {
+                    settings.appearance = changes.appearance;
+                }
+                if (changes.themeColor !== undefined) {
+                    settings.themeColor = changes.themeColor;
+                }
+                if (changes.hand !== undefined) {
+                    settings.hand = changes.hand;
+                    settings.grip = settings.hand === 'auto';
+                }
+                if (settings.grip && !this.settings.grip) {
+                    try {
+                        await this.grip.authorize(this.context);
+                    } catch (error) {
+                        this.grip.stop();
+                        this.sensedHand = 'auto';
+                        throw error as Error;
+                    }
+                }
+                await this.preference.save(this.context, settings, this.settings);
+                this.settings = settings;
+                if (!settings.grip) {
+                    this.grip.stop();
+                    this.sensedHand = 'auto';
+                }
+            }
+        });
+    }
+
+    suspend(): void {
+        this.grip.stop();
+        this.sensedHand = 'auto';
+    }
+
+    async resume(): Promise<void> {
+        this.tickClock();
+        if (this.settings.grip && this.context) {
+            try {
+                await this.grip.start(this.context, (hand: string) => {
+                    this.sensedHand = hand;
+                });
+            } catch (error) {
+                this.sensedHand = 'auto';
+            }
+        }
+    }
+
+    async shareProject(id: string): Promise<boolean> {
+        return this.perform(async () => {
+            const work = this.projectWork(id);
+            if (!work) {
+                throw new Error('计划已不存在，无法分享');
+            }
+            if (!this.context) {
+                throw new Error('应用尚未就绪，无法分享');
+            }
+            await ShareService.project(this.context, ShareService.object(work));
+        }, false);
+    }
+
+    async exportData(): Promise<boolean> {
+        let exported = false;
+        const success = await this.perform(async () => {
+            if (!this.context) {
+                throw new Error('应用尚未就绪');
+            }
+            exported = await new BackupService(this.db, this.context).export();
+            if (exported) {
+                const timestamp = Date.now();
+                this.lastMetadataExport = timestamp;
+                try {
+                    await setLastMetadataExport(timestamp);
+                } catch (error) {
+                    this.operationPartial = true;
+                    this.reportNotice('元数据已导出；导出时间未能保存。原照片请另行备份。');
+                    return;
+                }
+                this.reportNotice('元数据已导出。原照片请使用系统备份另行保护。');
+            }
+        }, false);
+        return success && exported;
+    }
+
+    async prepareRestoreData(): Promise<boolean> {
+        let selected = false;
+        const success = await this.perform(async () => {
+            if (!this.context) {
+                throw new Error('应用尚未就绪');
+            }
+            this.cancelRestoreData();
+            const selection = await new BackupService(this.db, this.context).prepareRestore();
+            if (selection) {
+                this.restoreInput = selection.input;
+                this.restorePreview = selection.preview;
+                selected = true;
+            }
+        }, false);
+        return success && selected;
+    }
+
+    cancelRestoreData(): void {
+        this.restoreInput = '';
+        this.restorePreview = undefined;
+    }
+
+    async loadDemoData(): Promise<boolean> {
+        return this.perform(async (): Promise<void> => {
+            if (!this.ready || !this.context || !this.media) {
+                throw new Error('应用尚未就绪');
+            }
+            const loaded = await new DemoDataRepository(this.db, this.context, this.media).load();
+            this.reportNotice(loaded ? '已添加原神与绝区零示例数据' : '示例数据已存在，可直接编辑；清空数据后可重新载入');
+        });
+    }
+
+    async restoreData(): Promise<boolean> {
+        const input = this.restoreInput;
+        const preview = this.restorePreview;
+        if (!input || !preview) {
+            this.reportError('请先选择并预览备份文件');
+            return false;
+        }
+        let restored = false;
+        const success = await this.perform(async () => {
+            if (!this.context) {
+                throw new Error('应用尚未就绪');
+            }
+            await new BackupService(this.db, this.context).restoreMetadata(input);
+            restored = true;
+            // Invalidate the staged input as soon as the transaction commits; refresh
+            // retries must never repeat replacement.
+            this.cancelRestoreData();
+            this.preparationUndos = [];
+            this.photoImport.clear();
+            const draftsCleared = await this.clearFormDrafts('元数据已恢复');
+            const canceled = await this.cancelEventReminders();
+            this.reportNotice('已替换恢复 ' + preview.incomingCount + ' 条记录。缺失图片需重新导入，活动提醒需在本机重新开启。' + (canceled ? '' : '旧提醒取消失败，重新打开应用后会再次清理。') + (draftsCleared ? '' : '本地草稿清理未完成，请勿恢复旧草稿。'));
+        });
+        return success && restored;
+    }
+
+    private async cancelEventReminders(): Promise<boolean> {
+        let canceled = true;
+        for (const event of this.events) {
+            try {
+                await this.reminder.cancel(event.reminderId);
+            } catch (error) {
+                canceled = false;
+                this.reportNotice('提醒清理未完成，重新打开应用后会重试');
+            }
+        }
+        return canceled;
+    }
+
+    async clearData(): Promise<boolean> {
+        return this.perform(async () => {
+            await this.relations.clear();
+            this.photoImport.clear();
+            this.preparationUndos = [];
+            await this.clearFormDrafts('正式记录已清空');
+            await this.cancelEventReminders();
+            await this.media?.collect([]);
+        });
+    }
+
+    private async clearFormDrafts(message: string): Promise<boolean> {
+        try {
+            await formDraftStore.clear();
+            return true;
+        } catch (error) {
+            this.operationPartial = true;
+            this.reportNotice(message + '；本地草稿清理未完成，请勿恢复旧草稿。');
+            return false;
+        }
+    }
+
+    projectAssets(id: string): Asset[] {
+        const assets = this.assetsById;
+        const result: Asset[] = [];
+        for (const link of this.linksByProject.get(id) || []) {
+            const asset = assets.get(link.assetId);
+            if (asset) {
+                result.push(asset);
+            }
+        }
+        return result;
+    }
+
+    characterName(id: string): string {
+        return this.charactersById.get(id)?.name || '未关联角色';
+    }
+
+    projectName(id: string): string {
+        return this.projectsById.get(id)?.name || '未关联计划';
+    }
+
+    progress(id: string): number {
+        return this.readiness(id).equipment.percent;
+    }
+
+    hand(): string {
+        return this.settings.hand === 'auto' ? this.sensedHand : this.settings.hand;
+    }
+}

@@ -1,59 +1,33 @@
-# 界面实现参考
+# 界面实现规范
 
-版本基线：**1.0.0-beta.1（10000001）**；文档核对：2026-10-08。现状与历史证据；最终构建、签名与交付结论见 [打包记录](RELEASE.md)。
+uifix 基于 codex/uxfix 的现有功能继续维护。保留五组浅深配色、HDS 材质、按压与光场、震动和无障碍语义。
 
-本文记录当前设计来源与实现位置，供修改相关页面时查阅。它不冻结交互、参数或组件选择；后续任务以用户的当次要求和实际效果为准，无需为调整历史方案额外请求确认。
+## 原生导航与平台兼容
 
-## Dashboard 参考
+目标 API26，最低 API20。平台判断集中在 `config/platformCompatibility.ets`，使用旧系统已有的版本字段；API23 材质与光场、API24 HDR、API26 专属属性按版本隔离。API20～22 保留原生页面、视图切换和普通反馈，不触发较新材质方法。
 
-本轮参照 `/Users/raychen/Develop/Dashboard/dashboard-HarmonyOS` 的工程组织、HDS 导航、偏好管理和公共工具。ElvaCos 独立维护，运行时不依赖该路径。
+根页面使用 HdsTabs，页内使用 HdsTitleBarSegment（原生 SegmentButtons）。二级视图使用 HdsViewTabs，工具操作统一放标题栏按钮。设置从首页齿轮进入，偏好／数据／关于使用二级 HdsTabs。首页与日历采用原生 GridRow 适配宽屏分栏。
 
-| Dashboard 来源 | ElvaCos 接入 | 当前用途 |
-|---|---|---|
-| pages/Dashboard | pages/Dashboard、SystemCapability | 五个 Tab、标题区、导航与滚动状态 |
-| HdsMiniBarButton、HdsTitleBarSegment、HdsViewTabs | component 下同名组件 | 浮动栏、分段、材质与按压反馈 |
-| common/vibration、visualEffects、motion、scroll | common 下对应工具 | 触觉、光场、入场、鼠标与触控板滚动 |
-| SettingsPanel、DiskStorage、storage | component / common | 用户名、材质、振动、偏好持久化 |
-| MyPage MoreRow | SettingsActionRow | 设置入口与 HDS 图标/控件列 |
-| AppsPage commonHeader | DashboardSearch | 搜索外观与反馈 |
-| base/dark color.json | 同名资源、Theme | 浅深色解析 |
-| AppLogPage、LocalHtmlPage | pages/more 下对应页面 | 版本记录与本地隐私正文 |
-| charts/InteractiveLineChart、OverviewSection DistributionPanel | component/charts | 月度花费折线、照片状态环形分布、Canvas 动画与选点/图例反馈 |
+DetailDestination 统一处理返回、每次显示时的进场动画、隐藏时的清理。入口 onBackPress 优先关闭当前 Sheet 或处理未保存编辑，再返回导航栈。不要在普通组件添加不会被系统调用的同名方法冒充生命周期。
 
-## 当前页面与交互
+## 排版与组件
 
-主页五个 HdsTabs 各有独立 HdsNavigation / NavPathStack；外层主栈承载覆盖式详情和设置。详情显示时隐藏主页底栏，二级多视图页用 HdsViewTabs 承载原生 HdsTabs / TabContent；底部只切换视图，动作在原生标题菜单或段内按钮。根页已有五入口页签，页内状态仍用标题分段。首页右上角仅有「我的」，其余根页保留本页新增 / 导入；更新日志与政策为阅读页。设置页版本信息不再显示构建号：连点版本号五次进入开发者选项（pages/more/DevPage），示例数据载入与只读诊断信息沿用设置页的 HDS 列表行，入口点击不振动，页面仍由公共 DetailDestination 承载。更新日志标题栏提供 Beta / RC / 正式版三个独立开关，复用 Dashboard 的开启/关闭图标、Toast 与触觉；包含空结果、正式版标识和卡片按压反馈，设置入口使用 app_log 图标。表单、关联选择、帮助使用 bindSheet 与 SheetHeader，删除/替换通过确认 Dialog。
+普通标题栏、分区标题、Sheet 标题都使用单一标题。卡片可以有一组主标题和副标题；不在标题区域再叠加说明。Sheet 的辅助说明可通过无障碍描述表达，业务上必要的提示放在相应内容区。
 
-标题分段使用原生 TabSegmentButtonV2，当前宽度为标题区的 50%。选中变化和重复点击分别处理，切换保留各页查询、滚动和路由上下文。页面承载多于一类内容家族时的分段设计（哪些页面分段、分段与筛选的分工）见 [体验重构规格 v2](UX_RESTRUCTURE_PLAN.md) 第 3.8 节，尚未执行。
+Theme 集中维护字体、页面边距、区块间距、卡片间距和阅读宽度。分区与组内留白有明显差别，普通行避免同时堆叠阴影、边框和胶囊。纯文字详情限制阅读宽度，计划与角色长列表使用原生懒加载列表及合理分列。
 
-颜色由 base/dark 成对资源、ThemePalettes 和 Theme 提供，包含透明背景；图标通过 Icons 提供语义入口。主题配色可选蓝、绿、粉、橙、红，每组均有浅色与深色；应用外观独立选择浅色、深色或跟随系统。蓝色保留原资源值；新增配色采用薄荷绿、图标同色系樱花粉、杏橙、珊瑚红，明亮填充与可读强调文字独立。设置保存在 app_storage，沿用 sky / mist / system 外观值，新增 themeColor 缺省蓝色，写入成功后更新 AppStorage。根 WithTheme 同步原生控件强调色。方案与色值见 [主题实现](THEMES.md)。
+筛选使用原生 Flex 换行组织；相关短字段并排，长字段留足宽度。FormEditor 管理提交、校验、草稿和键盘位置，各业务 Fields 组件只渲染对应原生字段。字段 ID、错误定位、读屏标签在拆分后保持一致。
 
-## 响应式与阅读
+相册范围和状态集中到同一筛选区。照片批量动作放标题栏，内容区显示选择数量及目标状态；选择变化只通知相关行。花费总览与明细由 HdsTabs 分开，范围过滤共同生效，两个视图各自保存位置。
 
-首页与设置以实际容器宽高判断布局：宽度达到 840vp 且高度达到 600vp 时为 4:6 分栏，最大宽度 1440vp；较窄或较矮窗口为完整单列滚动。业务列表/详情最大宽度 1440vp，阅读和统计内容最大宽度 840vp。PhotoGrid 根据可用宽度选择 2/3/4 列；ReferenceGallery 保留横向图片预览。
+## Sheet 与反馈
 
-设置普通行当前为 68vp，窄屏上下排布为 116vp；滑块宽度 190vp。档位文字允许换行，实际两倍应用字号已验证完整显示。原生花费条形图使用整数分计算比例，并支持分类筛选和取消筛选。
+主页面保留统一表单／导入／恢复宿主；当前详情最多另有一个原生 Sheet。内容类型在同一宿主内切换，Sheet 内收录编辑使用 embedded 模式，避免嵌套第三个宿主。隐藏二级目的地释放内容与其绑定，返回按路由恢复。
 
-花费统计增加近半年月度趋势，按记账日期分组、以整数分累计后换算元，缺少记录的月份补零，随所属计划筛选变化。作品页增加全部照片的处理分布，包含已归档且各组互斥；作品列表仍只包含成片与已发布，筛选使用「全部作品 / 成片 / 已发布」。两处图表移植 Dashboard Canvas 的资源色、入场动画与交互，适配 V2 和 Theme，并在环境或配色变化后重绘。照片卡片的说明区左右 12vp、底部 14vp 留白。
+`ui/sheet/sheet.ets` 管理宿主身份、打开关闭、手势返回和嵌入编辑优先级；异步未保存检查期间阻止重复关闭。SheetHeader 触发关闭请求，关闭震动统一在实际消失时发出。导航返回反馈作短时间去重，避免按钮回调与原生出栈各震动一次。
 
-安全区由 HDS 导航与标题参数协调，内容使用 Theme 中的顶部/底部留白。当前内层导航 titleBar 避让安全区，覆盖详情由 HDS 自身避让；历史上双重避让曾导致标题下移，调整时可参考这一原因，而不是固定沿用所有数值。
+## 性能与验证边界
 
-## 公共反馈与生命周期
+业务关联通过派生索引读取；准备口径集中计算，局部写入刷新受影响的数据。时钟按分钟、跨日及短时撤销的截止点调度，退出前台取消任务。图表按视图／展开状态创建；列表与缩略图复用已有媒体流程，退出时清理触摸定时器与监听。
 
-InteractiveCard、PressFeedback、HapticService 和 motion 复用既有按压光场、0.985 缩放与 130ms 弹簧。流畅档关闭增强视效；HDR 在支持的 API/硬件上降级处理。页面和复用控件提供中文播报标签，筛选项包含选中状态，装饰元素退出读屏。
-
-PressFeedback 的点光源和合成滤镜直接绑定可观察按压状态，AttributeUpdater 只负责触摸与缩放，避免通过属性更新器设置 HDS 光效时实机不显示。轻点保留至少 140ms，取消触摸立即复位。日历日期使用表面背景承接点光源。光效沿用 Dashboard pointLight，不额外叠加 pressShadow。PhotoGrid 保持稳定的数据源，通过 onDataReloaded 通知筛选、批量选择与列数变化，避免下拉框改变而懒加载照片仍显示旧内容。
-
-主页与设置页入场记录由启动会话共享，每次进入应用只播放一次；其他详情按显示生命周期重播，Sheet 每次打开重播。设置页的 HdsListItemCard、列表分组容器及行内按钮/滑块/标签不绑定 PressFeedback 或额外 clickEffect，保留原生触摸与选择操作，避免事件冲突。Timer 和过期异步回写在退出时取消，握姿在后台/离开相关任务时停止。光场/HDR 的人工观感与其他设备体验尚未等同于自动化通过。
-
-## 已遇到的实现问题
-
-带参数的匿名 BuilderParam 回调直接构造组件曾在真机触发 `class constructor cannot called without new`。当前采用明确的 @Builder 绑定衔接 V1 设置与 V2 页面；这是已有 bug 的修复依据，不是要求今后所有回调都采用同一形式。
-
-HDS 自定义卡片的外层 id 可能不进入 TestKit 组件树，且组件边界会被视口裁切。相关布局回归按实际文字逐段滚动，让完整行进入视口后检查高度。
-
-当前 API 与设备验证来源见 [CAPABILITIES](CAPABILITIES.md) 和 [VALIDATION](VALIDATION.md)。后续按实际修改选择必要检查，不重复历史清单。
-
-## Beta 打包核对
-
-2026-10-08 以当前五 Tab、覆盖详情、Sheet、五组主题与两处 Canvas 图表作为 Beta 界面基线。Release 编译保留现有资源与反馈，不更换导航，也未执行正式版体验提案。页面冒烟与硬件视觉体验分别记录；构建警告及未覆盖设备见 RELEASE / VALIDATION。
+结构、模型、备份、主题和模拟 API 分支检查属于开发确认；原生构建、手势与材质观感需在具备 SDK 和设备的环境验证。不得把模拟 API 分支通过写成 API20～26 真机验收通过。

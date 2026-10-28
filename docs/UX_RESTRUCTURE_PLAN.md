@@ -4,6 +4,10 @@
 
 本文是**可供 agent 直接执行的规格**：第 3 章（导航与入口契约）、第 8 章（数据口径）、第 13 章（工程落点）给出可核对的落点与规则；第 4–7 章给出页面与状态规格。本文的数值目标是建议值，不是已取得的结果。
 
+## 当前实现约束补充
+
+本轮 uifix 采用目标 API26／最低 API20；主页面 HdsTabs＋SegmentButtons，二级页面内切换使用 HdsTabs；工具操作位于标题栏。每次二级页面显示均有进场动画，返回和 Sheet 关闭统一处理。主宿主和当前目的地最多两个 Sheet，嵌入编辑复用宿主。普通标题区不堆叠大小标题，原生控件优先，保留反馈与无障碍。后文历史规格中冲突的布局描述以此和 UI_STYLE.md 为准。
+
 ## 0. 给实施者：硬约束
 
 以下 10 条是本文的执行骨架。与本文任何段落冲突时，以硬约束为准；需要突破时先在本文中修改该条，再改代码。
@@ -115,7 +119,7 @@
 | 衣柜 | 装备列表，支持分类/状态/位置筛选 | 查看被哪些计划使用 | 添加装备 |
 | 相册 | 按场次组织的照片 | 待处理队列、作品集、归档 | 导入照片 |
 
-**我的**参照 Dashboard 的应用身份区、偏好设置、数据与备份、帮助与关于布局，仅从**首页右上角人像按钮**进入同一目的地（`pages/more/SettingsPage.ets`）。它承载外观、主题、材质、触觉、备份、更新日志、隐私正文、示例数据与帮助，不新增 Tab。首页标题栏不放新增按钮；计划、日程、衣柜、相册各自保留本页标题栏的新增 / 导入入口。账号入口按第 12 章暂缓，离线业务不要求登录。
+**我的**参照 Dashboard 的应用身份区、偏好设置、数据与备份、帮助与关于布局，仅从**首页右上角人像按钮**进入同一目的地（`pages/settings/SettingsPage.ets`）。它承载外观、主题、材质、触觉、备份、更新日志、隐私正文、示例数据与帮助，不新增 Tab。首页标题栏不放新增按钮；计划、日程、衣柜、相册各自保留本页标题栏的新增 / 导入入口。账号入口按第 12 章暂缓，离线业务不要求登录。
 
 角色库以文字入口出现在**计划页首部**，同时可从全局搜索进入，不在首页重复放角色库按钮。花费统计以完整文字常驻**首页财务行**与统计页。
 
@@ -130,9 +134,9 @@
 | 活动 | 活动详情 `pages/detail/EventDetailPage.ets`（含今天模式） | 首页"接下来"、计划概览一行 |
 | 装备 | 装备详情 `pages/detail/AssetDetailPage.ets` | 准备/打包行、衣柜列表、当天"出发前" |
 | 照片 | 相册（由 `pages/main/LibraryPage.ets` 的照片分支拆出，成为独立一级入口） | 计划的照片视图（同一查询）、当天"收尾" |
-| 参考图 | 计划/角色的参考区 `component/ReferenceGallery.ets` | 不出现于其他任何位置 |
+| 参考图 | 计划/角色的参考区 `components/photos/ReferenceGallery.ets` | 不出现于其他任何位置 |
 | 团队 | 计划详情的团队区 | 当天"人" |
-| 花费 | 计划概览 / 花费明细 `pages/more/ExpenseSummaryPage.ets` | 首页财务行、统计页 |
+| 花费 | 计划概览 / 花费明细 `pages/ledger/ExpenseSummaryPage.ets` | 首页财务行、统计页 |
 | 日志 | 计划详情的记录区 | 角色履历 |
 | 收录 | 收录箱（未归位）/ 归属对象页（已归位） | 当天"凭证" |
 | 拍摄清单 | 计划详情的照片视图 | 当天"今天要做" |
@@ -170,7 +174,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 
 运行时路由保存分段、筛选、焦点、各视图偏移与来源引用；计划 section 索引重排不涉及数据迁移。相册根页与从计划进入的范围相册复用同一组件，后者返回所属计划，照片查看返回原集合与缩略图位置。首页「我的」返回保留首页位置；其他对象返回保留来源 Tab、筛选与偏移；清空或完整替换数据后统一重置这些上下文。
 
-全局搜索是第 3.2 节已声明入口的只读聚合视图（`pages/more/SearchPage.ets`），不提供编辑或删除。范围为计划、角色 / 版本、活动、装备、照片说明与收录；参考图仍只在所属对象参考区出现。结果进入既有对象家，照片查看沿用 PhotoViewerRoute；收录进入归属对象的收录视图，未归位条目进入收录箱。它从首页最近区的搜索文字入口进入，复用既有首页行，不另增区块或 Tab。
+全局搜索是第 3.2 节已声明入口的只读聚合视图（`pages/search/SearchPage.ets`），不提供编辑或删除。范围为计划、角色 / 版本、活动、装备、照片说明与收录；参考图仍只在所属对象参考区出现。结果进入既有对象家，照片查看沿用 PhotoViewerRoute；收录进入归属对象的收录视图，未归位条目进入收录箱。它从首页最近区的搜索文字入口进入，复用既有首页行，不另增区块或 Tab。
 
 ### 3.6 视图可以多处，家只能一个
 
@@ -328,7 +332,7 @@ H4 的核心。所有参数为运行时状态，不持久化（**禁止把导航
 
 一次计划结束后产出的**回顾产物**：封面、角色与版本、场次与日期、团队署名、花费、复用装备数。
 
-- 数据侧已就绪：`common/ShareService.ets` 的 `ProjectShareObject` 已是带 `schemaVersion` 的结构化对象。
+- 数据侧已就绪：`services/share/ShareService.ets` 的 `ProjectShareObject` 已是带 `schemaVersion` 的结构化对象。
 - 应用内渲染为 UI 卡片（便宜）；导出为图片属后续增强，单独估算。
 - 出现在：计划详情的完成状态、角色履历、首页"最近"。
 - 卡片是当前元数据的回顾视图，不是冻结的历史快照：数量 / 花费来自 `PlanReadiness`；衣柜复用数指当前关联的既有装备数，原值为当前资料价格，既不证明实际携带，也不计入支出。封面优先本计划成片缩略图；使用角色封面时明确说明。缺失场次 / 日期 / 署名保持未记录，不拿导入或更新时间补造。
@@ -667,16 +671,16 @@ H1/H10 的落地。
 
 | 工作包 | 当前落点 | 职责变化 |
 |---|---|---|
-| 导航与入口 | `pages/Dashboard.ets`、`component/DetailDestination.ets`、`component/HdsViewTabs.ets`、`model/ProjectRoute.ets` | 路由参数规范化（3.5）；详情动作与根导航分离；底栏只切换页面 |
-| 首页 / 完整待办 | `pages/main/HomePage.ets`、`component/TaskLinkCard.ets` | 三区块；共用待办聚合；新增完整待办目的地 |
-| 计划与角色 | `pages/main/CosPage.ets`、`component/ProjectCard.ets`、`pages/detail/ProjectDetailPage.ets`、`pages/detail/CharacterDetailPage.ets` | 四视图工作台（含概览与卡点）；角色履历；卡片去重进度 |
-| 相册 / 衣柜 | `pages/main/LibraryPage.ets`、`pages/main/AlbumPage.ets`、`component/PhotoGrid.ets`、`component/ManagedImage.ets` | 拆分：相册独立、衣柜只留装备；照片两模式；作品集不复制数据 |
-| 日程与今天模式 | `pages/main/EventsPage.ets`、`component/EventCalendar.ets`、`pages/detail/EventDetailPage.ets`、`model/Schedule.ets` | `dayMode` 与模块装配；提醒状态模型；跨日一致性 |
-| 收录 | 新增 `data/repository/`、`data/database/Schema.ets`、`model/Entities.ets` | 表、仓库、收录箱页、归位流程 |
-| 花费与统计 | `pages/more/ExpenseSummaryPage.ets`、`model/Statistics.ets`、`model/Rules.ets` | 统一范围与聚合；预算语义；明细下钻 |
-| 状态与性能 | `model/ApplicationState.ets`、`common/appState.ets` | 操作范围与结果类型；按依赖刷新 |
-| 持久化/备份 | `data/database`、`data/repository`、`data/media`、`common/BackupService.ets` | 增量迁移（收录、预算标记、在途、拍摄清单）；草稿持久化；媒体修复 |
-| 分享 | `common/ShareService.ets` | 作品卡数据复用现有 `ProjectShareObject` |
+| 导航与入口 | `pages/Dashboard.ets`、`components/navigation/DetailDestination.ets`、`components/navigation/HdsViewTabs.ets`、`models/ProjectRoute.ets` | 路由参数规范化（3.5）；详情动作与根导航分离；底栏只切换页面 |
+| 首页 / 完整待办 | `pages/main/HomePage.ets`、`components/plans/TaskLinkCard.ets` | 三区块；共用待办聚合；新增完整待办目的地 |
+| 计划与角色 | `pages/main/CosPage.ets`、`components/plans/ProjectCard.ets`、`pages/detail/ProjectDetailPage.ets`、`pages/detail/CharacterDetailPage.ets` | 四视图工作台（含概览与卡点）；角色履历；卡片去重进度 |
+| 相册 / 衣柜 | `pages/main/LibraryPage.ets`、`pages/main/AlbumPage.ets`、`components/photos/PhotoGrid.ets`、`components/common/ManagedImage.ets` | 拆分：相册独立、衣柜只留装备；照片两模式；作品集不复制数据 |
+| 日程与今天模式 | `pages/main/EventsPage.ets`、`components/schedule/EventCalendar.ets`、`pages/detail/EventDetailPage.ets`、`domain/schedule/Schedule.ets` | `dayMode` 与模块装配；提醒状态模型；跨日一致性 |
+| 收录 | 新增 `data/repository/`、`services/storage/database/Schema.ets`、`models/Entities.ets` | 表、仓库、收录箱页、归位流程 |
+| 花费与统计 | `pages/ledger/ExpenseSummaryPage.ets`、`domain/statistics/Statistics.ets`、`domain/plans/Rules.ets` | 统一范围与聚合；预算语义；明细下钻 |
+| 状态与性能 | `state/ApplicationState.ets`、`state/appState.ets` | 操作范围与结果类型；按依赖刷新 |
+| 持久化/备份 | `data/database`、`data/repository`、`data/media`、`services/backup/BackupService.ets` | 增量迁移（收录、预算标记、在途、拍摄清单）；草稿持久化；媒体修复 |
+| 分享 | `services/share/ShareService.ets` | 作品卡数据复用现有 `ProjectShareObject` |
 
 ### 13.2 迁移清单（全部为增量，不清空 `personal.db`）
 

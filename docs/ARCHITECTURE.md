@@ -1,5 +1,7 @@
 # 首版架构与实施设计
 
+当前 uifix 目录按职责归属：`pages` 编排页面，`components/<业务>` 组织组件，`domain/<业务>` 管理业务规则，`models` 管理实体与路由，`services` 管理持久化和系统能力，`state` 管理应用状态与草稿，`ui` 管理主题和交互，`config` 管理平台判断。当前 API 与导航约束见 AGENTS.md 和 UI_STYLE.md。
+
 版本基线：**1.0.0-beta.1（10000001）**；文档核对：2026-10-08。现状与历史证据；最终构建、签名与交付结论见 [打包记录](RELEASE.md)。
 
 本文是工程现状与历史取舍的参考，不是后续任务的固定规程。以用户当前要求和实际代码为准；已有结构、实现方式、参数与检查范围可以随任务调整。
@@ -8,7 +10,7 @@
 
 ## 已检查的工程
 
-Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.1.0(23)，target 26.0.0。本机 DevEco Studio 位于 ~/Applications；内置 SDK 26.0.0.105，Release。仅 Hypium、Hamock 测试依赖，无业务第三方依赖。当前使用 Git 管理工程。名称通过资源配置，业务不绑定 bundleName。用户指定直接复用 dashboard-HarmonyOS 的风格，详见 UI_STYLE.md。
+Stage / ArkTS / ArkUI，entry 单 HAP；compatible 6.0.0(20)，target 26.0.0。本机 DevEco Studio 位于 ~/Applications；内置 SDK 26.0.0.105，Release。仅 Hypium、Hamock 测试依赖，无业务第三方依赖。当前使用 Git 管理工程。名称通过资源配置，业务不绑定 bundleName。用户指定直接复用 dashboard-HarmonyOS 的风格，详见 UI_STYLE.md。
 
 ## 信息架构与导航
 
@@ -84,11 +86,11 @@ entry/src/main/ets/
 ## 2026-10-06 全局一致性修正
 
 - 安全区：外层 HdsNavigation、每个 Tab 的内层 HdsNavigation 与 HdsNavDestination 统一 `ignoreLayoutSafeArea(SYSTEM, TOP|BOTTOM)`，标题栏 `avoidLayoutSafeArea`；内容顶部留白按页面级别分档（一级 `contentTop`=100vp，二级 `detailTop`=100vp，标题栏含分段时 `detailTopWithSegment`=112vp），底部留白 96/110vp，均以滚动内容内的 `Blank()` 实现，页面不依赖 padding。
-- 主题：`common/Theme.ets` 为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace Resource`。`ThemePalettes` 提供蓝、绿、粉、橙、红五组成对资源；蓝色仍引用 Dashboard 原同名资源。配色 themeColor 与外观 appearance 分别持久化，外观浅色 / 深色 / 跟随系统使用 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，系统解析 base / dark。`SettingsService.load/save` 负责读取、保存与应用，根 `WithTheme` 同步原生控件强调色；业务页面只消费 Theme，不直接引用 `app.color.*`。
+- 主题：`ui/theme/Theme.ets` 为 `@ObservedV2` 单例（`Theme`），颜色字段为 `@Trace Resource`。`ThemePalettes` 提供蓝、绿、粉、橙、红五组成对资源；蓝色仍引用 Dashboard 原同名资源。配色 themeColor 与外观 appearance 分别持久化，外观浅色 / 深色 / 跟随系统使用 `setColorMode(COLOR_MODE_LIGHT | COLOR_MODE_DARK | COLOR_MODE_NOT_SET)`，系统解析 base / dark。`SettingsService.load/save` 负责读取、保存与应用，根 `WithTheme` 同步原生控件强调色；业务页面只消费 Theme，不直接引用 `app.color.*`。
 - 安全区分级：内层 HdsNavigation 的标题栏 `avoidLayoutSafeArea: true`，HdsNavDestination 为 `false`（HDS 已自行避让，再开一次会把标题栏下移一个状态栏高度）。
 - 偏好：仍在单一 `app_storage`。新增 `appearance`（sky/mist/system）与 `hand` 两个 key（`getAppearance/setAppearance`、`getHand/setHand`），`hand` 同时同步旧的 `holdCheckON` / `buttonPositionRIGHT`，旧数据由 `SettingsMigration` 显式转换。华为账号只持久化 OpenID / UnionID / 展示名 / 登录时间，不保存 authorizationCode 与 idToken。
-- 弹层：`common/sheet.ets` 的 `appSheetOptions()` 与 `component/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Dashboard`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
-- 华为账号：`common/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。
+- 弹层：`ui/sheet/sheet.ets` 的 `appSheetOptions()` 与 `component/SheetHeader` 统一内容弹层；表单（`FormEditor`）、计划关联（`ProjectDetail`）、漫展关联（`EventDetail`）、帮助（`SettingsPage`）、导入选择（`Dashboard`）全部为 bindSheet + 右上角关闭，返回键关闭后由 `onDisappear` 复位状态。
+- 华为账号：`services/account/AccountService.ets` 适配 Account Kit 的 `authentication`（syscap `SystemCapability.AuthenticationServices.HuaweiID.Auth`），登录失败按错误码给出可读提示；`AppState.signInHuawei / signOutHuawei` 维护登录态并在成功后写入 Preferences。云空间同步未实现，设置页只显示状态说明。
 
 ## 2026-10-07 · 准备与活动领域扩展
 

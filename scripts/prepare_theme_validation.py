@@ -8,20 +8,20 @@ source = Path(__file__).resolve().parent.parent
 clone = Path(subprocess.check_output(['python3', str(source / 'scripts/prepare_settings_layout.py')], text=True).strip())
 main = clone / 'entry/src/main/ets'
 name = 'theme_validation_' + uuid.uuid4().hex
-constants = main / 'common/constants.ets'
+constants = main / 'config/constants.ets'
 text = constants.read_text()
 for old in ['app_storage', 'profile', 'settings', 'myAppSettings']:
     text = text.replace("= '" + old + "';", "= '" + name + '_' + old + "';")
 constants.write_text(text)
 # storage has one legacy Elva Preferences lookup in addition to its named constants.
-storage = main / 'common/storage.ets'
+storage = main / 'services/settings/storage.ets'
 storage.write_text(storage.read_text().replace("getDiskStorageInstance('settings', ctx)", "getDiskStorageInstance('" + name + "_settings', ctx)"))
 ability = main / 'testability/SettingsLayoutAbility.ets'
 ability.write_text("""import { UIAbility } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { preferences } from '@kit.ArkData';
-import { getApplicationState } from '../common/appState';
-import { STORAGE_FILE_NAME } from '../common/constants';
+import { getApplicationState } from '../state/appState';
+import { STORAGE_FILE_NAME } from '../config/constants';
 export default class SettingsLayoutAbility extends UIAbility {
   async onWindowStageCreate(stage: window.WindowStage): Promise<void> {
     this.context.getApplicationContext().setFontSizeScale(1);
@@ -40,10 +40,10 @@ export default class SettingsLayoutAbility extends UIAbility {
 }
 """)
 page = main / 'testability/pages/SettingsLayout.ets'
-page.write_text("""import { getApplicationState } from '../../common/appState';
-import { AppState } from '../../model/ApplicationState';
-import { PreferenceSettings } from '../../component/PreferenceSettings';
-import { Theme } from '../../common/Theme';
+page.write_text("""import { getApplicationState } from '../../state/appState';
+import { AppState } from '../../state/ApplicationState';
+import { PreferenceSettings } from '../../components/settings/PreferenceSettings';
+import { Theme } from '../../ui/theme/Theme';
 import { common } from '@kit.AbilityKit';
 @Entry
 @ComponentV2

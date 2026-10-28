@@ -30,8 +30,8 @@ def inspect_hap(data, source_app, source_module):
             require(app[key] == source_app[key], 'HAP/source mismatch: ' + key)
         require(app['buildMode'] == 'release' and app['debug'] is False,
                 'Expected a Release HAP with debug=false')
-        require(app['minAPIVersion'] == 60100023 and app['targetAPIVersion'] == 260000026,
-                'Expected compatible API 23 / target API 26')
+        require(app['minAPIVersion'] == 60000020 and app['targetAPIVersion'] == 260000026,
+                'Expected compatible API 20 / target API 26')
         for key in ['name', 'type', 'mainElement', 'deviceTypes', 'metadata']:
             require(module[key] == source_module[key], 'Module/source mismatch: ' + key)
         require(module['requestPermissions'] == source_module['requestPermissions'] or
@@ -54,7 +54,7 @@ def inspect_hap(data, source_app, source_module):
                 'Expected demo JSON sources/dataset plus 32 JPEGs')
         return {'version': app['versionName'], 'build': app['versionCode'],
                 'mode': app['buildMode'], 'debug': app['debug'],
-                'compatible_api': 23, 'target_api': 26, 'demo_files': 34,
+                'compatible_api': 20, 'target_api': 26, 'demo_files': 34,
                 'permissions': [p['name'] for p in module['requestPermissions']]}
 
 
@@ -66,7 +66,7 @@ def main():
     # These two source manifests contain standard JSON, despite their json5 suffix.
     app = json.loads((ROOT / 'AppScope/app.json5').read_text())['app']
     module = json.loads((ROOT / 'entry/src/main/module.json5').read_text())['module']
-    constants = (ROOT / 'entry/src/main/ets/common/constants.ets').read_text()
+    constants = (ROOT / 'entry/src/main/ets/config/constants.ets').read_text()
     require(re.search(r"APP_VERSION = '([^']+)'", constants)[1] == app['versionName'],
             'APP_VERSION/source mismatch')
     require(int(re.search(r'APP_BUILD_NUMBER = (\d+)', constants)[1]) == app['versionCode'],

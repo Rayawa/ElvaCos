@@ -5,9 +5,9 @@ import planningTest from './Planning.test';
 import planningRulesTest from '../../../test/PlanningRules.test';
 
 export default function testsuite() {
-  structureTest();
-  abilityTest();
-  preparationTest();
-  planningRulesTest();
-  planningTest();
+    structureTest();
+    abilityTest();
+    preparationTest();
+    planningRulesTest();
+    planningTest();
 }

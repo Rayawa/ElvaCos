@@ -1,0 +1,79 @@
+import { PressFeedback } from '../../ui/feedback/pressFeedback';
+import { Theme } from '../../ui/theme/Theme';
+import { vibration } from '../../ui/feedback/vibration';
+import { validDate } from '../../domain/plans/Rules';
+import { validTime } from '../../domain/schedule/Schedule';
+
+@ComponentV2
+export struct DateField {
+    private feedback: PressFeedback = new PressFeedback(() => this.getUIContext());
+    @Param label: string = '';
+    @Param componentId: string = '';
+    @Param error: string = '';
+    @Event area: (value: Area) => void = () => {};
+    @Param value: string = '';
+    @Param time: boolean = false;
+    @Param optional: boolean = false;
+    @Event change: (value: string) => void = () => {};
+
+    private choose(): void {
+        vibration.dotVibration();
+        if (this.time) {
+            const selected = new Date();
+            if (validTime(this.value)) {
+                selected.setHours(Number(this.value.slice(0, 2)), Number(this.value.slice(3, 5)), 0, 0);
+            }
+            this.getUIContext()
+                .showTimePickerDialog({ selected: selected, useMilitaryTime: true, onAccept: (value: TimePickerResult): void => {
+                        this.change(String(value.hour ?? 0).padStart(2, '0') + ':' + String(value.minute ?? 0).padStart(2, '0'));
+                    }
+                });
+        } else {
+            this.getUIContext()
+                .showDatePickerDialog({ selected: validDate(this.value) ? new Date(this.value + 'T12:00:00') : new Date(), onDateAccept: (date: Date): void => {
+                        this.change(String(date.getFullYear()).padStart(4, '0') + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'));
+                    }
+                });
+        }
+    }
+
+    aboutToDisappear(): void {
+        this.feedback.dispose();
+    }
+
+    build() {
+        Column({ space: 8 }) {
+            Text(this.label).fontColor(Theme.muted).fontSize(13)
+            Row({ space: 8 }) {
+                Button(this.value || (this.optional ? '暂不设置' : this.time ? '选择时间' : '选择日期'))
+                    .id(this.componentId).layoutWeight(1)
+                    .constraintSize({ minHeight: 48 })
+                    .backgroundColor(Theme.bg)
+                    .fontColor(this.value ? Theme.ink : Theme.muted)
+                    .onClick((): void => this.choose())
+                    .accessibilityText(this.label + '，' + (this.value || '未设置'))
+                    .visualEffect(this.feedback.effect('button-1'))
+                    .compositingFilter(this.feedback.filter('button-1'))
+                    .attributeModifier(this.feedback.control('button-1'))
+                if (this.optional && this.value) {
+                    Button('清除')
+                        .backgroundColor(Theme.tint)
+                        .fontColor(Theme.accent)
+                        .onClick((): void => {
+                            vibration.dotVibration();
+                            this.change('');
+                        })
+                        .accessibilityText('清除' + this.label)
+                        .visualEffect(this.feedback.effect('button-2'))
+                        .compositingFilter(this.feedback.filter('button-2'))
+                        .attributeModifier(this.feedback.control('button-2'))
+                }
+            }.width('100%')
+            if (this.error) {
+                Text(this.error).fontSize(14).fontColor(Theme.danger).accessibilityText(this.label + '，' + this.error)
+            }
+        }.width('100%').alignItems(HorizontalAlign.Start).onAreaChange((_, value: Area): void => {
+            this.area(value);
+        })
+    }
+}

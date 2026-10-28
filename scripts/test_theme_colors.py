@@ -55,7 +55,7 @@ class ThemeColorsTest(unittest.TestCase):
             self.assertEqual({k for k in values if k.startswith('theme_')}, expected)
             for value in values.values():
                 self.assertRegex(value, r'^#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$')
-        source = (ROOT / 'entry/src/main/ets/common/ThemePalettes.ets').read_text()
+        source = (ROOT / 'entry/src/main/ets/ui/theme/ThemePalettes.ets').read_text()
         references = re.findall(r"\$r\('app.color.([^']+)'\)", source)
         self.assertEqual(set(references), expected | set(BLUE.values()))
         self.assertEqual(len(references), 5 * len(SLOTS))

@@ -5,8 +5,9 @@ import { TestContext } from './TestContext';
 import testsuite from '../test/List.test';
 
 export default class TestAbility extends UIAbility {
-  onCreate(): void {
-    TestContext.value = this.context;
-    Hypium.hypiumTest(abilityDelegatorRegistry.getAbilityDelegator(), abilityDelegatorRegistry.getArguments(), testsuite);
-  }
+
+    onCreate(): void {
+        TestContext.value = this.context;
+        Hypium.hypiumTest(abilityDelegatorRegistry.getAbilityDelegator(), abilityDelegatorRegistry.getArguments(), testsuite);
+    }
 }
