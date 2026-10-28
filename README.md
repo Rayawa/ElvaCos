@@ -29,14 +29,14 @@ Local toolchain: DevEco Studio 26.0.0 with bundled Release SDK 26.0.0.105; ArkTS
 For a new checkout, copy `build-profile.example.json5` to `build-profile.json5`. The example has no signing references and supports unsigned builds. Configure local signing in DevEco when device installation or distribution is required. Keep `build-profile.json5`, certificates, private keys and passwords outside version control.
 
 ```sh
-# 开发 HAP（默认 debug）
+# Development HAP (debug by default)
 ./scripts/build.sh
-# 测试 feature
+# Test feature
 ./scripts/build.sh assembleHap ohosTest
-# Release 全量 HAP / APP
+# Full Release HAP / APP
 ./scripts/build.sh clean default release
 ./scripts/build.sh assembleApp default release
-# 仅生成 Release HAP
+# Generate Release HAP only
 ./scripts/build.sh assembleHap default release
 ```
 
@@ -47,22 +47,22 @@ HAP files are written to `entry/build/default/outputs/default/`; APP files to `b
 ## Verification
 
 ```sh
-# 基础确认（开发期默认，不需要设备）
+# Basic checks (development default, no device required)
 ./scripts/build.sh
 python3 scripts/test_schema.py
 python3 scripts/test_theme_colors.py
 
-# 设备套件（仅用户要求或发布候选；已连接且解锁，可用 HDC_TARGET_ID 选择设备）
+# Device suite (only on user request or for a release candidate; connected and unlocked; select with HDC_TARGET_ID)
 ./scripts/device-test.sh
 ./scripts/ui-test.sh
 ./scripts/demo-test.sh
-# 修改相关布局/主题时选用
+# Use when changing relevant layouts/themes
 ./scripts/layout-test.sh
 ./scripts/settings-layout-test.sh
 ./scripts/theme-test.sh
 ./scripts/ui-polish-test.sh
 
-# 发布候选：核对交付产物
+# Release candidate: verify deliverables
 python3 scripts/check_release.py --hap build/releases/1.0.0-beta.1/ElvaCos-1.0.0-beta.1-release-signed.hap --app build/releases/1.0.0-beta.1/ElvaCos-1.0.0-beta.1-release-signed.app
 ```
 
@@ -76,15 +76,15 @@ Wide-screen canvases on a phone verify component layout only, not real Tablet / 
 
 ```text
 entry/src/main/ets/
-├── ability/          # Stage / 系统备份生命周期
-├── common/           # appState、偏好、Theme、图标与系统能力
-├── component/        # 导航、设置、表单、网格、Canvas 图表
+├── ability/          # Stage / system backup lifecycle
+├── common/           # appState, preferences, Theme, icons, system capabilities
+├── component/        # Navigation, settings, forms, grids, Canvas charts
 ├── pages/
-│   ├── Dashboard.ets # 五页导航与启动调度
-│   ├── main/         # 首页、Cos、活动、衣柜、我的
-│   ├── detail/       # 角色、计划、装备、活动、照片、参考图
-│   └── more/         # 设置、花费、更新日志、隐私阅读
-├── model/            # ApplicationState、实体、领域规则与统计
+│   ├── Dashboard.ets # Five-page navigation and startup scheduling
+│   ├── main/         # Home, Cos, events, wardrobe, Profile
+│   ├── detail/       # Characters, plans, equipment, events, photos, references
+│   └── more/         # Settings, expenses, changelog, privacy reader
+├── model/            # ApplicationState, entities, domain rules, statistics
 └── data/             # database、repository、media
 ```
 
