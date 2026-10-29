@@ -42,7 +42,8 @@ export struct TeamFields {
                 .accessibilityText('团队分工')
                 .visualEffect(this.feedback.effect('select-16'))
                 .compositingFilter(this.feedback.filter('select-16'))
-                .attributeModifier(this.feedback.control('select-16'))
+                .attributeModifier(this.feedback.control('select-16')).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             if (!TEAM_ROLES.includes(this.draft.type)) {
                 Field({ componentId: 'form-input:type', error: this.issue('type'), area: (area: Area): void => {
                         this.area('type', area);

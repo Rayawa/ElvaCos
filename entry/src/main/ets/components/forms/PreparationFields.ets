@@ -45,9 +45,10 @@ export struct PreparationFields {
                 .visualEffect(this.feedback.effect('select-19'))
                 .compositingFilter(this.feedback.filter('select-19'))
                 .attributeModifier(this.feedback.control('select-19'))
-                .id('form-input:categoryId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                .id('form-input:categoryId').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                     this.area('categoryId', area);
                 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             this.fieldIssue('categoryId')
             DateField({ componentId: 'form-input:date', error: this.issue('date'), area: (area: Area): void => {
                     this.area('date', area);

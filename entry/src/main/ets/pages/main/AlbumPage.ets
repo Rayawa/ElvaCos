@@ -26,6 +26,7 @@ export struct AlbumPage {
     @Param bottomInset: number = Theme.contentBottom;
     @Event view: (route: PhotoViewerRoute) => void = () => {};
     @Event importPhotos: (planId: string) => void = () => {};
+    @Event openPlan: (planId: string) => void = () => {};
     @Param scroller: Scroller = new Scroller();
     @Local distributionOpen: boolean = false;
     private entered: boolean = false;
@@ -130,13 +131,20 @@ export struct AlbumPage {
         })))
             .value(this.route.collection.planId ? this.state.projectName(this.route.collection.planId) : '全部场次 / 计划')
             .id('album-plan-filter')
-            .constraintSize({ minWidth: 140, minHeight: 48 })
+            .constraintSize({ minWidth: 140, minHeight: 36 })
             .margin({ right: 8, bottom: 8 })
             .enabled(!this.state.busy && !this.route.collection.submitting)
             .onSelect((index: number): void => {
-                this.route.collection.setPlan(index ? this.state.projects[index - 1].id : '');
+                const id = index ? this.state.projects[index - 1].id : '';
+                if (id && this.route.mode === 'byPlan' && !this.route.byPlan.planId) {
+                    this.route.groupOffset = this.scroller.currentOffset().yOffset;
+                    this.openPlan(id);
+                } else {
+                    this.route.collection.setPlan(id);
+                }
             })
             .accessibilityText('相册计划范围')
+            .controlSize(ControlSize.SMALL).font({ size: 14 })
     }
 
     @Builder scope() {
@@ -220,12 +228,13 @@ export struct AlbumPage {
                         return { value: label };
                     })).id(this.route.byPlan.portfolio ? 'portfolio-status-filter' : 'album-status-filter')
                         .value((this.route.byPlan.portfolio ? ['全部作品', '已发布'] : PHOTO_FILTER_LABELS)[this.route.byPlan.portfolio ? [0, 7].indexOf(this.route.byPlan.filter) : this.route.byPlan.filter])
-                        .constraintSize({ minHeight: 48 })
+                        .constraintSize({ minHeight: 36 })
                         .enabled(!this.state.busy).onSelect((filter: number): void => {
                             this.route.byPlan.setFilter(this.route.byPlan.portfolio ? [0, 7][filter] : filter);
                             this.route.groupOffset = 0;
                             this.restoreOffset();
                         }).accessibilityText('场次照片状态筛选')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     if (this.route.byPlan.feedback) {
                         Text(this.route.byPlan.feedback).fontSize(14).fontColor(Theme.accent)
                     }
@@ -234,7 +243,7 @@ export struct AlbumPage {
                         InteractiveCard({ label: '打开相册计划 ' + plan.name, hint: '双击查看本场照片', effects: this.state.settings.effects,
                             action: (): void => {
                                 this.route.groupOffset = this.scroller.currentOffset().yOffset;
-                                this.route.byPlan.setPlan(plan.id);
+                                this.openPlan(plan.id);
                             }, content: (): void => {
                                 this.planCard(plan);
                             }

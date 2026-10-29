@@ -147,12 +147,13 @@ export struct PhotoDetail {
                                 return { value: label };
                             }))
                                 .value(photoStatusLabel(this.photo.status))
-                                .constraintSize({ minHeight: 48 })
+                                .constraintSize({ minHeight: 36 })
                                 .enabled(!this.state.busy && !this.state.staleScopes.length)
                                 .onSelect((index: number): void => {
                                     vibration.dotVibration();
                                     this.state.setPhotoStatus(this.photo, PHOTO_STATUSES[index]);
                                 }).accessibilityText('照片业务状态')
+                                .controlSize(ControlSize.SMALL).font({ size: 14 })
                         }.width('100%').padding({ top: 8, bottom: 8 })
                         Divider().color(Theme.line)
                         DetailLink({ title: displayName(this.state.projectName(this.photo.projectId)), subtitle: '所属计划', icon: Icons.plan, action: (): void => {

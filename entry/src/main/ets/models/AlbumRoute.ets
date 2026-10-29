@@ -10,6 +10,7 @@ export class AlbumRoute {
     @Trace restoreVersion: number = 0;
     constructor(planId: string = '', queue: boolean = false) {
         this.byPlan.planId = planId;
+        this.queue.planId = planId;
         this.mode = queue ? 'queue' : 'byPlan';
     }
 

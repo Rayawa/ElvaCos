@@ -268,14 +268,16 @@ export struct EntryCollection {
                 this.conversion = ['', 'task', 'expense', 'reference'][index];
                 this.targetKind = this.conversion ? 'project' : 'event';
                 this.targetId = '';
-            })
+            }).constraintSize({ minHeight: 36 })
+            .controlSize(ControlSize.SMALL).font({ size: 14 })
         if (!this.conversion || this.conversion === 'reference') {
             Select(this.assignmentScopes().map((scope: string): SelectOption => ({ value: ENTRY_SCOPE_LABELS[ENTRY_SCOPES.indexOf(scope)] })))
                 .value(ENTRY_SCOPE_LABELS[ENTRY_SCOPES.indexOf(this.targetKind)]).enabled(!this.state.busy)
                 .onSelect((index: number): void => {
                     this.targetKind = this.assignmentScopes()[index];
                     this.targetId = '';
-                })
+                }).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
         }
         if (this.targetKind !== 'global') {
             TextInput({ placeholder: '搜索归属对象', text: this.ownerQuery }).enabled(!this.state.busy).onChange((value: string): void => {
@@ -337,7 +339,8 @@ export struct EntryCollection {
                     .value(ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.entryKind)])
                     .enabled(!this.state.busy).onSelect((index: number): void => {
                         this.entryKind = ENTRY_KINDS[index];
-                    })
+                    }).constraintSize({ minHeight: 36 })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 Field({ label: '标题（可选）', value: this.title, change: (value: string): void => {
                         this.title = value;
                     }
@@ -438,14 +441,16 @@ export struct EntryCollection {
                 Select([{ value: '未归位' }, { value: '全部收录' }]).value(this.route.untriagedOnly ? '未归位' : '全部收录').id('entry-scope-filter')
                     .onSelect((index: number): void => {
                         this.route.setUntriagedOnly(index === 0);
-                    })
+                    }).constraintSize({ minHeight: 36 })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 ContextRow({ label: '未归位', text: this.state.untriagedEntries.length + ' 条' })
             }
             Select(new Array<SelectOption>({ value: '所有类型' }).concat(ENTRY_KIND_LABELS.map((label: string): SelectOption => ({ value: label }))))
                 .value(this.route.kind ? ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.route.kind)] : '所有类型').id('entry-kind-filter')
                 .onSelect((index: number): void => {
                     this.route.setKind(index === 0 ? '' : ENTRY_KINDS[index - 1]);
-                })
+                }).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             if (this.route.feedback) {
                 Text(this.route.feedback).fontSize(14).fontColor(Theme.muted)
             }

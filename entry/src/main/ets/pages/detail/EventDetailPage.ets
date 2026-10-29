@@ -734,7 +734,7 @@ export struct EventDetail {
                 this.dayHeader()
             }
             HdsViewTabs({ labels: this.route.dayMode ? ['出发前', '现场'] : ['概览', '本场计划', '收录', '提醒'],
-                icons: this.route.dayMode ? [Icons.library, Icons.event] : [Icons.home, Icons.plan, Icons.importPhoto, Icons.event],
+                icons: this.route.dayMode ? [Icons.tabLibrary, Icons.tabEvent] : [Icons.tabHome, Icons.tabPlan, Icons.tabPhoto, Icons.tabEvent],
                 selectedIndex: this.route.section, componentId: 'event-view-tabs', effects: this.state.settings.effects,
                 materialLevel: this.state.settings.materialLevel, availableWidth: this.availableWidth,
                 haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,

@@ -56,9 +56,10 @@ export struct ProjectFields {
                 .visualEffect(this.feedback.effect('select-1'))
                 .compositingFilter(this.feedback.filter('select-1'))
                 .attributeModifier(this.feedback.control('select-1'))
-                .id('form-input:characterId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                .id('form-input:characterId').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                     this.area('characterId', area);
                 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             this.fieldIssue('characterId')
             if (this.draft.newCharacter) {
                 Field({ componentId: 'form-input:characterName', error: this.issue('characterName'), area: (area: Area): void => {
@@ -155,9 +156,10 @@ export struct ProjectFields {
                     .visualEffect(this.feedback.effect('select-4'))
                     .compositingFilter(this.feedback.filter('select-4'))
                     .attributeModifier(this.feedback.control('select-4'))
-                    .id('form-input:variantId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                    .id('form-input:variantId').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                         this.area('variantId', area);
                     })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 this.fieldIssue('variantId')
                 Text('关联活动').fontColor(Theme.muted).fontSize(13)
                 Select(new Array<SelectOption>({ value: '不关联活动' }).concat(this.state.events.map((e: CosEvent): SelectOption => {
@@ -172,9 +174,10 @@ export struct ProjectFields {
                     .visualEffect(this.feedback.effect('select-5'))
                     .compositingFilter(this.feedback.filter('select-5'))
                     .attributeModifier(this.feedback.control('select-5'))
-                    .id('form-input:eventId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                    .id('form-input:eventId').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                         this.area('eventId', area);
                     })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 this.fieldIssue('eventId')
                 if (this.draft.eventAssociationHint(this.state)) {
                     Text(this.draft.eventAssociationHint(this.state)).id('form-project-event-change').fontSize(14).fontColor(Theme.muted)
@@ -190,7 +193,8 @@ export struct ProjectFields {
                     .accessibilityText('计划状态')
                     .visualEffect(this.feedback.effect('select-6'))
                     .compositingFilter(this.feedback.filter('select-6'))
-                    .attributeModifier(this.feedback.control('select-6'))
+                    .attributeModifier(this.feedback.control('select-6')).constraintSize({ minHeight: 36 })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 DateField({ componentId: 'form-input:shootingTime', error: this.issue('shootingTime'), area: (area: Area): void => {
                         this.area('shootingTime', area);
                     }, label: '拍摄 / 约拍开始时间（可选）', value: this.draft.shootingTime, time: true, optional: true, change: (value: string): void => {

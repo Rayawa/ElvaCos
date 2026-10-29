@@ -50,6 +50,7 @@ struct UsernameEditor {
             alignItems: ItemAlign.Center
         }) {
             Text('用户名')
+                .width(this.narrow ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
                 .maxLines(2)
@@ -115,6 +116,9 @@ export struct SettingsPanel {
     @State handlePopupTrash: boolean = false;
     @State cacheSize: string = '计算中…';
     @State private contentWidth: number = 0;
+    @State private vibrationHeight: number = 44;
+    @State private materialHeight: number = 44;
+    @State private usernameHeight: number = 44;
     private readonly vibrationSupported: boolean = vibration.isSupported();
     private cacheSizeTimer: number = -1;
     private cacheRevision: number = 0;
@@ -312,7 +316,7 @@ export struct SettingsPanel {
     }
 
     private isNarrowSettings(): boolean {
-        return this.contentWidth > 0 && this.contentWidth < 330;
+        return this.contentWidth > 0 && this.contentWidth < 420;
     }
 
     private vibrationLevelName(): string {
@@ -334,7 +338,7 @@ export struct SettingsPanel {
                     this.vibrationLevelContent()
                 },
             },
-            cardHeight: this.isNarrowSettings() ? 116 : 68,
+            cardHeight: Math.max(68, this.vibrationHeight + 24),
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -355,6 +359,7 @@ export struct SettingsPanel {
             alignItems: ItemAlign.Center
         }) {
             Text('振动强度')
+                .width(this.isNarrowSettings() ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
                 .maxLines(2)
@@ -404,6 +409,7 @@ export struct SettingsPanel {
                 })
         }.width('100%')
             .padding({ right: 2 })
+            .onAreaChange((_, area: Area): void => { this.vibrationHeight = Number(area.height); })
             .accessibilityGroup(true)
             .accessibilityText(
                 `振动强度，当前${this.vibrationLevelName()}`
@@ -450,7 +456,7 @@ export struct SettingsPanel {
                     this.materialLevelContent()
                 },
             },
-            cardHeight: this.isNarrowSettings() ? 116 : 68,
+            cardHeight: Math.max(68, this.materialHeight + 24),
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -471,6 +477,7 @@ export struct SettingsPanel {
             alignItems: ItemAlign.Center
         }) {
             Text('材质等级')
+                .width(this.isNarrowSettings() ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
                 .maxLines(2)
@@ -524,6 +531,7 @@ export struct SettingsPanel {
                 })
         }.width('100%')
             .padding({ right: 2 })
+            .onAreaChange((_, area: Area): void => { this.materialHeight = Number(area.height); })
             .accessibilityGroup(true)
             .accessibilityText(
                 `材质等级，当前${this.materialLevelName()}`
@@ -564,7 +572,7 @@ export struct SettingsPanel {
                     this.usernameContent()
                 },
             },
-            cardHeight: this.isNarrowSettings() ? 108 : 68,
+            cardHeight: Math.max(68, this.usernameHeight + 24),
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -583,7 +591,7 @@ export struct SettingsPanel {
             initialUsername: this.username,
             narrow: this.isNarrowSettings(),
             onCommit: (value: string): void => this.persistUsername(value),
-        })
+        }).onAreaChange((_, area: Area): void => { this.usernameHeight = Number(area.height); })
     }
 
     @Builder

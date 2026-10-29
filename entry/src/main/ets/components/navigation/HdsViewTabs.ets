@@ -2,6 +2,7 @@ import { HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import { Theme } from '../../ui/theme/Theme';
 import { CompatibleTabsStyle } from '../../config/SystemCapability';
 import { HapticService } from '../../ui/feedback/HapticService';
+import { Icons } from '../../ui/icons/Icons';
 /** Native secondary view navigation. Actions stay in the title menu or within each view. */
 
 @ComponentV2
@@ -9,6 +10,7 @@ export struct HdsViewTabs {
     @Param labels: string[] = [];
     @Param icons: Resource[] = [];
     @Param selectedIndex: number = 0;
+    @Local activeIndex: number = 0;
     @Param componentId: string = 'detail-view-tabs';
     @Param effects: boolean = true;
     @Param materialLevel: number = 1;
@@ -19,35 +21,44 @@ export struct HdsViewTabs {
     @Event changed: (index: number) => void = () => {};
     @BuilderParam content: () => void = this.emptyContent;
     private controller: HdsTabsController = new HdsTabsController();
+    aboutToAppear(): void {
+        this.activeIndex = this.selectedIndex;
+    }
+
+    @Monitor('selectedIndex')
+    private selectionChanged(): void {
+        this.activeIndex = this.selectedIndex;
+    }
     @Builder emptyContent() {
         Blank()
     }
 
     build() {
-        HdsTabs({ controller: this.controller, index: this.selectedIndex }) {
+        HdsTabs({ controller: this.controller, index: this.activeIndex }) {
             ForEach(this.labels, (label: string, index: number) => {
                 TabContent() {
                     // The native bar floats above the immersive content. Routes retain each view's scroll context.
-                    if (index === this.selectedIndex) {
+                    if (index === this.activeIndex) {
                         this.content()
                     }
-                }.tabBar(new BottomTabBarStyle(this.icons[index], label).id(this.componentId + '-' + index).labelStyle({ selectedColor: Theme.accent, unselectedColor: Theme.muted }).iconStyle({ selectedColor: Theme.accent, unselectedColor: Theme.muted }))
+                }.tabBar(Icons.tabBar(this.icons[index], label, this.componentId + '-' + index))
             }, (label: string) => label)
         }.id(this.componentId).barPosition(BarPosition.End).barHeight(Theme.mainTabsHeight)
             .barWidth(Math.min(this.labels.length * 76, Math.max(0, this.availableWidth - 32)))
             .scrollable(false).barOverlap(true).animationDuration(0)
-            .attributeModifier(new CompatibleTabsStyle(this.effects, this.materialLevel))
+            .attributeModifier(new CompatibleTabsStyle(this.effects, this.materialLevel, 1))
             .onContentWillChange((_current: number, coming: number): boolean => {
-                return coming === this.selectedIndex || this.canChange(coming);
+                return coming === this.activeIndex || this.canChange(coming);
             })
             .onChange((index: number): void => {
-                if (index === this.selectedIndex) {
+                if (index === this.activeIndex) {
                     return;
                 }
                 if (this.canChange(index)) {
+                    this.activeIndex = index;
                     this.changed(index);
                 } else {
-                    this.controller.changeIndex(this.selectedIndex);
+                    this.controller.changeIndex(this.activeIndex);
                 }
             })
             .onTabBarClick((): void => {

@@ -1097,23 +1097,23 @@ struct Dashboard {
     }
 
     private viewIcons(kind: string): Resource[] {
-        if (kind === 'settings') { return [Icons.settings, Icons.library, Icons.help]; }
+        if (kind === 'settings') { return [Icons.tabSettings, Icons.tabLibrary, Icons.tabHelp]; }
         if (kind === 'expenseStats') {
-            return [Icons.home, Icons.plan];
+            return [Icons.tabHome, Icons.tabPlan];
         }
         if (kind === 'project') {
-            return [Icons.home, Icons.check, Icons.library, Icons.importPhoto];
+            return [Icons.tabHome, Icons.tabCheck, Icons.tabLibrary, Icons.tabPhoto];
         }
         if (kind === 'character') {
-            return [Icons.profile, Icons.plan, Icons.importPhoto];
+            return [Icons.tabProfile, Icons.tabPlan, Icons.tabPhoto];
         }
         if (kind === 'asset') {
-            return [Icons.library, Icons.plan];
+            return [Icons.tabLibrary, Icons.tabPlan];
         }
         if (kind === 'album') {
-            return [Icons.importPhoto, Icons.check];
+            return [Icons.tabPhoto, Icons.tabCheck];
         }
-        return [Icons.plan, Icons.profile, Icons.event, Icons.library];
+        return [Icons.tabPlan, Icons.tabProfile, Icons.tabEvent, Icons.tabLibrary];
     }
 
     private viewIndex(kind: string, param: Object): number {
@@ -1207,7 +1207,8 @@ struct Dashboard {
                 }
             })
         } else if (kind === 'album') {
-            AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, topInset: Theme.detailTop, bottomInset: Theme.detailFloatingBottom, view: (route: PhotoViewerRoute): void => {
+            AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, topInset: Theme.detailTop, bottomInset: Theme.detailFloatingBottom,
+                openPlan: (id: string): void => this.open('album', id), view: (route: PhotoViewerRoute): void => {
                     this.openPhoto(route);
                 }, importPhotos: (id: string): void => {
                     this.chooseImport(id);
@@ -1271,7 +1272,7 @@ struct Dashboard {
         } else {
             DetailDestination({
                 titleOptions: SystemCapability.titleBar(
-                    kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'project' ? (param as ProjectRoute).id : kind === 'character' ? (param as CharacterRoute).id : kind === 'asset' ? (param as AssetRoute).id : param as string),
+                    kind === 'album' ? ((param as AlbumRoute).collection.planId ? this.state.projectName((param as AlbumRoute).collection.planId) + '照片' : '相册') : kind === 'tasks' ? '全部待办' : kind === 'inbox' ? this.inboxTitle(param as InboxRoute) : this.destinationTitle(kind, kind === 'project' ? (param as ProjectRoute).id : kind === 'character' ? (param as CharacterRoute).id : kind === 'asset' ? (param as AssetRoute).id : param as string),
                     this.state.settings.effects,
                     this.state.settings.materialLevel,
                     undefined,
@@ -1910,6 +1911,7 @@ struct Dashboard {
                 } else {
                     AlbumPage({
                         state: this.state, route: this.albumRoute,
+                        openPlan: (id: string): void => this.open('album', id),
                         scroller: this.pageScrollers[index], entranceSession: this.mainEntranceSession,
                         topInset: this.mainContentTop, bottomInset: Theme.contentBottom + this.daySnackBottomInset, active: this.tab === index,
                         view: (route: PhotoViewerRoute): void => {
@@ -1952,19 +1954,19 @@ struct Dashboard {
         HdsTabs({ controller: this.tabsController, index: this.tab }) {
             TabContent() {
                 this.mainNavigation(0)
-            }.tabBar(new BottomTabBarStyle(Icons.home, '首页')).accessibilityText('首页标签页')
+            }.tabBar(Icons.tabBar(Icons.tabHome, '首页')).accessibilityText('首页标签页')
             TabContent() {
                 this.mainNavigation(1)
-            }.tabBar(new BottomTabBarStyle(Icons.plan, '计划')).accessibilityText('计划标签页')
+            }.tabBar(Icons.tabBar(Icons.tabPlan, '计划')).accessibilityText('计划标签页')
             TabContent() {
                 this.mainNavigation(2)
-            }.tabBar(new BottomTabBarStyle(Icons.event, '日程')).accessibilityText('日程标签页')
+            }.tabBar(Icons.tabBar(Icons.tabEvent, '日程')).accessibilityText('日程标签页')
             TabContent() {
                 this.mainNavigation(3)
-            }.tabBar(new BottomTabBarStyle(Icons.library, '衣柜')).accessibilityText('衣柜标签页')
+            }.tabBar(Icons.tabBar(Icons.tabLibrary, '衣柜')).accessibilityText('衣柜标签页')
             TabContent() {
                 this.mainNavigation(4)
-            }.tabBar(new BottomTabBarStyle(Icons.importPhoto, '相册')).accessibilityText('相册标签页')
+            }.tabBar(Icons.tabBar(Icons.tabPhoto, '相册')).accessibilityText('相册标签页')
         }.id('main-tabs')
             .barPosition(BarPosition.End).barHeight(this.rootPagesVisible[this.tab] ? Theme.mainTabsHeight : 0)
             .barWidth(this.rootPagesVisible[this.tab] ? Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)) : 0)

@@ -83,10 +83,11 @@ export struct SearchPage {
                         }))
                             .id('search-resource-filter')
                             .value(SEARCH_RESOURCE_LABELS[SEARCH_RESOURCE_KINDS.indexOf(this.route.resourceKind)])
-                            .constraintSize({ minHeight: 48 })
+                            .constraintSize({ minHeight: 36 })
                             .onSelect((index: number): void => {
                                 this.route.setResourceKind(SEARCH_RESOURCE_KINDS[index]);
                             }).accessibilityText('搜索资源类型')
+                            .controlSize(ControlSize.SMALL).font({ size: 14 })
                     }
                     ContextRow({ label: SEARCH_SECTIONS[this.route.section], text: this.rows.length + ' 条结果' }).id('search-result-count')
                     if (this.route.section === 1 || !this.route.query.trim()) {

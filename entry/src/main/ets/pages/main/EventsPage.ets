@@ -165,7 +165,7 @@ export struct EventsPage {
                         Flex({ space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) }, wrap: FlexWrap.Wrap }) {
                             if (!this.route.calendar && !this.route.dateFocused) {
                                 Select([{ value: '全部日期' }, { value: '已结束' }, { value: '日期待定' }, { value: '今天' }, { value: '即将到来' }])
-                                    .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.route.filter]).constraintSize({ minHeight: 48 })
+                                    .value(['全部日期', '已结束', '日期待定', '今天', '即将到来'][this.route.filter]).constraintSize({ minHeight: 36 })
                                     .onSelect((index: number): void => {
                                         vibration.dotVibration();
                                         this.route.filter = index;
@@ -173,12 +173,14 @@ export struct EventsPage {
                                         this.resetPosition();
                                     })
                                     .id('event-list-filter').accessibilityText('活动日期筛选')
+                                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                             }
-                            Select(this.typeOptions()).value(this.route.eventType || '全部类型').constraintSize({ minHeight: 48 })
+                            Select(this.typeOptions()).value(this.route.eventType || '全部类型').constraintSize({ minHeight: 36 })
                                 .onSelect((index: number): void => {
                                     this.route.eventType = index === 0 ? '' : this.types()[index - 1];
                                     this.resetPosition();
                                 }).accessibilityText('活动类型筛选')
+                                .controlSize(ControlSize.SMALL).font({ size: 14 })
                         }.width('100%')
                         if (!this.route.calendar) {
                             Row({ space: 8 }) {

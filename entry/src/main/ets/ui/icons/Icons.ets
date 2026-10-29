@@ -1,4 +1,5 @@
 import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { Theme } from '../theme/Theme';
 /**
 * 图标集中定义。
 *
@@ -9,6 +10,24 @@ import { SymbolGlyphModifier } from '@kit.ArkUI';
 */
 
 export class Icons {
+    static tabHome: Resource = $r('sys.symbol.house');
+    static tabPlan: Resource = $r('sys.symbol.square_and_pencil');
+    static tabEvent: Resource = $r('sys.symbol.calendar');
+    static tabLibrary: Resource = $r('sys.symbol.archivebox');
+    static tabPhoto: Resource = $r('sys.symbol.picture');
+    static tabProfile: Resource = $r('sys.symbol.person');
+    static tabSettings: Resource = $r('sys.symbol.gearshape');
+    static tabCheck: Resource = $r('sys.symbol.checkmark');
+    static tabHelp: Resource = $r('sys.symbol.questionmark_circle');
+
+    static tabBar(icon: Resource, label: string, id: string = ''): BottomTabBarStyle {
+        const style = new BottomTabBarStyle({
+            normal: new SymbolGlyphModifier(icon).fontColor([Theme.muted]),
+            selected: new SymbolGlyphModifier(icon).fontColor([Theme.accent]),
+        }, label).labelStyle({ selectedColor: Theme.accent, unselectedColor: Theme.muted });
+        return id ? style.id(id) : style;
+    }
+
     // 一级导航与标题菜单
     static home: Resource = $r('sys.media.return_home_fill');
     static plan: Resource = $r('sys.media.ohos_ic_public_edit');

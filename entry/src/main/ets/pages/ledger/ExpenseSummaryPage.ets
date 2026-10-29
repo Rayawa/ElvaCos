@@ -123,19 +123,22 @@ export struct ExpenseSummary {
                 .value(RANGE_LABELS[RANGES.indexOf(this.route.range)]).onSelect((index: number): void => {
                     this.chooseRange(index);
                 })
-                .constraintSize({ minHeight: 48, minWidth: 140 }).margin({ right: 8, bottom: 8 }).accessibilityText('花费日期范围')
+                .constraintSize({ minHeight: 36, minWidth: 140 }).margin({ right: 8, bottom: 8 }).accessibilityText('花费日期范围')
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Select(new Array<SelectOption>({ value: '全部计划' }).concat(this.state.projects.map((project: CosProject): SelectOption => ({ value: project.name }))))
                 .id('expense-project').value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
                 .onSelect((index: number): void => {
                     vibration.dotVibration();
                     this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
                 })
-                .constraintSize({ minHeight: 48, minWidth: 140 }).margin({ right: 8, bottom: 8 }).accessibilityText('花费所属计划')
+                .constraintSize({ minHeight: 36, minWidth: 140 }).margin({ right: 8, bottom: 8 }).accessibilityText('花费所属计划')
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Select(this.categoryOptions()).id('expense-category-filter').value(this.route.category || '全部分类')
                 .onSelect((index: number): void => {
                     this.route.category = index === 0 ? '' : this.categoryNames[index - 1];
                 })
-                .constraintSize({ minHeight: 48, minWidth: 140 }).margin({ bottom: 8 }).accessibilityText('花费分类筛选')
+                .constraintSize({ minHeight: 36, minWidth: 140 }).margin({ bottom: 8 }).accessibilityText('花费分类筛选')
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
         }.width('100%')
         if (this.route.range === 'custom') {
             Row({ space: 12 }) {

@@ -133,28 +133,31 @@ export struct LibraryPage {
                 return { value: label };
             }))
                 .value(this.route.type ? ASSET_TYPE_LABELS[ASSET_TYPES.indexOf(this.route.type as AssetType)] : '全部类型')
-                .constraintSize({ minHeight: 48 })
+                .constraintSize({ minHeight: 36 })
                 .onSelect((index: number): void => {
                     this.route.type = index ? ASSET_TYPES[index - 1] : '';
                     this.route.changed();
                 }).accessibilityText('衣柜装备类型筛选').margin({ right: 12, bottom: 8 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Select(['全部状态'].concat(ASSET_STATUS_LABELS).map((label: string): SelectOption => {
                 return { value: label };
             }))
                 .value(this.route.status ? ASSET_STATUS_LABELS[ASSET_STATUSES.indexOf(this.route.status as AssetStatus)] : '全部状态')
-                .constraintSize({ minHeight: 48 })
+                .constraintSize({ minHeight: 36 })
                 .onSelect((index: number): void => {
                     this.route.status = index ? ASSET_STATUSES[index - 1] : '';
                     this.route.changed();
                 }).accessibilityText('衣柜装备状态筛选').margin({ right: 12, bottom: 8 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Select(this.locationLabels().map((label: string): SelectOption => {
                 return { value: label };
-            })).value(this.locationLabels()[this.locationIndex()]).constraintSize({ minHeight: 48 })
+            })).value(this.locationLabels()[this.locationIndex()]).constraintSize({ minHeight: 36 })
                 .onSelect((index: number): void => {
                     this.route.locationMode = index === 0 ? 'all' : index === 1 ? 'unrecorded' : 'named';
                     this.route.location = index > 1 ? this.locations()[index - 2] : '';
                     this.route.changed();
                 }).accessibilityText('衣柜存放位置筛选').margin({ bottom: 8 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
         }.width('100%')
         if (this.route.filtered) {
             Button('清除衣柜筛选').constraintSize({ minHeight: 48 }).onClick((): void => {

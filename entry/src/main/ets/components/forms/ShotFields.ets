@@ -41,13 +41,14 @@ export struct ShotFields {
                 return { value: (reference.caption || '参考图') + (reference.projectId ? '（此计划）' : '（此角色）') };
             })))
                 .value(this.draft.referenceId ? (this.references().find((reference: ReferenceImage) => reference.id === this.draft.referenceId)?.caption || (this.references().some((reference: ReferenceImage) => reference.id === this.draft.referenceId) ? '参考图' : '参考图已不存在，请重新选择')) : '不关联参考图')
-                .constraintSize({ minHeight: 48 }).id('form-input:referenceId').accessibilityText('拍摄参考图')
+                .constraintSize({ minHeight: 36 }).id('form-input:referenceId').accessibilityText('拍摄参考图')
                 .onSelect((index: number): void => {
                     this.draft.referenceId = index === 0 ? '' : this.references()[index - 1].id;
                 })
                 .onAreaChange((_, area: Area): void => {
                     this.area('referenceId', area);
                 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             this.fieldIssue('referenceId')
             Text('拍摄勾选独立于准备任务、装包与照片处理状态。').fontSize(14).fontColor(Theme.muted)
         }.width('100%').alignItems(HorizontalAlign.Start)

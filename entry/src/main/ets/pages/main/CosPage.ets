@@ -198,20 +198,22 @@ export struct CosPage {
                 Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
                     Select(this.statusOptions())
                         .value(this.route.status ? PROJECT_LABELS[PROJECT_STATUSES.indexOf(this.route.status as ProjectStatus)] : '全部状态')
-                        .constraintSize({ minHeight: 48, minWidth: 140 }).margin({ right: 8, bottom: 8 })
+                        .constraintSize({ minHeight: 36, minWidth: 140 }).margin({ right: 8, bottom: 8 })
                         .onSelect((index: number): void => {
                             this.route.status = index === 0 ? '' : this.statuses()[index - 1];
                             this.resetPosition();
                         })
                         .accessibilityText('计划状态筛选')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     Select([{ value: '全部日期' }, { value: '日期待定' }, { value: '日期已过' }, { value: '今天' }, { value: '未来七天' }, { value: '今天及以后' }])
                         .value(['全部日期', '日期待定', '日期已过', '今天', '未来七天', '今天及以后'][['all', 'undated', 'overdue', 'today', 'week', 'future'].indexOf(this.route.dateRange)])
-                        .constraintSize({ minHeight: 48, minWidth: 140 }).margin({ bottom: 8 })
+                        .constraintSize({ minHeight: 36, minWidth: 140 }).margin({ bottom: 8 })
                         .onSelect((index: number): void => {
                             this.route.dateRange = ['all', 'undated', 'overdue', 'today', 'week', 'future'][index];
                             this.resetPosition();
                         })
                         .accessibilityText('计划日期筛选')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('100%')
                 Row({ space: 12 }) {
                     Text(this.visiblePlans.length + ' 份计划').fontSize(14).fontColor(Theme.muted).layoutWeight(1)
@@ -233,11 +235,12 @@ export struct CosPage {
             } else {
                 Row({ space: 12 }) {
                     Select([{ value: '全部角色' }, { value: '已收藏角色' }]).value(this.route.favoriteOnly ? '已收藏角色' : '全部角色')
-                        .constraintSize({ minHeight: 48 }).accessibilityText('角色收藏筛选')
+                        .constraintSize({ minHeight: 36 }).accessibilityText('角色收藏筛选')
                         .onSelect((index: number): void => {
                             this.route.favoriteOnly = index === 1;
                             this.resetPosition();
                         })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     Text(this.visibleCharacters.length + ' 位角色').fontSize(14).fontColor(Theme.muted).layoutWeight(1).textAlign(TextAlign.End)
                     if (this.route.query.trim() || this.route.favoriteOnly) {
                         Button('清除筛选').constraintSize({ minHeight: 48 }).onClick((): void => {

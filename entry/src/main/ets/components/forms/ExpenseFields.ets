@@ -46,9 +46,10 @@ export struct ExpenseFields {
                 .visualEffect(this.feedback.effect('select-17'))
                 .compositingFilter(this.feedback.filter('select-17'))
                 .attributeModifier(this.feedback.control('select-17'))
-                .id('form-input:parentId').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                .id('form-input:parentId').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                     this.area('parentId', area);
                 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             this.fieldIssue('parentId')
             Text('分类').fontSize(13).fontColor(Theme.muted)
             Select(EXPENSE_CATEGORIES.map((category: string): SelectOption => {
@@ -61,7 +62,8 @@ export struct ExpenseFields {
                 .accessibilityText('花费分类')
                 .visualEffect(this.feedback.effect('select-18'))
                 .compositingFilter(this.feedback.filter('select-18'))
-                .attributeModifier(this.feedback.control('select-18'))
+                .attributeModifier(this.feedback.control('select-18')).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Field({ componentId: 'form-input:money', error: this.issue('money'), area: (area: Area): void => {
                     this.area('money', area);
                 }, focused: (): void => {

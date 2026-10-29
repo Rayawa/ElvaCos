@@ -165,13 +165,14 @@ export struct PhotoGrid {
                     .value(this.filterLabels()[this.filters().indexOf(this.route.filter)] || this.filterLabels()[0])
                     .constraintSize({ minWidth: 140 })
                     .margin({ right: 8, bottom: 8 })
-                    .enabled(!this.state.busy && !this.route.submitting).constraintSize({ minHeight: 48 })
+                    .enabled(!this.state.busy && !this.route.submitting).constraintSize({ minHeight: 36 })
                     .id(this.route.portfolio ? 'portfolio-status-filter' : 'photo-status-filter')
                     .onSelect((index: number): void => {
                         vibration.dotVibration();
                         this.route.setFilter(this.filters()[index]);
                     })
                     .accessibilityText('照片状态筛选')
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
             }.width('100%')
             if (this.route.selecting) {
                 Row() {
@@ -183,11 +184,12 @@ export struct PhotoGrid {
                     }))
                         .value('标为' + photoStatusLabel(this.route.targetStatus))
                         .layoutWeight(1)
-                        .constraintSize({ minHeight: 48 })
+                        .constraintSize({ minHeight: 36 })
                         .enabled(!this.state.busy && !this.route.submitting)
                         .onSelect((index: number): void => {
                             this.route.targetStatus = PHOTO_EDIT_STATUSES[index];
                         }).accessibilityText('批量照片状态')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('100%')
             }
             if (this.route.feedback) {

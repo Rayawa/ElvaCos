@@ -240,6 +240,8 @@ export struct ProjectPhotoHeader {
                         .shots.done + ' / ' + this.state.readiness(this.route.id)
                         .shots.total + ' 项' })
             }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).id('project-shots-open')
+                .backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+                .padding({ left: 16, right: 16 })
                 .onClick((): void => {
                     this.actionError = '';
                     this.route.shotsOpen = true;

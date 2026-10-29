@@ -48,9 +48,10 @@ export struct EventFields {
                         .visualEffect(this.feedback.effect('select-9'))
                         .compositingFilter(this.feedback.filter('select-9'))
                         .attributeModifier(this.feedback.control('select-9'))
-                        .id('form-input:type').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                        .id('form-input:type').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                             this.area('type', area);
                         })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     this.fieldIssue('type')
                 }.width('48%').constraintSize({ minWidth: 140 }).alignItems(HorizontalAlign.Start)
                 Column({ space: 8 }) {
@@ -81,9 +82,10 @@ export struct EventFields {
                         .visualEffect(this.feedback.effect('select-10'))
                         .compositingFilter(this.feedback.filter('select-10'))
                         .attributeModifier(this.feedback.control('select-10'))
-                        .id('form-input:dateMode').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                        .id('form-input:dateMode').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                             this.area('dateMode', area);
                         })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     this.fieldIssue('dateMode')
                 }.width('48%').constraintSize({ minWidth: 140 }).alignItems(HorizontalAlign.Start)
             }.width('100%')
@@ -126,9 +128,10 @@ export struct EventFields {
                     .visualEffect(this.feedback.effect('select-11'))
                     .compositingFilter(this.feedback.filter('select-11'))
                     .attributeModifier(this.feedback.control('select-11'))
-                    .id('form-input:timeMode').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                    .id('form-input:timeMode').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                         this.area('timeMode', area);
                     })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 this.fieldIssue('timeMode')
                 if (this.draft.timeMode !== 'none') {
                     DateField({ componentId: 'form-input:startTime', error: this.issue('startTime'), area: (area: Area): void => {
@@ -179,9 +182,10 @@ export struct EventFields {
                     .visualEffect(this.feedback.effect('select-13'))
                     .compositingFilter(this.feedback.filter('select-13'))
                     .attributeModifier(this.feedback.control('select-13'))
-                    .id('form-input:reminderMinutes').constraintSize({ minHeight: 48 }).onAreaChange((_, area: Area): void => {
+                    .id('form-input:reminderMinutes').constraintSize({ minHeight: 36 }).onAreaChange((_, area: Area): void => {
                         this.area('reminderMinutes', area);
                     })
+                    .controlSize(ControlSize.SMALL).font({ size: 14 })
                 this.fieldIssue('reminderMinutes')
                 if (this.draft.reminderMinutes >= 0) {
                     Text('保存时申请通知授权；未标记时间的活动按当天 09:00 提醒。').fontSize(12).fontColor(Theme.muted)
@@ -225,7 +229,8 @@ export struct EventFields {
                 .accessibilityText('活动参与状态')
                 .visualEffect(this.feedback.effect('select-14'))
                 .compositingFilter(this.feedback.filter('select-14'))
-                .attributeModifier(this.feedback.control('select-14'))
+                .attributeModifier(this.feedback.control('select-14')).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Row() {
                 Text('已购票')
                     .fontColor(Theme.ink)

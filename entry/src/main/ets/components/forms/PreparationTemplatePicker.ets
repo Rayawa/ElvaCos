@@ -27,7 +27,8 @@ export struct PreparationTemplatePicker {
                 .accessibilityText('准备模板')
                 .visualEffect(this.feedback.effect('select-1'))
                 .compositingFilter(this.feedback.filter('select-1'))
-                .attributeModifier(this.feedback.control('select-1'))
+                .attributeModifier(this.feedback.control('select-1')).constraintSize({ minHeight: 36 })
+                .controlSize(ControlSize.SMALL).font({ size: 14 })
             Text('按这次需要选择任务，创建后可修改名称、日期和分类。').fontSize(12).fontColor(Theme.muted)
             if (this.mode !== 0) {
                 ForEach(PREPARATION_TEMPLATES, (category: CategoryTemplate) => {

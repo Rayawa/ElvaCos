@@ -51,7 +51,8 @@ export struct AssetFields {
                         .accessibilityText('装备类型')
                         .visualEffect(this.feedback.effect('select-7'))
                         .compositingFilter(this.feedback.filter('select-7'))
-                        .attributeModifier(this.feedback.control('select-7'))
+                        .attributeModifier(this.feedback.control('select-7')).constraintSize({ minHeight: 36 })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('48%').constraintSize({ minWidth: 140 }).alignItems(HorizontalAlign.Start)
                 Column({ space: 8 }) {
                     Text('状态').fontSize(13).fontColor(Theme.muted)
@@ -66,7 +67,8 @@ export struct AssetFields {
                         .accessibilityText('装备状态')
                         .visualEffect(this.feedback.effect('select-8'))
                         .compositingFilter(this.feedback.filter('select-8'))
-                        .attributeModifier(this.feedback.control('select-8'))
+                        .attributeModifier(this.feedback.control('select-8')).constraintSize({ minHeight: 36 })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('48%').constraintSize({ minWidth: 140 }).alignItems(HorizontalAlign.Start)
             }.width('100%')
             Field({ componentId: 'form-input:location', error: this.issue('location'), area: (area: Area): void => {

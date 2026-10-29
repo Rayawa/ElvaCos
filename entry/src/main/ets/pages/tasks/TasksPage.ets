@@ -96,17 +96,20 @@ export struct TasksPage {
                         .value(CATEGORY_LABELS[CATEGORIES.indexOf(this.route.category)]).onSelect((index: number): void => {
                             this.route.category = CATEGORIES[index];
                             this.route.range = index === 4 || index === 5 ? 'all' : 'action';
-                        }).accessibilityText('待办类别').constraintSize({ minHeight: 48 }).margin({ right: 8, bottom: 8 })
+                        }).accessibilityText('待办类别').constraintSize({ minHeight: 36 }).margin({ right: 8, bottom: 8 })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     Select(this.projectOptions()).value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
                         .onSelect((index: number): void => {
                             this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
-                        }).accessibilityText('待办所属计划').constraintSize({ minHeight: 48 }).margin({ right: 8, bottom: 8 })
+                        }).accessibilityText('待办所属计划').constraintSize({ minHeight: 36 }).margin({ right: 8, bottom: 8 })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                     Select(RANGE_LABELS.map((label: string): SelectOption => {
                         return { value: label };
                     }))
                         .value(RANGE_LABELS[RANGES.indexOf(this.route.range)]).onSelect((index: number): void => {
                             this.route.range = RANGES[index];
-                        }).accessibilityText('待办日期范围').constraintSize({ minHeight: 48 }).margin({ bottom: 8 })
+                        }).accessibilityText('待办日期范围').constraintSize({ minHeight: 36 }).margin({ bottom: 8 })
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('100%')
                 SectionHeading({ title: CATEGORY_LABELS[CATEGORIES.indexOf(this.route.category)], trailing: this.items().length + ' 项' })
                 ForEach(this.items(), (item: TaskQueueItem) => {

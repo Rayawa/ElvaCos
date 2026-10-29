@@ -436,7 +436,7 @@ export struct ProjectDetail {
                         .onClick((): void => {
                             this.expandCategory(category.id);
                         }).accessibilityText((this.route.expandedCategories.includes(category.id) ? '收起分类 ' : '展开分类 ') + category.name)
-                    Select([{ value: '添加任务' }, { value: '编辑分类' }, { value: '删除分类' }]).value('更多').constraintSize({ minHeight: 48 })
+                    Select([{ value: '添加任务' }, { value: '编辑分类' }, { value: '删除分类' }]).value('更多').constraintSize({ minHeight: 36 })
                         .enabled(!this.state.busy && !this.state.staleScopes.length).onSelect((index: number): void => {
                             if (index === 0) {
                                 this.edit('preparation', '', category.id);
@@ -446,6 +446,7 @@ export struct ProjectDetail {
                                 this.remove('category', category.id);
                             }
                         }).accessibilityText(category.name + '，添加任务、编辑或删除分类')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('100%')
                 ForEach(this.visibleTasks(category.id), (task: PreparationTask) => {
                     Row({ space: 8 }) {
@@ -485,7 +486,7 @@ export struct ProjectDetail {
                             .visualEffect(this.feedback.effect('column-16' + ":" + category.id + ":" + task.id))
                             .compositingFilter(this.feedback.filter('column-16' + ":" + category.id + ":" + task.id))
                             .attributeModifier(this.feedback.control('column-16' + ":" + category.id + ":" + task.id))
-                        Select([{ value: '编辑任务' }, { value: '删除任务' }]).value('更多').constraintSize({ minHeight: 48 }).font({ size: 12 })
+                        Select([{ value: '编辑任务' }, { value: '删除任务' }]).value('更多').constraintSize({ minHeight: 36 }).font({ size: 12 })
                             .enabled(!this.state.busy && !this.state.staleScopes.length).onSelect((index: number): void => {
                                 if (index === 0) {
                                     this.edit('preparation', task.id, this.project.id);
@@ -493,6 +494,7 @@ export struct ProjectDetail {
                                     this.remove('preparation', task.id);
                                 }
                             }).accessibilityText(task.label + '，编辑或删除任务')
+                            .controlSize(ControlSize.SMALL).font({ size: 14 })
                     }.id('preparation-row:' + task.id)
                         .width('100%')
                         .padding(8)

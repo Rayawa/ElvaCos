@@ -97,10 +97,11 @@ export struct CharacterDetail {
             return { value: variant.name };
         })))
             .value(this.route.variantId ? this.variants().find((variant: CharacterVariant) => variant.id === this.route.variantId)?.name || '版本已不存在' : '不指定版本')
-            .constraintSize({ minHeight: 48 }).accessibilityText('新建计划使用的角色版本').id('character-plan-version')
+            .constraintSize({ minHeight: 36 }).accessibilityText('新建计划使用的角色版本').id('character-plan-version')
             .onSelect((index: number): void => {
                 this.route.variantId = index === 0 ? '' : this.variants()[index - 1].id;
             })
+            .controlSize(ControlSize.SMALL).font({ size: 14 })
         if (!this.validVersion()) {
             Text('所选版本已不存在，请重新选择后新建计划。').fontSize(14).fontColor(Theme.danger)
         }
@@ -156,7 +157,7 @@ export struct CharacterDetail {
             Column({ space: 8 }) {
                 Row({ space: 8 }) {
                     Text(variant.name).fontSize(20).fontWeight(FontWeight.Medium).fontColor(Theme.ink).layoutWeight(1)
-                    Select([{ value: '编辑版本' }, { value: '删除版本' }]).value('更多').constraintSize({ minHeight: 48 }).enabled(this.writable())
+                    Select([{ value: '编辑版本' }, { value: '删除版本' }]).value('更多').constraintSize({ minHeight: 36 }).enabled(this.writable())
                         .onSelect((index: number): void => {
                             if (index === 0) {
                                 this.edit('variant', variant.id, this.character.id);
@@ -164,6 +165,7 @@ export struct CharacterDetail {
                                 this.remove('variant', variant.id);
                             }
                         }).accessibilityText(variant.name + '，编辑或删除版本')
+                        .controlSize(ControlSize.SMALL).font({ size: 14 })
                 }.width('100%')
                 if (variant.notes) {
                     Text(variant.notes).fontSize(14).fontColor(Theme.muted)
