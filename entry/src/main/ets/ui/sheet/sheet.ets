@@ -3,6 +3,7 @@ import { StaggerEntrance } from '../animation/motion';
 import { Theme } from '../theme/Theme';
 import { HapticService } from '../feedback/HapticService';
 import { STORAGE_KEY_VIBRATION_LEVEL } from '../../config/constants';
+import { AppShortcut, resolveAppShortcut } from '../input/shortcuts';
 interface SheetBackHandler {
     id: number;
     close: () => void | Promise<void>;
@@ -52,6 +53,20 @@ export function handleSheetBack(): boolean {
     }
     void closeSheet(sheet.close);
     return true;
+}
+
+export function handleSheetKey(event: KeyEvent): boolean {
+    if (event.type !== KeyType.Down) {
+        return false;
+    }
+    try {
+        const shortcut = resolveAppShortcut(event.keyCode, event.getModifierKeyState?.(['Ctrl']) === true,
+            event.getModifierKeyState?.(['Alt']) === true, event.getModifierKeyState?.(['Shift']) === true,
+            event.metaKey !== 0);
+        return shortcut === AppShortcut.BACK && handleSheetBack();
+    } catch (_error) {
+        return false;
+    }
 }
 
 export async function dismissSheet(action: DismissSheetAction, allowed: () => Promise<boolean> = async () => true): Promise<void> {

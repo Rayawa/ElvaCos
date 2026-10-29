@@ -17,6 +17,7 @@ import { ManagedImage } from '../../components/common/ManagedImage';
 
 @ComponentV2
 export struct HomePage {
+    @Param dayEntryInSnack: boolean = false;
     @Require @Param state: AppState;
     @Param scroller: Scroller = new Scroller();
     @Param topInset: number = 100;
@@ -171,7 +172,7 @@ export struct HomePage {
     @Builder next() {
         Column({ space: 8 }) {
             SectionHeading({ title: '接下来' })
-            if (this.state.todayEvents.length) {
+            if (this.state.todayEvents.length && !this.dayEntryInSnack) {
                 Button() {
                     Column({ space: 6 }) {
                         ContextRow({ label: dayContext(this.state.todayEvents[0], this.state.clockTime), text: displayName(this.state.todayEvents[0].name), prominent: true })
@@ -198,7 +199,7 @@ export struct HomePage {
                     .onClick((): void => {
                         this.open('event', this.upcomingEvent?.id || '');
                     })
-            } else if (!this.state.todayEvents.length) {
+            } else if (!this.state.todayEvents.length || this.dayEntryInSnack) {
                 Button('新建计划').constraintSize({ minHeight: 48 }).onClick((): void => {
                     this.add('project', '');
                 })

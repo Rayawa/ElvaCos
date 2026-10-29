@@ -60,6 +60,6 @@ export struct ProjectCard {
             effects: this.state.settings.effects, contentPadding: 16,
             action: () => this.open(),
             content: (): void => this.body()
-        })
+        }).id('project-card:' + this.project.id)
     }
 }

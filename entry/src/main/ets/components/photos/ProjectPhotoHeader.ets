@@ -1,3 +1,4 @@
+import { SheetContent } from '../common/SheetContent';
 import { ContextRow } from '../common/ContextRow';
 import { AppState } from '../../state/ApplicationState';
 import { ProjectRoute } from '../../models/ProjectRoute';
@@ -150,85 +151,86 @@ export struct ProjectPhotoHeader {
     }
 
     @Builder sheet() {
-        Column({ space: 14 }) {
-            SheetHeader({ title: '拍摄清单', hint: this.state.projectName(this.route.id), haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => {
-                    this.close();
+        SheetContent() {
+            Column({ space: 14 }) {
+                SheetHeader({ title: '拍摄清单', hint: this.state.projectName(this.route.id), haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => {
+                        this.close();
+                    }
+                })
+                ContextRow({ label: '已拍', text: this.state.readiness(this.route.id)
+                        .shots.done + ' / ' + this.state.readiness(this.route.id)
+                        .shots.total + ' 项' })
+                Button('添加拍摄事项').constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable()).onClick((): void => {
+                    this.startEdit('');
+                })
+                if (this.actionError || this.state.error) {
+                    Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger)
                 }
-            })
-            ContextRow({ label: '已拍', text: this.state.readiness(this.route.id)
-                    .shots.done + ' / ' + this.state.readiness(this.route.id)
-                    .shots.total + ' 项' })
-            Button('添加拍摄事项').constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable()).onClick((): void => {
-                this.startEdit('');
-            })
-            if (this.actionError || this.state.error) {
-                Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger)
-            }
-            Scroll(this.scroller) {
-                Column({ space: 12 }) {
-                    ForEach(this.items(), (shot: ProjectShot) => {
-                        Column({ space: 8 }) {
-                            Button() {
-                                ContextRow({ label: shot.done ? '已拍' : '待拍', text: shot.title, prominent: true })
-                            }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable())
-                                .backgroundColor(shot.done ? Theme.tint : Theme.surface).fontColor(Theme.ink).id('shot-row:' + shot.id).focusable(true)
-                                .onClick((): void => {
-                                    void this.toggle(shot);
-                                }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
-                            if (this.reference(shot)) {
+                Scroll(this.scroller) {
+                    Column({ space: 12 }) {
+                        ForEach(this.items(), (shot: ProjectShot) => {
+                            Column({ space: 8 }) {
                                 Button() {
-                                    Row({ space: 10 }) {
-                                        if (this.reference(shot)?.thumbnailPath) {
-                                            ManagedImage({ sourcePath: this.reference(shot)?.thumbnailPath || '', label: '拍摄参考图' }).width(64).height(64)
-                                        }
-                                        ContextRow({ label: '参考图', text: this.reference(shot)?.caption || '无说明' }).layoutWeight(1)
-                                    }.width('100%')
-                                }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).onClick((): void => {
-                                    this.startReference(shot.referenceId);
-                                })
-                            }
-                            Row({ space: 8 }) {
-                                Button('编辑事项').constraintSize({ minHeight: 48 }).enabled(this.writable()).onClick((): void => {
-                                    this.startEdit(shot.id);
-                                }).accessibilityText('编辑拍摄事项 ' + shot.title)
-                                Button('删除事项').constraintSize({ minHeight: 48 }).enabled(this.writable()).fontColor(Theme.danger).onClick((): void => {
-                                    void this.remove(shot);
-                                }).accessibilityText('删除拍摄事项 ' + shot.title)
-                            }
-                        }.width('100%').alignItems(HorizontalAlign.Start).padding(12).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
-                            .onAreaChange((_, area: Area): void => {
-                                this.focusArea(shot, area);
-                            })
-                    }, (shot: ProjectShot) => shot.id)
-                    if (!this.items().length) {
-                        EmptyState({ title: '记下今天想拍的画面', message: '可选关联此计划或角色的参考图，拍摄完成后勾选。', button: '添加拍摄事项', action: (): void => {
-                                if (this.writable()) {
-                                    this.startEdit('');
+                                    ContextRow({ label: shot.done ? '已拍' : '待拍', text: shot.title, prominent: true })
+                                }.type(ButtonType.Normal).constraintSize({ minHeight: 48 }).width('100%').enabled(this.writable())
+                                    .backgroundColor(shot.done ? Theme.tint : Theme.surface).fontColor(Theme.ink).id('shot-row:' + shot.id).focusable(true)
+                                    .onClick((): void => {
+                                        void this.toggle(shot);
+                                    }).accessibilityText((shot.done ? '取消已拍 ' : '标记已拍 ') + shot.title)
+                                if (this.reference(shot)) {
+                                    Button() {
+                                        Row({ space: 10 }) {
+                                            if (this.reference(shot)?.thumbnailPath) {
+                                                ManagedImage({ sourcePath: this.reference(shot)?.thumbnailPath || '', label: '拍摄参考图' }).width(64).height(64)
+                                            }
+                                            ContextRow({ label: '参考图', text: this.reference(shot)?.caption || '无说明' }).layoutWeight(1)
+                                        }.width('100%')
+                                    }.type(ButtonType.Normal).width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).onClick((): void => {
+                                        this.startReference(shot.referenceId);
+                                    })
                                 }
-                            }
-                        })
-                    }
-                }.width('100%').alignItems(HorizontalAlign.Start)
-            }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
-                .onAreaChange((_, area: Area): void => {
-                    this.viewportTop = Number(area.globalPosition.y);
-                    if (Number(area.height) > 0 && !this.measured) {
-                        this.measured = true;
-                        this.restore();
-                    }
-                })
-                .onDidScroll((): void => {
-                    if (this.measured && !this.restoring) {
-                        this.route.shotOffset = this.scroller.currentOffset().yOffset;
-                    }
-                })
-        }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
+                                Row({ space: 8 }) {
+                                    Button('编辑事项').constraintSize({ minHeight: 48 }).enabled(this.writable()).onClick((): void => {
+                                        this.startEdit(shot.id);
+                                    }).accessibilityText('编辑拍摄事项 ' + shot.title)
+                                    Button('删除事项').constraintSize({ minHeight: 48 }).enabled(this.writable()).fontColor(Theme.danger).onClick((): void => {
+                                        void this.remove(shot);
+                                    }).accessibilityText('删除拍摄事项 ' + shot.title)
+                                }
+                            }.width('100%').alignItems(HorizontalAlign.Start).padding(12).backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
+                                .onAreaChange((_, area: Area): void => {
+                                    this.focusArea(shot, area);
+                                })
+                        }, (shot: ProjectShot) => shot.id)
+                        if (!this.items().length) {
+                            EmptyState({ title: '记下今天想拍的画面', message: '可选关联此计划或角色的参考图，拍摄完成后勾选。', button: '添加拍摄事项', action: (): void => {
+                                    if (this.writable()) {
+                                        this.startEdit('');
+                                    }
+                                }
+                            })
+                        }
+                    }.width('100%').alignItems(HorizontalAlign.Start)
+                }.layoutWeight(1).width('100%').scrollBar(BarState.Off)
+                    .onAreaChange((_, area: Area): void => {
+                        this.viewportTop = Number(area.globalPosition.y);
+                        if (Number(area.height) > 0 && !this.measured) {
+                            this.measured = true;
+                            this.restore();
+                        }
+                    })
+                    .onDidScroll((): void => {
+                        if (this.measured && !this.restoring) {
+                            this.route.shotOffset = this.scroller.currentOffset().yOffset;
+                        }
+                    })
+            }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
+        }
     }
 
     build() {
         Column({ space: 8 }) {
-            Text(this.state.projectName(this.route.id)).fontSize(18).fontColor(Theme.ink)
-            Text('本计划照片 ' + this.state.readiness(this.route.id).photos.total + ' 张').fontSize(14).fontColor(Theme.muted)
+            ContextRow({ label: '本计划照片', text: this.state.readiness(this.route.id).photos.total + ' 张' })
             Button('在相册查看本计划').width('100%').constraintSize({ minHeight: 48 }).backgroundColor(Theme.tint).fontColor(Theme.accent)
                 .onClick((): void => {
                     this.openAlbum();

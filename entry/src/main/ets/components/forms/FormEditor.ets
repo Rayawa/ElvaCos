@@ -37,6 +37,7 @@ export struct FormEditor {
     private viewportHeight: number = 0;
     private focusedField: string = '';
     private focusTimer: number = -1;
+    private resizeTimer: number = -1;
     private attempted: boolean = false;
     @Computed
     get draftValue(): string {
@@ -59,6 +60,10 @@ export struct FormEditor {
             clearTimeout(this.focusTimer);
             this.focusTimer = -1;
         }
+        if (this.resizeTimer >= 0) {
+            clearTimeout(this.resizeTimer);
+            this.resizeTimer = -1;
+        }
         void this.session.flush();
     }
 
@@ -74,8 +79,26 @@ export struct FormEditor {
     }
 
     private reveal(field: string, requestFocus: boolean = false): void {
-        const offset = this.positions.get(field);
-        this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, (offset || 0) - 12), animation: false });
+        try {
+            const context = this.getUIContext();
+            const geometry = context.getComponentUtils();
+            const viewport = geometry.getRectangleById('form-scroll');
+            const target = geometry.getRectangleById('form-input:' + field);
+            if (target.size.height <= 0 || viewport.size.height <= 0) {
+                throw new Error('Field layout is not ready');
+            }
+            const top = context.px2vp(target.windowOffset.y - viewport.windowOffset.y);
+            const height = context.px2vp(target.size.height);
+            const available = context.px2vp(viewport.size.height);
+            const delta = top < 12 || height > available - 24 ? top - 12
+                : top + height > available - 12 ? top + height - available + 12 : 0;
+            if (Math.abs(delta) > 0.5) {
+                this.scroller.scrollBy(0, delta);
+            }
+        } catch (_error) {
+            const offset = this.positions.get(field);
+            this.scroller.scrollTo({ xOffset: 0, yOffset: Math.max(0, (offset || 0) - 12), animation: false });
+        }
         if (requestFocus && field !== 'object') {
             try {
                 this.getUIContext().getFocusController().requestFocus('form-input:' + field);
@@ -86,7 +109,6 @@ export struct FormEditor {
 
     private focus(field: string): void {
         this.focusedField = field;
-        this.reveal(field);
     }
 
     private locateFirstError(): void {
@@ -370,7 +392,13 @@ export struct FormEditor {
                     this.viewportTop = Number(area.globalPosition.y);
                     const height = Number(area.height);
                     if (this.viewportHeight && height !== this.viewportHeight && this.focusedField) {
-                        this.reveal(this.focusedField);
+                        if (this.resizeTimer >= 0) {
+                            clearTimeout(this.resizeTimer);
+                        }
+                        this.resizeTimer = setTimeout((): void => {
+                            this.resizeTimer = -1;
+                            this.reveal(this.focusedField);
+                        }, 0);
                     }
                     this.viewportHeight = height;
                 })

@@ -1,3 +1,4 @@
+import { SheetContent } from '../../components/common/SheetContent';
 import { DetailLink } from '../../components/common/DetailLink';
 import { Icons } from '../../ui/icons/Icons';
 import { displayName, formatTimestamp } from '../../utils/format/format';
@@ -257,12 +258,14 @@ export struct ProjectDetail {
     }
 
     @Builder activeSheet() {
-        if (this.route.contextSheet) {
-            this.contextSheet()
-        } else if (this.route.sheetKind === 0) {
-            this.preparationSheet()
-        } else {
-            this.linkSheet()
+        SheetContent() {
+            if (this.route.contextSheet) {
+                this.contextSheet()
+            } else if (this.route.sheetKind === 0) {
+                this.preparationSheet()
+            } else {
+                this.linkSheet()
+            }
         }
     }
     /** 名称由原生标题栏承载，这里只显示状态与日期上下文。 */

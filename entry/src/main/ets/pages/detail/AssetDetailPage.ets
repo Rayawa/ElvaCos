@@ -1,3 +1,4 @@
+import { SheetContent } from '../../components/common/SheetContent';
 import { DetailLink } from '../../components/common/DetailLink';
 import { Icons } from '../../ui/icons/Icons';
 import { displayName } from '../../utils/format/format';
@@ -203,52 +204,54 @@ export struct AssetDetail {
     }
 
     @Builder planSheet() {
-        Column({ space: 14 }) {
-            SheetHeader({ title: '选择计划加入装备', hint: displayName(this.asset.name), close: (): void => {
-                    if (!this.state.busy) {
-                        this.route.linking = false;
+        SheetContent() {
+            Column({ space: 14 }) {
+                SheetHeader({ title: '选择计划加入装备', hint: displayName(this.asset.name), close: (): void => {
+                        if (!this.state.busy) {
+                            this.route.linking = false;
+                        }
                     }
+                })
+                if (this.asset.status !== AssetStatus.OWNED) {
+                    Text('加入后仍保留当前不可用状态，相关计划会显示装备问题。').fontSize(14).fontColor(Theme.accent)
                 }
-            })
-            if (this.asset.status !== AssetStatus.OWNED) {
-                Text('加入后仍保留当前不可用状态，相关计划会显示装备问题。').fontSize(14).fontColor(Theme.accent)
-            }
-            DashboardSearch({ value: this.route.projectQuery, label: '查找要加入的计划', placeholder: '搜索计划 / 角色', changed: (value: string): void => {
-                    this.route.projectQuery = value;
-                }
-            })
-            if (this.actionError || this.state.error) {
-                Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger)
-            }
-            List({ space: 10 }) {
-                ForEach(this.projectsToChoose(), (project: CosProject) => {
-                    ListItem() {
-                        Button() {
-                            ContextRow({ label: this.linked(project.id) ? '已加入' : PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: displayName(project.name), prominent: true })
-                        }.type(ButtonType.Normal)
-                            .constraintSize({ minHeight: 48 })
-                            .width('100%')
-                            .enabled(!this.state.busy && !this.state.staleScopes.length && !this.linked(project.id))
-                            .onClick((): void => {
-                                void this.join(project);
-                            }).accessibilityText('将装备加入计划 ' + project.name)
+                DashboardSearch({ value: this.route.projectQuery, label: '查找要加入的计划', placeholder: '搜索计划 / 角色', changed: (value: string): void => {
+                        this.route.projectQuery = value;
                     }
-                }, (project: CosProject) => project.id)
-                if (!this.projectsToChoose().length) {
-                    ListItem() {
-                        EmptyState({ title: this.route.projectQuery.trim() ? '没有匹配的计划' : '先建立一份计划', message: '装备保持在衣柜，计划建立后可在此选择加入。', button: this.route.projectQuery.trim() ? '清除搜索' : '新建计划', action: (): void => {
-                                if (this.route.projectQuery.trim()) {
-                                    this.route.projectQuery = '';
-                                } else {
-                                    this.route.linking = false;
-                                    this.edit('project', '', '');
+                })
+                if (this.actionError || this.state.error) {
+                    Text(this.actionError || this.state.error).fontSize(14).fontColor(Theme.danger)
+                }
+                List({ space: 10 }) {
+                    ForEach(this.projectsToChoose(), (project: CosProject) => {
+                        ListItem() {
+                            Button() {
+                                ContextRow({ label: this.linked(project.id) ? '已加入' : PROJECT_LABELS[PROJECT_STATUSES.indexOf(project.status)], text: displayName(project.name), prominent: true })
+                            }.type(ButtonType.Normal)
+                                .constraintSize({ minHeight: 48 })
+                                .width('100%')
+                                .enabled(!this.state.busy && !this.state.staleScopes.length && !this.linked(project.id))
+                                .onClick((): void => {
+                                    void this.join(project);
+                                }).accessibilityText('将装备加入计划 ' + project.name)
+                        }
+                    }, (project: CosProject) => project.id)
+                    if (!this.projectsToChoose().length) {
+                        ListItem() {
+                            EmptyState({ title: this.route.projectQuery.trim() ? '没有匹配的计划' : '先建立一份计划', message: '装备保持在衣柜，计划建立后可在此选择加入。', button: this.route.projectQuery.trim() ? '清除搜索' : '新建计划', action: (): void => {
+                                    if (this.route.projectQuery.trim()) {
+                                        this.route.projectQuery = '';
+                                    } else {
+                                        this.route.linking = false;
+                                        this.edit('project', '', '');
+                                    }
                                 }
-                            }
-                        })
+                            })
+                        }
                     }
-                }
-            }.layoutWeight(1).width('100%')
-        }.padding(24).width('100%').height('100%').backgroundColor(Theme.surface)
+                }.layoutWeight(1).width('100%')
+            }.padding(24).width('100%').height('100%').backgroundColor(Theme.surface)
+        }
     }
 
     private sheetOptions(): SheetOptions {

@@ -17,6 +17,12 @@ global.canIUse = () => true;
 global.SheetSize = { LARGE: 1 };
 global.SheetType = { BOTTOM: 1 };
 global.BlurStyle = { COMPONENT_ULTRA_THICK: 1 };
+global.KeyType = { Down: 0, Up: 1 };
+global.Color = { Transparent: '#00000000' };
+Object.defineProperty(global, 'TabsCacheMode', { get() {
+    assert(api >= 23, `API ${api} resolved the newer native tab cache enum`);
+    return { CACHE_LATEST_SWITCHED: 1 };
+} });
 const originalLoad = Module._load;
 Module._load = function(id, parent, isMain) {
     if (id === '@kit.BasicServicesKit') return { deviceInfo: { sdkApiVersion: api, distributionOSApiVersion: api >= 23 ? 60100 : 60000 } };
@@ -53,8 +59,8 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
         fresh('config/platformCompatibility.ets');
         const { CompatibleTabsStyle } = fresh('config/SystemCapability.ets');
         let calls = 0;
-        new CompatibleTabsStyle(true, 1).applyNormalAttribute({ barFloatingStyle() { calls++; }, blurStrategy() { calls++; } });
-        assert.equal(calls, api >= 23 ? 2 : 0);
+        new CompatibleTabsStyle(true, 1, 5).applyNormalAttribute({ barFloatingStyle() { calls++; }, blurStrategy() { calls++; }, cachedMaxCount(count, mode) { assert.equal(count, 5); assert.equal(mode, 1); calls++; } });
+        assert.equal(calls, api >= 23 ? 3 : 0);
         const effects = fresh('ui/feedback/visualEffects.ets');
         const light = effects.pressVisualEffect(true, true);
         assert.equal(!!light, api >= 23);
@@ -69,6 +75,12 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
     let closed = 0, allow = false;
     const options = sheet.appSheetOptions(() => {}, entrance, {}, 1, async () => allow, () => closed++);
     options.onAppear();
+    const sheetKey = (keyCode, modifiers = []) => ({ type: KeyType.Down, keyCode, metaKey: 0, getModifierKeyState: keys => keys.every(key => modifiers.includes(key)) });
+    assert.equal(sheet.handleSheetKey(sheetKey(2030)), false, 'ordinary form input stays native');
+    assert.equal(sheet.handleSheetKey(sheetKey(2070, ['Ctrl'])), false, 'modified Escape stays native');
+    assert.equal(sheet.handleSheetKey(sheetKey(2070)), true);
+    await flush();
+    assert.equal(closed, 0, 'sheet Escape uses the same unsaved-edit guard');
     assert.equal(sheet.handleSheetBack(), true);
     await flush();
     assert.equal(closed, 0, 'hardware back preserves rejected edits');

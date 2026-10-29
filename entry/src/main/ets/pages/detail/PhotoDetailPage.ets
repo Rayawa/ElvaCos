@@ -135,7 +135,7 @@ export struct PhotoDetail {
                         Text(this.repairError || this.state.error).fontSize(14).fontColor(Theme.danger)
                     }
                     Column() {
-                        DetailLink({ title: '照片说明', subtitle: this.photo.caption || '尚未填写，点击补充', icon: Icons.edit, interactive: !this.state.busy && !this.state.staleScopes.length,
+                        DetailLink({ title: '照片说明', componentId: 'photo-caption-open', subtitle: this.photo.caption || '尚未填写，点击补充', icon: Icons.edit, interactive: !this.state.busy && !this.state.staleScopes.length,
                             action: (): void => {
                                 this.edit('photo', this.photo.id, this.photo.projectId);
                             }
@@ -168,6 +168,6 @@ export struct PhotoDetail {
                 .width('100%')
                 .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
                 .alignItems(HorizontalAlign.Start)
-        }.width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
+        }.id('photo-detail-scroll').width('100%').height('100%').scrollBar(BarState.Off).align(Alignment.Top).transition(pageTransition())
     }
 }

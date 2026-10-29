@@ -29,10 +29,16 @@ assert.match(read('components/navigation/DetailDestination.ets'), /SUPPORTS_API_
 assert.match(read('components/navigation/HdsViewTabs.ets'), /HdsTabs\(/);
 assert.match(read('pages/Dashboard.ets'), /root-action-设置/);
 assert(!read('components/common/SheetHeader.ets').includes('Text(this.hint)'), 'sheet titles must not stack a subtitle');
-for (const name of ['ProjectDetailPage', 'CharacterDetailPage', 'EventDetailPage']) {
+for (const name of ['ProjectDetailPage', 'CharacterDetailPage']) {
     const source = read('pages/detail/' + name + '.ets');
     for (const match of source.matchAll(/EntryCollectionView\(\{([\s\S]*?)\}\)/g)) assert.match(match[1], /embedded:\s*true/, `${name}: do not mount an editor sheet inside an owner sheet`);
 }
+// Event's collection is a full-page view, so it owns an editor host only while
+// the event's tool host is absent. Collections inside owner sheets stay embedded.
+const event = read('pages/detail/EventDetailPage.ets');
+assert.match(event, /if \(!this\.route\.dayMode && this\.route\.section === 2 && !this\.nativeSheetVisible\(\)\) \{\s*EntryCollectionView\(\{ embedded: false/);
+assert.match(event, /EntryCollectionView\(\{ embedded: true/);
+assert.match(event, /\.bindSheet\(this\.nativeSheetVisible\(\),/);
 const profile = fs.readFileSync(path.resolve(__dirname, '../build-profile.example.json5'), 'utf8');
 assert.match(profile, /compatibleSdkVersion.*6\.0\.0\(20\)/);
 assert.match(profile, /targetSdkVersion.*26\.0\.0/);

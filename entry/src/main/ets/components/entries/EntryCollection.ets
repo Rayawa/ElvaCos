@@ -8,7 +8,7 @@ import { AppState } from '../../state/ApplicationState';
 import { CollectedEntry, InboxRoute, filterCollectedEntries, ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_SCOPES, ENTRY_SCOPE_LABELS, entryTitle } from '../../models/CollectedEntry';
 import { operationCommitted } from '../../domain/operations/OperationResult';
 import { Theme } from '../../ui/theme/Theme';
-import { appSheetOptions, dismissSheet, registerInlineSheetBack, releaseInlineSheetBack } from '../../ui/sheet/sheet';
+import { appSheetOptions, dismissSheet, handleSheetBack, handleSheetKey, registerInlineSheetBack, releaseInlineSheetBack } from '../../ui/sheet/sheet';
 import { StaggerEntrance } from '../../ui/animation/motion';
 import { confirm } from '../../ui/feedback/Confirm';
 import { ManagedImage } from '../common/ManagedImage';
@@ -395,6 +395,10 @@ export struct EntryCollection {
             Scroll() {
                 this.editorBody()
             }.id('entry-editor-scroll').height('100%').width('100%').backgroundColor(Theme.surface)
+                .onKeyPreIme((event: KeyEvent): boolean => handleSheetKey(event))
+                .keyboardShortcut(FunctionKey.ESC, [], (): void => {
+                    handleSheetBack();
+                })
         }
     }
 

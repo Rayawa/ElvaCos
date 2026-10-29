@@ -1,3 +1,4 @@
+import { SheetContent } from '../../components/common/SheetContent';
 import { formatTimestamp } from '../../utils/format/format';
 import { DEVELOPER_ENTRANCE_TAPS, DEVELOPER_ENTRANCE_WINDOW_MS, APP_AUTHOR, APP_COPYRIGHT, APP_SITE, APP_VERSION } from '../../config/constants';
 import { PreferenceSettings } from '../../components/settings/PreferenceSettings';
@@ -93,52 +94,54 @@ export struct SettingsPage {
     }
 
     @Builder helpSheet() {
-        Column({ space: 16 }) {
-            SheetHeader({
-                title: this.helpKind === 'cloud' ? '云空间与同步' : '使用说明',
-                hint: this.helpKind === 'cloud' ? '备份与日历同步的当前能力' : '三分钟了解绮秀的用法',
-                haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
-                close: (): void => {
-                    this.helpOpen = false;
-                },
-            }).opacity(this.sheetEntrance.step >= 1 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 1 ? 0 : 20 })
-            Scroll() {
-                Column({ space: 18 }) {
-                    if (this.helpKind === 'cloud') {
-                        Text('当前同步状态').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('应用尚未接入账号登录或云端数据同步。角色、计划、照片与收录保存在本机，离线业务可直接使用。').fontSize(14).fontColor(Theme.muted)
-                        Text('备份到云空间').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('可以在系统文件选择器中将元数据导出到云空间。JSON 不含照片，照片原文件需另行保存；系统备份的恢复范围以设备服务为准。').fontSize(14).fontColor(Theme.muted)
-                        Button('导出元数据备份')
-                            .accessibilityText('导出元数据备份')
-                            .width('100%')
-                            .backgroundColor(Theme.brand)
-                            .fontColor(Theme.onAccent)
-                            .enabled(!this.state.busy)
-                            .onClick((): void => {
-                                vibration.dotVibration();
-                                this.state.exportData();
-                            })
-                            .visualEffect(this.feedback.effect('button-1'))
-                            .compositingFilter(this.feedback.filter('button-1'))
-                            .attributeModifier(this.feedback.control('button-1'))
-                        Text('设备日历').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('添加活动到设备日历时，在系统确认页选择日历账户与提醒。日历是否同步由系统日历和云空间设置决定，应用内计划与照片不会随之同步。').fontSize(14).fontColor(Theme.muted)
-                    } else {
-                        Text('准备一次 Cos').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('新建计划时选择已有角色，或一起创建角色。准备页添加本次装备，打包页逐件确认装包，照片页支持导入、筛选与批量选片。新增和编辑都在弹出的表单中完成。').fontSize(14).fontColor(Theme.muted)
-                        Text('操作模式').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('左手和右手固定出门清单确认按钮的位置。选择智感握持时申请感知权限，仅在出门模式检测；拒绝权限会保留原设置，设备不支持时可选择手动布局。').fontSize(14).fontColor(Theme.muted)
-                        Text('主题配色、应用外观与材质等级').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
-                        Text('主题配色可选蓝、绿、粉、橙、红，每组都包含浅色和深色。应用外观可选浅色、深色或跟随系统，切换后立即生效并记住选择。材质等级为流畅时关闭原生材质、光场和按压增强。').fontSize(14).fontColor(Theme.muted)
-                    }
-                }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 24 })
-            }.layoutWeight(1)
-                .width('100%')
-                .align(Alignment.Top)
-                .opacity(this.sheetEntrance.step >= 2 ? 1 : 0)
-                .translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
-        }.padding(24).width('100%').height('100%').backgroundColor(Theme.surface)
+        SheetContent() {
+            Column({ space: 16 }) {
+                SheetHeader({
+                    title: this.helpKind === 'cloud' ? '云空间与同步' : '使用说明',
+                    hint: this.helpKind === 'cloud' ? '备份与日历同步的当前能力' : '三分钟了解绮秀的用法',
+                    haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel,
+                    close: (): void => {
+                        this.helpOpen = false;
+                    },
+                }).opacity(this.sheetEntrance.step >= 1 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 1 ? 0 : 20 })
+                Scroll() {
+                    Column({ space: 18 }) {
+                        if (this.helpKind === 'cloud') {
+                            Text('当前同步状态').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('应用尚未接入账号登录或云端数据同步。角色、计划、照片与收录保存在本机，离线业务可直接使用。').fontSize(14).fontColor(Theme.muted)
+                            Text('备份到云空间').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('可以在系统文件选择器中将元数据导出到云空间。JSON 不含照片，照片原文件需另行保存；系统备份的恢复范围以设备服务为准。').fontSize(14).fontColor(Theme.muted)
+                            Button('导出元数据备份')
+                                .accessibilityText('导出元数据备份')
+                                .width('100%')
+                                .backgroundColor(Theme.brand)
+                                .fontColor(Theme.onAccent)
+                                .enabled(!this.state.busy)
+                                .onClick((): void => {
+                                    vibration.dotVibration();
+                                    this.state.exportData();
+                                })
+                                .visualEffect(this.feedback.effect('button-1'))
+                                .compositingFilter(this.feedback.filter('button-1'))
+                                .attributeModifier(this.feedback.control('button-1'))
+                            Text('设备日历').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('添加活动到设备日历时，在系统确认页选择日历账户与提醒。日历是否同步由系统日历和云空间设置决定，应用内计划与照片不会随之同步。').fontSize(14).fontColor(Theme.muted)
+                        } else {
+                            Text('准备一次 Cos').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('新建计划时选择已有角色，或一起创建角色。准备页添加本次装备，打包页逐件确认装包，照片页支持导入、筛选与批量选片。新增和编辑都在弹出的表单中完成。').fontSize(14).fontColor(Theme.muted)
+                            Text('操作模式').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('左手和右手固定出门清单确认按钮的位置。选择智感握持时申请感知权限，仅在出门模式检测；拒绝权限会保留原设置，设备不支持时可选择手动布局。').fontSize(14).fontColor(Theme.muted)
+                            Text('主题配色、应用外观与材质等级').fontSize(16).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
+                            Text('主题配色可选蓝、绿、粉、橙、红，每组都包含浅色和深色。应用外观可选浅色、深色或跟随系统，切换后立即生效并记住选择。材质等级为流畅时关闭原生材质、光场和按压增强。').fontSize(14).fontColor(Theme.muted)
+                        }
+                    }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 24 })
+                }.layoutWeight(1)
+                    .width('100%')
+                    .align(Alignment.Top)
+                    .opacity(this.sheetEntrance.step >= 2 ? 1 : 0)
+                    .translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
+            }.padding(24).width('100%').height('100%').backgroundColor(Theme.surface)
+        }
     }
 
     @Builder
@@ -163,7 +166,7 @@ export struct SettingsPage {
                 .fontColor(Theme.muted)
                 .textAlign(TextAlign.Center)
                 .accessibilityText('本应用备案域名rayawa点top')
-        }.width('100%')
+        }.id('settings-version').width('100%')
             .padding({ top: 14 })
         // 连点版本号进开发者选项；这里不发声也不振动，避免暴露入口。
             .onClick((): void => {

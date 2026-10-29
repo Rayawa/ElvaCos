@@ -1,3 +1,4 @@
+import { SheetContent } from '../components/common/SheetContent';
 import { SUPPORTS_API_23 } from '../config/platformCompatibility';
 import { ContextRow } from '../components/common/ContextRow';
 import lazy { SearchPage } from './search/SearchPage';
@@ -87,6 +88,9 @@ struct Dashboard {
     @Local pendingImportPlanId: string = '';
     @Local importOpen: boolean = false;
     @Local formOpen: boolean = false;
+    private rootSheetMounted: boolean = false;
+    private pendingRootEdit?: () => void;
+    private pendingRootEditTimer: number = -1;
     @Local restoreOpen: boolean = false;
     @Local formSession: FormSession = new FormSession(new EditDraft(), formDraftStore);
     private editingShotRoute?: ProjectRoute;
@@ -162,6 +166,11 @@ struct Dashboard {
     }
 
     private cancelTasks(): void {
+        if (this.pendingRootEditTimer >= 0) {
+            clearTimeout(this.pendingRootEditTimer);
+            this.pendingRootEditTimer = -1;
+        }
+        this.pendingRootEdit = undefined;
         this.visible = false;
         this.hideDaySnack();
         if (this.clockTimer >= 0) {
@@ -236,6 +245,7 @@ struct Dashboard {
         return false;
     }
 
+    // Search/IME can consume Esc before bubbling. Only app commands are handled here.
     private onShortcut(event: KeyEvent): boolean {
         if (event.type !== KeyType.Down) {
             return false;
@@ -627,11 +637,21 @@ struct Dashboard {
         this.detailStack.pushPathByName('developer', 'developer');
     }
 
-    private edit(kind: string, id: string = '', parent: string = '', variant: string = ''): void {
+    private edit(kind: string, id: string = '', parent: string = '', variant: string = '', shotRoute?: ProjectRoute, forImport: boolean = false): void {
+        if (this.formOpen || this.checkingFormClose) {
+            return;
+        }
+        if (this.rootSheetMounted && !this.importOpen && !this.restoreOpen) {
+            // Native dismiss finishes after the visible controls leave the tree.
+            // Reopening now lets the old onDisappear erase the next form session.
+            this.pendingRootEdit = (): void => this.edit(kind, id, parent, variant, shotRoute, forImport);
+            return;
+        }
         if (!this.state.staleScopes.length) {
             this.state.error = '';
         }
-        this.creatingForImport = false;
+        this.creatingForImport = forImport;
+        this.editingShotRoute = shotRoute;
         this.pendingImportPlanId = '';
         this.rootSheetKind = 'form';
         this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent, variant), formDraftStore);
@@ -805,6 +825,7 @@ struct Dashboard {
 
     private rootSheetOptions(): SheetOptions {
         const options = appSheetOptions((): void => {
+            this.rootSheetMounted = false;
             this.importOpen = false;
             this.formOpen = false;
             this.restoreOpen = false;
@@ -822,6 +843,16 @@ struct Dashboard {
                     route.shotsOpen = true;
                 }
             }
+            const pending = this.pendingRootEdit;
+            this.pendingRootEdit = undefined;
+            if (pending) {
+                this.pendingRootEditTimer = setTimeout((): void => {
+                    this.pendingRootEditTimer = -1;
+                    pending();
+                }, 0);
+            } else {
+                this.syncDaySnack();
+            }
         }, this.sheetEntrance, this.getUIContext(), SheetSize.LARGE,
             async (): Promise<boolean> => this.rootSheetKind === 'form' ? this.allowFormClose() : !this.state.busy,
             (): void => {
@@ -829,6 +860,21 @@ struct Dashboard {
                 this.importOpen = false;
                 this.restoreOpen = false;
             });
+        const willAppear = options.onWillAppear;
+        options.onWillAppear = (): void => {
+            this.rootSheetMounted = true;
+            willAppear?.();
+        };
+        const willDisappear = options.onWillDisappear;
+        options.onWillDisappear = (): void => {
+            // Native back/drag dismisses before bindSheet's flags are cleared.
+            // Keep the host mounted until onDisappear, but allow the next edit
+            // to enter the queue during the accepted closing animation.
+            this.formOpen = false;
+            this.importOpen = false;
+            this.restoreOpen = false;
+            willDisappear?.();
+        };
         if (this.rootSheetKind === 'form') {
             options.keyboardAvoidMode = SheetKeyboardAvoidMode.RESIZE_ONLY;
             options.onWillDismiss = (action: DismissSheetAction): void => {
@@ -844,18 +890,20 @@ struct Dashboard {
     }
 
     @Builder rootSheet() {
-        if (this.rootSheetKind === 'form') {
-            this.form()
-        } else if (this.rootSheetKind === 'restore') {
-            BackupRestoreSheet({ state: this.state, close: (): void => {
-                    this.closeRestore();
-                }, done: (): void => {
-                    this.restoreOpen = false;
-                    this.resetNavigation();
-                }
-            })
-        } else {
-            this.importSheet()
+        SheetContent({ shortcut: (event: KeyEvent): boolean => this.onShortcut(event) }) {
+            if (this.rootSheetKind === 'form') {
+                this.form()
+            } else if (this.rootSheetKind === 'restore') {
+                BackupRestoreSheet({ state: this.state, close: (): void => {
+                        this.closeRestore();
+                    }, done: (): void => {
+                        this.restoreOpen = false;
+                        this.resetNavigation();
+                    }
+                })
+            } else {
+                this.importSheet()
+            }
         }
     }
 
@@ -1345,8 +1393,7 @@ struct Dashboard {
     }
 
     private createForImport(): void {
-        this.edit('project');
-        this.creatingForImport = true;
+        this.edit('project', '', '', '', undefined, true);
         this.importOpen = false;
     }
 
@@ -1538,8 +1585,7 @@ struct Dashboard {
     @Builder projectPhotoHeader(route: ProjectRoute) {
         ProjectPhotoHeader({ state: this.state, route: route,
             edit: (id: string, projectId: string): void => {
-                this.edit('shot', id, projectId);
-                this.editingShotRoute = route;
+                this.edit('shot', id, projectId, '', route);
             },
             openReference: (id: string): void => {
                 this.open('reference', id);
@@ -1801,6 +1847,7 @@ struct Dashboard {
                     }
                 } else if (index === 0) {
                     HomePage({
+                        dayEntryInSnack: this.daySnackReservation > 0,
                         entranceSession: this.mainEntranceSession,
                         scroller: this.pageScrollers[index],
                         state: this.state,
@@ -1913,9 +1960,8 @@ struct Dashboard {
         }.id('main-tabs')
             .barPosition(BarPosition.End).barHeight(this.rootPagesVisible[this.tab] ? Theme.mainTabsHeight : 0)
             .barWidth(this.rootPagesVisible[this.tab] ? Math.min(Theme.mainTabsWidth, Math.max(0, this.viewportWidth - 32)) : 0)
-            .cachedMaxCount(5, TabsCacheMode.CACHE_LATEST_SWITCHED)
             .scrollable(false).vertical(false).barOverlap(true)
-            .attributeModifier(new CompatibleTabsStyle(this.state.settings.effects, this.state.settings.materialLevel))
+            .attributeModifier(new CompatibleTabsStyle(this.state.settings.effects, this.state.settings.materialLevel, 5))
             .onTabBarClick((index: number): void => {
                 if (index === this.tab && this.stacks[index].size() === 0) {
                     HapticService.confirm(this.state.settings.haptic);
@@ -1979,7 +2025,7 @@ struct Dashboard {
             return;
         }
         const event = this.state.todayEvents[0];
-        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.stacks[this.tab].size() > 0 || this.formOpen || this.importOpen || this.restoreOpen || this.closingDaySnack) {
+        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.stacks[this.tab].size() > 0 || this.rootSheetMounted || this.formOpen || this.importOpen || this.restoreOpen || this.closingDaySnack) {
             this.hideDaySnack();
             return;
         }
@@ -2047,7 +2093,7 @@ struct Dashboard {
                 .width('100%').height(LayoutPolicy.matchParent)
                 .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
                 .backgroundColor(Theme.bg).overlay(this.loadingOverlay, { align: Alignment.Center })
-                .onKeyEvent((event: KeyEvent): boolean => this.onShortcut(event))
+                .onKeyPreIme((event: KeyEvent): boolean => this.onShortcut(event))
                 .bindSheet(this.importOpen || this.formOpen || this.restoreOpen, this.rootSheet(), this.rootSheetOptions())
         }
     }

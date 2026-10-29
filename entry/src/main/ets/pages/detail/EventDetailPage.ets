@@ -1,3 +1,4 @@
+import { SheetContent } from '../../components/common/SheetContent';
 import { window } from '@kit.ArkUI';
 import { LocationSheet } from '../../components/schedule/LocationSheet';
 import { DetailLink } from '../../components/common/DetailLink';
@@ -750,71 +751,84 @@ export struct EventDetail {
         })
     }
 
+    private nativeSheetVisible(): boolean {
+        return this.locationOpen || this.linking || this.route.configuring || this.route.recording || this.viewing;
+    }
+
     @Builder viewContent() {
-        Column() {
-            if (!this.route.dayMode && this.route.section === 2) {
-                EntryCollectionView({ embedded: true, state: this.state, route: this.route.entries, componentId: 'event-entries-scroll', restoreVersion: this.route.restoreVersion,
-                    topInset: this.contentTop, bottomInset: Theme.detailFloatingBottom, horizontalPadding: Theme.pagePadding, open: this.open })
-                    .layoutWeight(1)
-            } else {
-                Scroll(this.scroller) {
-                    Column({ space: Theme.sectionSpacing }) {
-                        if (!this.route.dayMode) {
-                            if (this.route.section === 0) {
-                                this.overview()
-                            } else if (this.route.section === 1) {
-                                this.plans()
+        // The collection owns its editor sheet here. Other event tools replace that
+        // host with the event sheet, keeping the root plus destination at two hosts.
+        if (!this.route.dayMode && this.route.section === 2 && !this.nativeSheetVisible()) {
+            EntryCollectionView({ embedded: false, state: this.state, route: this.route.entries, componentId: 'event-entries-scroll', restoreVersion: this.route.restoreVersion,
+                topInset: this.contentTop, bottomInset: Theme.detailFloatingBottom, horizontalPadding: Theme.pagePadding, open: this.open })
+        } else {
+            Column() {
+                if (!this.route.dayMode && this.route.section === 2) {
+                    EntryCollectionView({ embedded: true, state: this.state, route: this.route.entries, componentId: 'event-entries-scroll', restoreVersion: this.route.restoreVersion,
+                        topInset: this.contentTop, bottomInset: Theme.detailFloatingBottom, horizontalPadding: Theme.pagePadding, open: this.open })
+                        .layoutWeight(1)
+                } else {
+                    Scroll(this.scroller) {
+                        Column({ space: Theme.sectionSpacing }) {
+                            if (!this.route.dayMode) {
+                                if (this.route.section === 0) {
+                                    this.overview()
+                                } else if (this.route.section === 1) {
+                                    this.plans()
+                                } else {
+                                    this.reminders()
+                                }
                             } else {
-                                this.reminders()
+                                ForEach(this.modules(), (module: DayModule) => {
+                                    this.dayModule(module)
+                                }, (module: DayModule) => module.id)
+                                if (!this.modules().length) {
+                                    Text('这一段暂时没有内容。可以在详情中关联计划、收录凭证，或开启已关闭的模块。').fontSize(17).fontColor(Theme.muted)
+                                }
                             }
-                        } else {
-                            ForEach(this.modules(), (module: DayModule) => {
-                                this.dayModule(module)
-                            }, (module: DayModule) => module.id)
-                            if (!this.modules().length) {
-                                Text('这一段暂时没有内容。可以在详情中关联计划、收录凭证，或开启已关闭的模块。').fontSize(17).fontColor(Theme.muted)
+                            Blank().height(Theme.detailFloatingBottom).width('100%')
+                        }.width('100%')
+                            .constraintSize({ maxWidth: Theme.readingMaxWidth })
+                            .padding({ top: this.route.dayMode ? 0 : this.contentTop, left: Theme.pagePadding, right: Theme.pagePadding })
+                            .alignItems(HorizontalAlign.Start)
+                    }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top)
+                        .onAreaChange((_, area: Area): void => {
+                            if (!this.measured && Number(area.height) > 0) {
+                                this.measured = true;
+                                this.restoreScroll();
                             }
-                        }
-                        Blank().height(Theme.detailFloatingBottom).width('100%')
-                    }.width('100%')
-                        .constraintSize({ maxWidth: Theme.readingMaxWidth })
-                        .padding({ top: this.route.dayMode ? 0 : this.contentTop, left: Theme.pagePadding, right: Theme.pagePadding })
-                        .alignItems(HorizontalAlign.Start)
-                }.layoutWeight(1).width('100%').scrollBar(BarState.Off).align(Alignment.Top)
-                    .onAreaChange((_, area: Area): void => {
-                        if (!this.measured && Number(area.height) > 0) {
-                            this.measured = true;
-                            this.restoreScroll();
-                        }
-                    })
-                    .onDidScroll((): void => {
-                        if (this.measured && !this.restoring) {
-                            this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset;
-                        }
-                    })
-            }
-        }.width('100%').height('100%')
-            .bindSheet(this.locationOpen || this.linking || this.route.configuring || this.route.recording || this.viewing, this.activeSheet(), this.sheetOptions())
+                        })
+                        .onDidScroll((): void => {
+                            if (this.measured && !this.restoring) {
+                                this.route.offsets[this.displayedIndex] = this.scroller.currentOffset().yOffset;
+                            }
+                        })
+                }
+            }.width('100%').height('100%')
+                .bindSheet(this.nativeSheetVisible(), this.activeSheet(), this.sheetOptions())
+        }
     }
 
     @Builder activeSheet() {
-        if (this.locationOpen) {
-            LocationSheet({ city: this.event.city, venue: this.event.venue, writable: !this.state.busy && !this.state.staleScopes.length,
-                close: (): void => {
-                    this.locationOpen = false;
-                }, editLocation: (): void => {
-                    this.locationOpen = false;
-                    this.edit('event', this.event.id, '');
-                }
-            })
-        } else if (this.linking) {
-            this.linkSheet()
-        } else if (this.route.configuring) {
-            this.configurationSheet()
-        } else if (this.route.recording) {
-            this.recordSheet()
-        } else {
-            this.credentialSheet()
+        SheetContent() {
+            if (this.locationOpen) {
+                LocationSheet({ city: this.event.city, venue: this.event.venue, writable: !this.state.busy && !this.state.staleScopes.length,
+                    close: (): void => {
+                        this.locationOpen = false;
+                    }, editLocation: (): void => {
+                        this.locationOpen = false;
+                        this.edit('event', this.event.id, '');
+                    }
+                })
+            } else if (this.linking) {
+                this.linkSheet()
+            } else if (this.route.configuring) {
+                this.configurationSheet()
+            } else if (this.route.recording) {
+                this.recordSheet()
+            } else {
+                this.credentialSheet()
+            }
         }
     }
 }

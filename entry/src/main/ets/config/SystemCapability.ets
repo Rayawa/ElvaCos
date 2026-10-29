@@ -76,7 +76,7 @@ export class SystemCapability {
         return {
             barBottomMargin: Theme.mainTabsBottomMargin,
             lightColor: Theme.brand,
-            gradientMask: { maskColor: Theme.transparent, maskHeight: 92 },
+            gradientMask: { maskColor: Color.Transparent, maskHeight: 92 },
             systemMaterialEffect: {
                 materialType: enabled ? HDS_MATERIAL_ADAPTIVE : HDS_MATERIAL_NONE,
                 materialLevel: level,
@@ -89,15 +89,20 @@ export class SystemCapability {
 export class CompatibleTabsStyle implements AttributeModifier<HdsTabsAttribute> {
     private enabled: boolean;
     private level: number;
+    private cacheCount: number;
 
-    constructor(enabled: boolean, level: number) {
+    constructor(enabled: boolean, level: number, cacheCount: number = 0) {
         this.enabled = enabled;
         this.level = level;
+        this.cacheCount = cacheCount;
     }
 
     applyNormalAttribute(instance: HdsTabsAttribute): void {
         if (!SUPPORTS_API_23) {
             return;
+        }
+        if (this.cacheCount > 0) {
+            instance.cachedMaxCount(this.cacheCount, TabsCacheMode.CACHE_LATEST_SWITCHED);
         }
         const style = SystemCapability.tabs(this.enabled, this.level);
         if (style) {

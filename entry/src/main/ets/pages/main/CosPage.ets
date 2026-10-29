@@ -302,7 +302,7 @@ export struct CosPage {
                     Blank().height(this.bottomInset).width('100%')
                 }.width('100%')
             }
-        }.width('100%').height('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
+        }.id(this.projects ? 'project-list' : 'character-list').width('100%').height('100%').constraintSize({ maxWidth: Theme.contentMaxWidth })
             .lanes(this.columns, 12).cachedCount(4).padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             .scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
             .onAreaChange((_, area: Area): void => {

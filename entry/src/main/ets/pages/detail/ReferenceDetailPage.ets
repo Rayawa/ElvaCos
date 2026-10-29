@@ -37,6 +37,7 @@ export struct ReferenceDetail {
                 }).width('100%').constraintSize({ maxHeight: 720 }).attributeModifier(this.entrance.group(1))
                 Column({ space: 12 }) {
                     DetailLink({
+                        componentId: 'reference-owner-open',
                         title: this.reference.projectId ? '所属计划' : '所属角色',
                         value: this.reference.projectId ? this.state.projectName(this.reference.projectId) : this.state.characterName(this.reference.characterId),
                         action: (): void => { this.open(this.reference.projectId ? 'project' : 'character', this.reference.projectId || this.reference.characterId); }
@@ -53,6 +54,6 @@ export struct ReferenceDetail {
                 .constraintSize({ maxWidth: Theme.readingMaxWidth })
                 .alignItems(HorizontalAlign.Start)
                 .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
-        }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off).transition(pageTransition())
+        }.id('reference-detail-scroll').width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off).transition(pageTransition())
     }
 }

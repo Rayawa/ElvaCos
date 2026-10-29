@@ -1,3 +1,4 @@
+import { SheetContent } from '../../components/common/SheetContent';
 import { DetailLink } from '../../components/common/DetailLink';
 import { Icons } from '../../ui/icons/Icons';
 import { EntryCollectionView } from '../../components/entries/EntryCollectionView';
@@ -114,7 +115,7 @@ export struct CharacterDetail {
 
     @Builder profile() {
         if (this.character.cover) {
-            ManagedImage({ large: true, sourcePath: this.character.cover, label: this.character.name + '角色封面（不改变计划照片）', ratio: 1.3, radius: Theme.cardRadius })
+            ManagedImage({ large: true, sourcePath: this.character.cover, label: this.character.name + '角色封面（不改变计划照片）', fit: ImageFit.Contain, ratio: 1.3, radius: Theme.cardRadius })
                 .width('100%')
                 .aspectRatio(1.3)
         }
@@ -223,19 +224,21 @@ export struct CharacterDetail {
     }
 
     @Builder entriesSheet() {
-        Column({ space: 14 }) {
-            SheetHeader({ title: '角色收录', hint: this.character.name, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => {
-                    void closeSheet((): void => {
-                        this.route.entriesOpen = false;
-                    });
-                }
-            })
-            EntryCollectionView({ embedded: true, state: this.state, route: this.route.entries, componentId: 'character-entries-scroll', active: this.route.entriesOpen,
-                restoreVersion: this.route.restoreVersion, open: (kind: string, id: string): void => {
-                    this.open(kind, id);
-                }
-            }).layoutWeight(1)
-        }.width('100%').height('100%').padding(Theme.pagePadding).backgroundColor(Theme.surface)
+        SheetContent() {
+            Column({ space: 14 }) {
+                SheetHeader({ title: '角色收录', hint: this.character.name, haptic: this.state.settings.haptic, hapticLevel: this.state.settings.hapticLevel, close: (): void => {
+                        void closeSheet((): void => {
+                            this.route.entriesOpen = false;
+                        });
+                    }
+                })
+                EntryCollectionView({ embedded: true, state: this.state, route: this.route.entries, componentId: 'character-entries-scroll', active: this.route.entriesOpen,
+                    restoreVersion: this.route.restoreVersion, open: (kind: string, id: string): void => {
+                        this.open(kind, id);
+                    }
+                }).layoutWeight(1)
+            }.width('100%').height('100%').padding(Theme.pagePadding).backgroundColor(Theme.surface)
+        }
     }
 
     build() {

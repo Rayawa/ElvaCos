@@ -51,6 +51,7 @@ export struct ReferenceGallery {
                                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                             }.width(128)
                         }.type(ButtonType.Normal)
+                            .id('reference-thumbnail:' + r.id)
                             .backgroundColor(Theme.transparent)
                             .onClick((): void => {
                                 vibration.dotVibration();
