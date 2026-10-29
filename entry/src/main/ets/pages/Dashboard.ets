@@ -1,5 +1,5 @@
 import { SheetContent } from '../components/common/SheetContent';
-import { SUPPORTS_API_23 } from '../config/platformCompatibility';
+import { NATIVE_SNACKBAR_AT_TOP, SUPPORTS_API_23 } from '../config/platformCompatibility';
 import { ContextRow } from '../components/common/ContextRow';
 import lazy { SearchPage } from './search/SearchPage';
 import { SearchRoute, SearchHit, globalSearch, searchRows, SEARCH_SECTIONS } from '../domain/search/GlobalSearch';
@@ -103,6 +103,14 @@ struct Dashboard {
     @Local rootVisible: boolean = true;
     private closingDaySnack: boolean = false;
     @Local daySnackReservation: number = 0;
+    @Computed
+    private get mainContentTop(): number {
+        return Theme.contentTop + (NATIVE_SNACKBAR_AT_TOP ? this.daySnackReservation : 0);
+    }
+    @Computed
+    private get daySnackBottomInset(): number {
+        return NATIVE_SNACKBAR_AT_TOP ? 0 : this.daySnackReservation;
+    }
     private clockTimer: number = -1;
     private startupTimer: number = -1;
     private maintenanceTimer: number = -1;
@@ -1851,8 +1859,8 @@ struct Dashboard {
                         entranceSession: this.mainEntranceSession,
                         scroller: this.pageScrollers[index],
                         state: this.state,
-                        topInset: Theme.contentTop,
-                        bottomInset: Theme.homeContentBottom + this.daySnackReservation,
+                        topInset: this.mainContentTop,
+                        bottomInset: Theme.homeContentBottom + this.daySnackBottomInset,
                         active: this.tab === index,
                         open: (k: string, id: string) => this.open(k, id),
                         openTask: (item: TaskQueueItem): void => {
@@ -1865,8 +1873,8 @@ struct Dashboard {
                         entranceSession: this.mainEntranceSession,
                         scroller: this.pageScrollers[index],
                         state: this.state,
-                        topInset: Theme.contentTop,
-                        bottomInset: Theme.contentBottom + this.daySnackReservation,
+                        topInset: this.mainContentTop,
+                        bottomInset: Theme.contentBottom + this.daySnackBottomInset,
                         active: this.tab === index,
                         route: this.planListRoute,
                         open: (k: string, id: string) => this.open(k, id),
@@ -1877,8 +1885,8 @@ struct Dashboard {
                         entranceSession: this.mainEntranceSession,
                         scroller: this.pageScrollers[index],
                         state: this.state,
-                        topInset: Theme.contentTop,
-                        bottomInset: Theme.contentBottom + this.daySnackReservation,
+                        topInset: this.mainContentTop,
+                        bottomInset: Theme.contentBottom + this.daySnackBottomInset,
                         active: this.tab === index,
                         route: this.scheduleRoute,
                         openTask: (item: TaskQueueItem): void => {
@@ -1892,8 +1900,8 @@ struct Dashboard {
                         entranceSession: this.mainEntranceSession,
                         scroller: this.pageScrollers[index],
                         state: this.state,
-                        topInset: Theme.contentTop,
-                        bottomInset: Theme.contentBottom + this.daySnackReservation,
+                        topInset: this.mainContentTop,
+                        bottomInset: Theme.contentBottom + this.daySnackBottomInset,
                         active: this.tab === index,
                         route: this.wardrobeRoute,
                         open: (k: string, id: string) => this.open(k, id),
@@ -1903,7 +1911,7 @@ struct Dashboard {
                     AlbumPage({
                         state: this.state, route: this.albumRoute,
                         scroller: this.pageScrollers[index], entranceSession: this.mainEntranceSession,
-                        topInset: Theme.contentTop, bottomInset: Theme.contentBottom + this.daySnackReservation, active: this.tab === index,
+                        topInset: this.mainContentTop, bottomInset: Theme.contentBottom + this.daySnackBottomInset, active: this.tab === index,
                         view: (route: PhotoViewerRoute): void => {
                             this.openPhoto(route);
                         },

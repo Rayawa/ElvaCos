@@ -8,6 +8,9 @@ export const SUPPORTS_API_23: boolean = deviceInfo.sdkApiVersion >= 23 && device
 export const SUPPORTS_API_24: boolean = deviceInfo.sdkApiVersion >= 24;
 
 export const SUPPORTS_API_26: boolean = deviceInfo.sdkApiVersion >= 26;
+
+// The native desktop SnackBar uses the upper edge of the app window.
+export const NATIVE_SNACKBAR_AT_TOP: boolean = deviceInfo.deviceType === '2in1';
 // Stable SDK 26 values avoid resolving newer native enums during API 20 startup.
 
 export const HDS_MATERIAL_NONE: number = 0;
