@@ -1,3 +1,4 @@
+import { captureScreenshot } from '../testability/UiEvidence';
 import { getApplicationState } from '../../../main/ets/state/appState';
 import { Driver, ON, Rect } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
@@ -153,12 +154,12 @@ export default function fidelityLayoutTest(): void {
             const last = await photos[photos.length - 1].getBounds();
             expect(last.bottom <= before.top).assertTrue();
             sameRect(before, await tabs());
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-library-bottom.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-library-bottom.png');
             await tap('相册');
             await driver.delayMs(500);
             photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
             sameRect(first, await photos[0].getBounds());
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-library-top.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-library-top.png');
         });
         it('repeatedValidationKeepsItsInlineErrorAndFieldPosition', 0, async () => {
             await tap('计划');
@@ -170,14 +171,14 @@ export default function fidelityLayoutTest(): void {
             const error = await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle));
             expect(!!error).assertTrue();
             const before = await field.getBounds();
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-inline-error-first.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-inline-error-first.png');
             // The error persists after a toast would have expired, and repeat validation preserves the focused field.
             await driver.delayMs(2300);
             expect(!!(await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle)))).assertTrue();
             await tap('保存');
             sameRect(before, await field.getBounds());
             expect(!!(await driver.findComponent(ON.text('名称需要 1–80 个字').inWindow(bundle)))).assertTrue();
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-inline-error-repeat.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-inline-error-repeat.png');
             await tap('sheet-close');
             expect((await driver.findComponents(ON.text('添加角色').inWindow(bundle))).length > 0).assertTrue();
             await back();
@@ -217,7 +218,7 @@ export default function fidelityLayoutTest(): void {
                 await scrollBody(0.5);
                 sameRect(baseline, await segment.getBounds());
                 sameRect(bar, await action.getBounds());
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-plan-' + index + '.png');
+                await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-plan-' + index + '.png');
             }
             const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
             let opened: boolean = false;
@@ -249,7 +250,7 @@ export default function fidelityLayoutTest(): void {
                         }
                 }
                 expect(restoredPosition).assertTrue();
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-fidelity-plan-photo-return.png');
+                await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-fidelity-plan-photo-return.png');
                 opened = true;
                 break;
             }

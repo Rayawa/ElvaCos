@@ -1,5 +1,8 @@
+import { captureScreenshot } from '../testability/UiEvidence';
 import { getApplicationState } from '../../../main/ets/state/appState';
 import { window } from '@kit.ArkUI';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { KeyCode } from '@kit.InputKit';
 import { DeviceCalendarService } from '../../../main/ets/services/calendar/DeviceCalendarService';
 import { CollectedEntry } from '../../../main/ets/models/CollectedEntry';
 import { CosEvent, CosProject, Character, ChecklistItem, PhotoAsset, PhotoStatus, ProjectStatus } from '../../../main/ets/models/Entities';
@@ -15,14 +18,23 @@ export default function uiShellTest(): void {
         let previousKeepScreenOn = false;
         let revealNumber = 0;
         const bundle = 'top.rayawa.elvacos';
+        const settle = async (): Promise<void> => {
+            // UiTest idle detection does not wait for compositor-only sheet dismissal.
+            await driver.delayMs(700);
+            if (!await driver.waitForIdle(150, 5000)) {
+                throw new Error('Application UI did not settle before the next interaction');
+            }
+        };
         let caseNumber = 0;
         const diagnosticRun = String(Date.now());
         const diagnostic = async (stage: string = 'failure'): Promise<void> => {
             const path = '/data/storage/el2/base/cache/elvacos-ui-case-' + diagnosticRun + '-' + caseNumber + '-' + stage;
             // Diagnostic failure must never replace the original UI assertion.
             try {
-                await driver.dumpLayout(path + '.json');
-                await driver.screenCap(path + '.png');
+                if (deviceInfo.sdkApiVersion >= 26) {
+                    await driver.dumpLayout(path + '.json');
+                }
+                await captureScreenshot(driver, path + '.png');
             } catch (error) {
             }
         };
@@ -33,6 +45,14 @@ export default function uiShellTest(): void {
                 throw new Error('Missing bounds component: ' + id);
             }
             return component.getBounds();
+        };
+        const chromeBounds = async (component?: Component): Promise<Rect | undefined> => {
+            try {
+                return component ? await component.getBounds() : undefined;
+            } catch (_error) {
+                // Native bars can be replaced as HDS commits its responsive layout.
+                return undefined;
+            }
         };
         const searchValue = async (): Promise<string> => {
             // Search's outer node has no text; the native SearchField holds the entered query.
@@ -53,45 +73,63 @@ export default function uiShellTest(): void {
             await field.inputText(value);
         };
         const scrollSearch = async (scroll: Component, target: On): Promise<void> => {
+            if (!scroll) {
+                await diagnostic();
+                throw new Error('Missing scroll container before searching for a control');
+            }
             const viewport = await scroll.getBounds();
-            let inset = 80;
-            let bottom = viewport.bottom;
-            // HDS bars float over content. UiTest's default 80 px gesture begins inside the bar.
+            let top = viewport.top, bottom = viewport.bottom;
             for (const bar of await driver.findComponents(ON.type('TabBar').inWindow(bundle)) || []) {
-                const bounds = await bar.getBounds();
-                if (bounds.top > viewport.top && bounds.top < bottom) {
+                const bounds = await chromeBounds(bar);
+                if (bounds && bounds.top > (viewport.top + viewport.bottom) / 2 && bounds.top < bottom) {
                     bottom = bounds.top;
                 }
             }
-            inset = Math.max(inset, viewport.bottom - bottom + 24);
+            const dayEntry = await driver.findComponent(ON.id('day-entry-bar').inWindow(bundle));
+            if (dayEntry) {
+                const bounds = await chromeBounds(dayEntry);
+                if (bounds && bounds.top > (viewport.top + viewport.bottom) / 2 && bounds.top < bottom) {
+                    bottom = bounds.top - 80;
+                } else if (bounds && bounds.bottom > top && bounds.bottom < (viewport.top + viewport.bottom) / 2) {
+                    top = bounds.bottom + 80;
+                }
+            }
             const title = await driver.findComponent(ON.id('HdsTitleBar').inWindow(bundle));
             if (title) {
-                const bounds = await title.getBounds();
-                if (bounds.bottom > viewport.top && bounds.bottom < bottom) {
-                    inset = Math.max(inset, bounds.bottom - viewport.top + 24);
+                const bounds = await chromeBounds(title);
+                if (bounds && bounds.bottom > top && bounds.bottom < bottom) {
+                    top = bounds.bottom;
                 }
             }
-            const ready = await driver.findComponent(target);
-            if (ready) {
-                const bounds = await ready.getBounds();
-                const center = (bounds.top + bounds.bottom) / 2;
-                // Native scrollSearch can keep swiping a non-scrollable sheet even when its button is visible.
-                if (bounds.bottom > bounds.top && center > viewport.top + 24 && center < bottom - 24) {
-                    return;
-                }
-            }
-            await scroll.scrollSearch(target, true, Math.round(inset));
-            const found = await driver.findComponent(target);
-            if (!found) {
+            const upper = Math.round(top + 32), lower = Math.round(bottom - 32);
+            if (lower - upper < 64) {
+                await abilityDelegatorRegistry.getAbilityDelegator().print('SCROLL_VIEWPORT ' + JSON.stringify({ viewport: viewport, top: top, bottom: bottom }) + '\n');
                 await diagnostic();
-                throw new Error('Scroll search did not find its target');
+                throw new Error('The scroll viewport is covered by native chrome');
             }
-            const bounds = await found.getBounds();
-            if ((bounds.top + bounds.bottom) / 2 >= bottom - 24) {
-                const x = Math.round((viewport.left + viewport.right) / 2);
-                await driver.swipe(x, Math.round(bottom - 48), x, Math.round(Math.max(viewport.top + inset, bottom - (bottom - viewport.top) * 0.45)), 800);
-                await driver.delayMs(350);
+            const x = Math.round(viewport.left + (viewport.right - viewport.left) * 0.2);
+            // A symmetric native scrollSearch inset can exceed half the width when
+            // floating bars cover the bottom. Use gestures within the actual body.
+            for (let pass = 0; pass < 2; pass++) {
+                for (let attempt = 0; attempt < 12; attempt++) {
+                    const found = await driver.findComponent(target);
+                    let reverse = pass === 1;
+                    let distance = lower - upper;
+                    if (found) {
+                        const bounds = await found.getBounds();
+                        const center = (bounds.top + bounds.bottom) / 2;
+                        if (bounds.bottom > bounds.top && center > upper && center < lower) {
+                            return;
+                        }
+                        reverse = center <= upper;
+                        distance = Math.min(lower - upper - 32, Math.max(96, Math.abs(center - (upper + lower) / 2)));
+                    }
+                    await driver.swipe(x, reverse ? upper : lower, x, Math.round(reverse ? upper + distance : lower - distance), 1000);
+                    await driver.delayMs(150);
+                }
             }
+            await diagnostic();
+            throw new Error('Scroll search did not find its target in the visible body');
         };
         const revealHeader = async (scroll: Component, target: On): Promise<void> => {
             await diagnostic('reveal-header-' + (++revealNumber));
@@ -99,14 +137,14 @@ export default function uiShellTest(): void {
             let top = viewport.top, bottom = viewport.bottom;
             const title = await driver.findComponent(ON.id('HdsTitleBar').inWindow(bundle));
             if (title) {
-                const bounds = await title.getBounds();
-                if (bounds.bottom > top && bounds.bottom < bottom) {
+                const bounds = await chromeBounds(title);
+                if (bounds && bounds.bottom > top && bounds.bottom < bottom) {
                     top = bounds.bottom;
                 }
             }
             for (const bar of await driver.findComponents(ON.type('TabBar').inWindow(bundle)) || []) {
-                const bounds = await bar.getBounds();
-                if (bounds.top > top && bounds.top < bottom) {
+                const bounds = await chromeBounds(bar);
+                if (bounds && bounds.top > (viewport.top + viewport.bottom) / 2 && bounds.top < bottom) {
                     bottom = bounds.top;
                 }
             }
@@ -127,12 +165,14 @@ export default function uiShellTest(): void {
         };
         const tap = async (text: string): Promise<void> => {
             await (await driver.findWindow({ bundleName: bundle })).focus();
-            let components = await driver.findComponents(ON.text(text).inWindow(bundle));
-            if (!components || components.length === 0) {
-                components = await driver.findComponents(ON.id('root-action-' + text).inWindow(bundle));
-            }
+            await settle();
+            // Prefer the actionable title-menu ID over an identically named page title.
+            let components = await driver.findComponents(ON.id('root-action-' + text).inWindow(bundle));
             if (!components || components.length === 0) {
                 components = await driver.findComponents(ON.id('detail-action-' + text).inWindow(bundle));
+            }
+            if (!components || components.length === 0) {
+                components = await driver.findComponents(ON.text(text).inWindow(bundle));
             }
             if (!components || components.length === 0) {
                 components = await driver.findComponents(ON.id(text).inWindow(bundle));
@@ -143,12 +183,12 @@ export default function uiShellTest(): void {
             }
             // Native tab labels come after the current page's title in the layout tree.
             await components[components.length - 1].click();
-            await driver.delayMs(350);
+            await settle();
         }
         const back = async (): Promise<void> => {
             await (await driver.findWindow({ bundleName: bundle })).focus();
             await driver.pressBack();
-            await driver.delayMs(500);
+            await settle();
         };
         const present = async (text: string): Promise<void> => {
             if (await driver.findComponent(ON.id('root-action-' + text).inWindow(bundle))) {
@@ -167,7 +207,7 @@ export default function uiShellTest(): void {
         }
         const atRoot = async (): Promise<boolean> => {
             // main-tabs also wraps the schedule's covering destination; its ID alone is not a root marker.
-            for (const action of ['我的', '新建计划', '添加活动', '添加装备', '导入照片']) {
+            for (const action of ['设置', '新建计划', '添加活动', '添加装备', '导入照片']) {
                 if (await driver.findComponent(ON.id('root-action-' + action).inWindow(bundle))) {
                     return true;
                 }
@@ -195,7 +235,23 @@ export default function uiShellTest(): void {
         });
         beforeEach(async () => {
             caseNumber++;
-            await (await driver.findWindow({ bundleName: bundle })).focus();
+            let appWindow = await driver.findWindow({ bundleName: bundle });
+            if (!appWindow) {
+                const delegator = abilityDelegatorRegistry.getAbilityDelegator();
+                await delegator.print('UI_RECOVERY Restoring EntryAbility before the next independent case\n');
+                await delegator.startAbility({ bundleName: bundle, abilityName: 'EntryAbility' });
+                for (let attempt = 0; attempt < 75; attempt++) {
+                    appWindow = await driver.findWindow({ bundleName: bundle });
+                    if (appWindow && getApplicationState().ready && !getApplicationState().busy) {
+                        break;
+                    }
+                    await driver.delayMs(200);
+                }
+            }
+            if (!appWindow) {
+                throw new Error('Cannot restore the application window before this UI case');
+            }
+            await appWindow.focus();
             await driver.delayMs(350);
             for (let attempt = 0; attempt < 12; attempt++) {
                 const discard = await driver.findComponent(ON.text('放弃修改').inWindow(bundle));
@@ -226,7 +282,9 @@ export default function uiShellTest(): void {
             if (testWindow) {
                 await testWindow.setWindowKeepScreenOn(previousKeepScreenOn);
             }
-            await tap('首页');
+            if (await driver.findWindow({ bundleName: bundle })) {
+                await tap('首页');
+            }
         });
         const scrollBody = async (): Promise<void> => {
             const bounds = await (await driver.findWindow({ bundleName: bundle })).getBounds();
@@ -257,11 +315,11 @@ export default function uiShellTest(): void {
             await tap('首页');
             await present('root-action-设置');
             await driver.delayMs(1000);
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-home.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-home.png');
             await tap('计划');
             await tap('plan-role-library');
             await present('添加角色');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-characters.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-characters.png');
             const characters = await driver.findComponents(ON.description('双击打开角色详情').inWindow(bundle));
             if (characters && characters.length > 0) {
                 await characters[0].click();
@@ -278,7 +336,7 @@ export default function uiShellTest(): void {
                 await tap('用这个角色新建计划');
                 await present('新建计划');
                 await tap('sheet-close');
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-character-detail.png');
+                await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-character-detail.png');
                 await tap('添加版本');
                 await present('添加角色版本');
                 await tap('sheet-close');
@@ -325,7 +383,7 @@ export default function uiShellTest(): void {
                 await tap('sheet-close');
                 await back();
             }
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-projects.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-projects.png');
             await tap('日程');
             await present('添加活动');
             await tap('日历');
@@ -335,10 +393,10 @@ export default function uiShellTest(): void {
             await present('schedule-date-picker');
             await tap('schedule-clear-date');
             await present('event-list-filter');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-events.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-events.png');
             await tap('衣柜');
             await present('添加装备');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-library.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-library.png');
             await present('全部类型');
             await present('全部状态');
             await present('全部位置');
@@ -372,26 +430,67 @@ export default function uiShellTest(): void {
                 const loadedPhotos = await driver.findComponents(ON.description('照片已加载').inWindow(bundle));
                 expect(loadedPhotos.length > 0).assertTrue();
             }
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-library-photos.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-library-photos.png');
             const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
             if (photos && photos.length > 0) {
                 await photos[0].click();
                 await driver.delayMs(500);
-                await present('照片工作流');
-                await present('编辑照片说明');
-                await tap('编辑照片说明');
+                await present('photo-detail-scroll');
+                await scrollSearch(await driver.findComponent(ON.id('photo-detail-scroll').inWindow(bundle)), ON.id('photo-caption-open').inWindow(bundle));
+                await tap('photo-caption-open');
                 await present('编辑照片说明');
                 await present('照片说明');
                 await tap('sheet-close');
-                await present('照片工作流');
+                await present('photo-detail-scroll');
                 expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
                 expect((await driver.findComponents(ON.description('照片已加载').inWindow(bundle))).length > 0).assertTrue();
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-photo-detail.png');
+                await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-photo-detail.png');
                 await back();
                 await driver.delayMs(350);
             }
             await present('album-portfolio-toggle');
             await tap('首页');
+        });
+        it('photoAndReferenceDetailsAreActuallyRenderedAndReturnToTheirOwners', 0, async () => {
+            const state = getApplicationState();
+            const photo = state.photos.find((item: PhotoAsset): boolean => !!item.localPath && !!item.thumbnailPath && state.projects.some((project: CosProject): boolean => project.id === item.projectId));
+            const reference = state.references.find((item): boolean => !!item.localPath && !!item.characterId);
+            if (!photo || !reference) {
+                throw new Error('Visual acceptance requires a real fixture photo and character reference');
+            }
+            await tap('相册');
+            await tap('按场次');
+            await tap('album-plan-filter');
+            await tap('全部场次 / 计划');
+            const album = await driver.findComponent(ON.id('album-plan-list').inWindow(bundle));
+            await scrollSearch(album, ON.id('album-plan:' + photo.projectId).inWindow(bundle));
+            await tap('album-plan:' + photo.projectId);
+            await scrollSearch(await driver.findComponent(ON.id('photo-list').inWindow(bundle)), ON.id('photo-thumbnail:' + photo.id).inWindow(bundle));
+            await tap('photo-thumbnail:' + photo.id);
+            await present('photo-detail-scroll');
+            expect(!!await driver.waitForComponent(ON.description('照片已加载').inWindow(bundle), 5000)).assertTrue();
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-photo-detail-verified.png');
+            await scrollSearch(await driver.findComponent(ON.id('photo-detail-scroll').inWindow(bundle)), ON.id('photo-caption-open').inWindow(bundle));
+            await tap('photo-caption-open');
+            await present('form-input:notes');
+            await tap('sheet-close');
+            await back();
+            await present('photo-thumbnail:' + photo.id);
+            await tap('计划');
+            await tap('plan-role-library');
+            await scrollSearch(await driver.findComponent(ON.id('character-list').inWindow(bundle)), ON.id('character-library:' + reference.characterId).inWindow(bundle));
+            await tap('character-library:' + reference.characterId);
+            await tap('参考图');
+            await scrollSearch(await driver.findComponent(ON.id('character-detail-scroll').inWindow(bundle)), ON.id('reference-thumbnail:' + reference.id).inWindow(bundle));
+            await tap('reference-thumbnail:' + reference.id);
+            expect(!!await driver.waitForComponent(ON.description('照片已加载').inWindow(bundle), 5000)).assertTrue();
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-reference-detail-verified.png');
+            await scrollSearch(await driver.findComponent(ON.id('reference-detail-scroll').inWindow(bundle)), ON.id('reference-owner-open').inWindow(bundle));
+            await present('reference-owner-open');
+            await back();
+            await present('reference-thumbnail:' + reference.id);
+            await back();
+            await back();
         });
         it('globalSearchRestoresItsQueryAndOffersTheExistingObjectHomes', 0, async () => {
             await tap('首页');
@@ -615,14 +714,27 @@ export default function uiShellTest(): void {
                 await revealHeader(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id('entry-kind-filter').inWindow(bundle));
                 await driver.delayMs(350);
                 await present('地图');
+                await step('find event row before editing');
                 await scrollSearch(await driver.findComponent(ON.id('event-entries-scroll').inWindow(bundle)), ON.id(id).inWindow(bundle));
+                await step('open event entry editor');
                 await tap(id);
-                const editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
+                let editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
+                await step('find editor url input');
                 await scrollSearch(editor, ON.id('entry-input:url').inWindow(bundle));
                 const urlInput = await driver.findComponent(ON.id('entry-input:url').inWindow(bundle));
-                await urlInput.inputText('not-a-url');
+                await urlInput.click();
+                await driver.delayMs(700);
+                await abilityDelegatorRegistry.getAbilityDelegator().print('ENTRY_INPUT ' + JSON.stringify({
+                    type: await urlInput.getType(), enabled: await urlInput.isEnabled(), bounds: await urlInput.getBounds(), busy: state.busy
+                }) + '\n');
+                await diagnostic('entry-input-focused');
+                await (await driver.findComponent(ON.id('entry-input:url').inWindow(bundle))).inputText('not-a-url', { paste: true });
+                await driver.delayMs(300);
+                await diagnostic('entry-input-typed');
+                expect(await (await driver.findComponent(ON.id('entry-input:url').inWindow(bundle))).getText()).assertEqual('not-a-url');
                 await driver.pressBack();
-                await driver.delayMs(350);
+                await settle();
+                editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
                 await diagnostic('entry-before-save');
                 await scrollSearch(editor, ON.text('保存修改').inWindow(bundle));
                 await tap('保存修改');
@@ -632,10 +744,12 @@ export default function uiShellTest(): void {
                 await step('verify persistent validation');
                 expect(await (await driver.findComponent(ON.id('entry-action-error').inWindow(bundle))).getText())
                     .assertEqual('链接需要以 https:// 或 http:// 开头');
+                editor = await driver.findComponent(ON.id('entry-editor-scroll').inWindow(bundle));
                 await scrollSearch(editor, ON.id('entry-input:url').inWindow(bundle));
                 expect(await (await driver.findComponent(ON.id('entry-input:url').inWindow(bundle))).getText()).assertEqual('not-a-url');
                 expect(state.entries.find((entry: CollectedEntry): boolean => entry.id === 'ui-inbox-context-30')!.url).assertEqual('');
-                // This editor fits the sheet. Its close button is already visible above the covered page's title bar.
+                await editor.scrollToTop(600);
+                await settle();
                 await tap('sheet-close');
                 await present('放弃本次修改？');
                 await tap('放弃修改');
@@ -833,17 +947,19 @@ export default function uiShellTest(): void {
             expect(before.bottom < windowBounds.bottom).assertTrue();
             await tap('首页');
             await tap('设置');
+            await tap('偏好');
             await settingsItem('用户名');
             await driver.delayMs(1000);
             expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-top.png');
-            const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-settings-top.png');
             await settingsItem('材质等级');
-            await settingsScroll.scrollToBottom(1000);
+            await tap('关于');
+            const settingsScroll = await driver.findComponent(ON.id('settings-scroll').inWindow(bundle));
+            await scrollSearch(settingsScroll, ON.id('settings-version').inWindow(bundle));
             await driver.delayMs(350);
-            const footer = await driver.findComponent(ON.text('版本 1.0.0-beta.1').inWindow(bundle));
+            const footer = await driver.findComponent(ON.id('settings-version').inWindow(bundle));
             expect((await footer.getBounds()).bottom < windowBounds.bottom).assertTrue();
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-bottom.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-settings-bottom.png');
             await back();
             await driver.delayMs(250);
             await present('root-action-设置');
@@ -875,7 +991,7 @@ export default function uiShellTest(): void {
             const viewport = await boundsFor('form-scroll');
             expect(fieldBounds.top >= viewport.top && fieldBounds.bottom <= viewport.bottom).assertTrue();
             expect((await (await driver.findComponent(ON.text('添加角色').inWindow(bundle))).getBounds()).top).assertEqual(formTitleBounds.top);
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-form.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-form.png');
             await tap('sheet-close');
             await present('添加角色');
             await back();
@@ -895,7 +1011,7 @@ export default function uiShellTest(): void {
             await tap('创建计划并开始准备');
             await driver.delayMs(300);
             await present('form-input:characterName');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-new-plan.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-new-plan.png');
             await (await driver.findComponent(ON.id('form-input:characterName').inWindow(bundle))).inputText('未提交验证角色');
             await driver.delayMs(500);
             await back();
@@ -919,57 +1035,61 @@ export default function uiShellTest(): void {
         });
         it('planViewsUseContextualActionsAndReturnToTheirTaskView', 0, async () => {
             await tap('计划');
-            const plans = await driver.findComponents(ON.description('双击打开计划详情').inWindow(bundle));
-            if (plans && plans.length > 0) {
-                await plans[0].click();
-                await driver.delayMs(400);
-                await tap('准备');
-                await present('project-preparation');
-                await detailActions();
-                await tap('添加准备任务');
-                await present('补入所选任务');
-                await present('常用准备模板');
-                await tap('sheet-close');
-                await tap('从衣柜复用');
-                await present('从衣柜添加');
-                await tap('＋ 新装备');
-                await present('添加装备');
-                await present('名称 *');
-                await tap('sheet-close');
-                await present('project-preparation');
-                await tap('打包');
-                await present('打包清单');
-                expect((await driver.findComponents(ON.id('project-packing').inWindow(bundle))).length).assertEqual(1);
-                await tap('添加物品');
-                await present('添加清单项');
-                await tap('sheet-close');
-                await present('打包清单');
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-packing.png');
-                await tap('照片');
-                await present('批量选片');
-                await present('导入照片');
-                const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
-                if (photos && photos.length > 0) {
-                    await tap('批量选片');
-                    const selectable = await driver.findComponents(ON.description('双击切换照片选择').inWindow(bundle));
-                    await selectable[0].click();
-                    await present('已选 1 张');
-                    await present('photo-batch-apply');
-                    await tap('取消选择');
-                    const restored = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
-                    await restored[0].click();
-                    await driver.delayMs(350);
-                    await present('照片工作流');
-                    await back();
-                    await driver.delayMs(350);
-                    await present('批量选片');
-                }
-                await driver.screenCap('/data/storage/el2/base/cache/elvacos-plan-photos.png');
-                await tap('准备');
-                await present('project-preparation');
-                await back();
-                await driver.delayMs(250);
+            await tap('全部');
+            const state = getApplicationState();
+            const plan = state.projects.find((item: CosProject): boolean => item.status !== ProjectStatus.COMPLETED && item.status !== ProjectStatus.ARCHIVED && state.photos.some((photo: PhotoAsset): boolean => photo.projectId === item.id));
+            if (!plan) {
+                throw new Error('Plan view acceptance requires an active fixture plan with photos');
             }
+            await scrollSearch(await driver.findComponent(ON.id('project-list').inWindow(bundle)), ON.id('project-card:' + plan.id).inWindow(bundle));
+            await tap('project-card:' + plan.id);
+            await driver.delayMs(400);
+            await tap('准备');
+            await present('project-preparation');
+            await detailActions();
+            await tap('添加准备任务');
+            await present('补入所选任务');
+            await present('常用准备模板');
+            await tap('sheet-close');
+            await tap('从衣柜复用');
+            await present('从衣柜添加');
+            await tap('＋ 新装备');
+            await present('添加装备');
+            await present('名称 *');
+            await tap('sheet-close');
+            await present('project-preparation');
+            await tap('打包');
+            await present('打包清单');
+            expect((await driver.findComponents(ON.id('project-packing').inWindow(bundle))).length).assertEqual(1);
+            await tap('添加物品');
+            await present('添加清单项');
+            await tap('sheet-close');
+            await present('打包清单');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-packing.png');
+            await tap('照片');
+            await present('批量选片');
+            await present('导入照片');
+            const photos = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
+            if (photos && photos.length > 0) {
+                await tap('批量选片');
+                const selectable = await driver.findComponents(ON.description('双击切换照片选择').inWindow(bundle));
+                await selectable[0].click();
+                await present('已选 1 张');
+                await present('photo-batch-apply');
+                await tap('取消选择');
+                const restored = await driver.findComponents(ON.description('双击打开照片详情').inWindow(bundle));
+                await restored[0].click();
+                await driver.delayMs(350);
+                await present('photo-detail-scroll');
+                await back();
+                await driver.delayMs(350);
+                await present('批量选片');
+            }
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-plan-photos.png');
+            await tap('准备');
+            await present('project-preparation');
+            await back();
+            await driver.delayMs(250);
             await tap('首页');
         });
         it('calendarChangesMonthAndCanCreatePendingOrMultidayActivityWithoutSaving', 0, async () => {
@@ -980,7 +1100,7 @@ export default function uiShellTest(): void {
             await present('calendar-next');
             await tap('calendar-next');
             await tap('今天');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-calendar.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-calendar.png');
             await tap('添加活动');
             await present('添加活动');
             await present('form-input:dateMode');
@@ -994,7 +1114,7 @@ export default function uiShellTest(): void {
             await present('开始日期 *');
             await present('结束日期 *');
             await present('event-device-calendar');
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-event-schedule.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-event-schedule.png');
             await tap('sheet-close');
             await present('今天');
             await tap('列表');
@@ -1023,16 +1143,18 @@ export default function uiShellTest(): void {
         });
         it('expenseSummaryUsesCoveringRouteAndCancelableRecordSheet', 0, async () => {
             await tap('首页');
+            await scrollSearch(await driver.findComponent(ON.id('home-scroll').inWindow(bundle)), ON.id('home-expenses').inWindow(bundle));
             await tap('home-expenses');
             await present('花费统计');
             expect(((await driver.findComponents(ON.id('detail-action-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
             expect(((await driver.findComponents(ON.id('main-tabs').inWindow(bundle)))?.length || 0)).assertEqual(0);
             await present('expense-range');
             await present('expense-scope');
+            await tap('明细');
             await scrollSearch(await driver.findComponent(ON.id('expense-scroll').inWindow(bundle)), ON.text('花费明细').inWindow(bundle));
             await present('花费明细');
             const before = await (await driver.findComponent(ON.text('花费明细').inWindow(bundle))).getBounds();
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-expenses.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-expenses.png');
             await tap('记一笔');
             await present('添加花费');
             await present('实际花费（元） *');
@@ -1091,7 +1213,7 @@ export default function uiShellTest(): void {
             await driver.delayMs(1500);
             expect(settled).assertFalse();
             expect((await driver.findComponents(ON.text(event.name))).length > 0).assertTrue();
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-device-calendar-confirm.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-device-calendar-confirm.png');
             await driver.pressBack();
             await driver.delayMs(400);
             const discard = await driver.findComponent(ON.text('放弃'));
@@ -1104,14 +1226,77 @@ export default function uiShellTest(): void {
             await driver.delayMs(400);
             await present('root-action-设置');
         });
+        it('largeFontsAndBothAppearancesKeepAllRootsUsable', 0, async () => {
+            const state = getApplicationState();
+            const ability = await abilityDelegatorRegistry.getAbilityDelegator().getCurrentTopAbility();
+            const application = ability.context.getApplicationContext();
+            const originalScale = ability.context.config.fontSizeScale || 1;
+            const originalAppearance = state.settings.appearance;
+            const actions: string[] = ['设置', '新建计划', '添加活动', '添加装备', '导入照片'];
+            try {
+                for (const appearance of ['sky', 'mist']) {
+                    expect(await state.updateSettings({ appearance: appearance })).assertTrue();
+                    let headingHeight = 0;
+                    for (const scale of [1, 2]) {
+                        application.setFontSizeScale(scale);
+                        for (let index = 0; index < 5; index++) {
+                            await (await driver.findWindow({ bundleName: bundle })).focus();
+                            await driver.triggerCombineKeys(KeyCode.KEYCODE_CTRL_LEFT, KeyCode.KEYCODE_1 + index);
+                            await settle();
+                            if (index === 0) {
+                                await tap('首页');
+                                const heading = await (await driver.findComponent(ON.text('接下来').inWindow(bundle))).getBounds();
+                                if (scale === 1) {
+                                    headingHeight = heading.bottom - heading.top;
+                                } else {
+                                    expect(heading.bottom - heading.top > headingHeight * 1.4).assertTrue();
+                                }
+                            }
+                            const action = await driver.waitForComponent(ON.id('root-action-' + actions[index]).inWindow(bundle), 5000);
+                            expect(!!action).assertTrue();
+                            const bounds = await action.getBounds();
+                            const viewport = await (await driver.findWindow({ bundleName: bundle })).getBounds();
+                            expect(bounds.left >= viewport.left && bounds.right <= viewport.right && bounds.top >= viewport.top && bounds.bottom <= viewport.bottom).assertTrue();
+                            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-font-' + scale + '-' + appearance + '-root-' + index + '.png');
+                        }
+                    }
+                }
+            } finally {
+                application.setFontSizeScale(originalScale);
+                await state.updateSettings({ appearance: originalAppearance });
+                await (await driver.findWindow({ bundleName: bundle })).focus();
+                await driver.triggerCombineKeys(KeyCode.KEYCODE_CTRL_LEFT, KeyCode.KEYCODE_1);
+                await settle();
+            }
+        });
+        it('developerOptionsShowDeviceInformationAndReturnToSettings', 0, async () => {
+            await tap('设置');
+            await tap('关于');
+            await scrollSearch(await driver.findComponent(ON.id('settings-scroll').inWindow(bundle)), ON.id('settings-version').inWindow(bundle));
+            const version = await driver.findComponent(ON.id('settings-version').inWindow(bundle));
+            for (let index = 0; index < 5; index++) {
+                await version.click();
+                await driver.delayMs(100);
+            }
+            await present('developer-scroll');
+            await scrollSearch(await driver.findComponent(ON.id('developer-scroll').inWindow(bundle)), ON.text('设备信息').inWindow(bundle));
+            await present('查看全部设备信息');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-developer-device.png');
+            await back();
+            await present('settings-scroll');
+            await back();
+            await present('root-action-设置');
+        });
         it('settingsUseAlignedHandChoicesAndRealHelpSheets' , 0, async () => {
             await tap('首页');
             await tap('设置');
+            await tap('数据');
             await settingsItem('云同步');
             await tap('说明');
             await present('云空间与同步');
             await present('导出元数据备份');
             await tap('sheet-close');
+            await tap('偏好');
             await settingsItem('用户名');
             await settingsItem('材质等级');
             await settingsItem('右手');
@@ -1129,12 +1314,13 @@ export default function uiShellTest(): void {
             expect(grip.top).assertEqual(right.top);
             expect(((await driver.findComponents(ON.type('Select').inWindow(bundle)))?.length || 0)).assertEqual(0);
             expect(((await driver.findComponents(ON.type('Toggle').inWindow(bundle)))?.length || 0)).assertEqual(0);
-            await driver.screenCap('/data/storage/el2/base/cache/elvacos-settings-preferences.png');
+            await captureScreenshot(driver, '/data/storage/el2/base/cache/elvacos-settings-preferences.png');
+            await tap('关于');
             await settingsItem('使用说明');
             await tap('使用说明');
             await present('准备一次 Cos');
             await tap('sheet-close');
-            await present('隐私政策');
+            await settingsItem('更新日志');
             await tap('更新日志');
             await present('1.0.0-beta.1');
             await present('app-log-scroll');
@@ -1145,6 +1331,7 @@ export default function uiShellTest(): void {
             await tap('app-log-filter-beta');
             await present('1.0.0-beta.1');
             await back();
+            await settingsItem('隐私政策');
             await tap('隐私政策');
             await present('关于绮秀与隐私的声明');
             await present('privacy-scroll');

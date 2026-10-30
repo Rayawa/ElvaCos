@@ -32,7 +32,7 @@ export default function planningRulesTest(): void {
             event.reminderMinutes = 60;
             const draft = deviceCalendarDraft(event);
             expect(draft.endTime - draft.startTime).assertEqual(150 * 60000);
-            expect(draft.location).assertEqual('杭州 · 公园');
+            expect(draft.location).assertEqual('杭州，公园');
             expect(draft.description).assertEqual('带道具');
             expect(draft.reminderTime[0]).assertEqual(60);
         });
