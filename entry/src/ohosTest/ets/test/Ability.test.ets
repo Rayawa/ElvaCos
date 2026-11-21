@@ -4,14 +4,14 @@ import { relationalStore, preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
-import { Database } from '../../../main/ets/services/storage/database/Database';
-import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, PhotoAssetRepository, RelationRepository, ChecklistItemRepository } from '../../../main/ets/services/storage/repositories/Repositories';
+import { Database } from '../../../main/ets/services/storage/Database';
+import { CharacterRepository, CharacterVariantRepository, CosProjectRepository, AssetRepository, PhotoAssetRepository, RelationRepository, ChecklistItemRepository } from '../../../main/ets/services/storage/Repositories';
 import { Character, CharacterVariant, CosProject, Asset, PhotoAsset, PhotoStatus, newId } from '../../../main/ets/models/Entities';
-import { BackupService } from '../../../main/ets/services/backup/BackupService';
-import { MetadataBackupRepository } from '../../../main/ets/services/storage/repositories/MetadataBackupRepository';
-import { MediaRepository } from '../../../main/ets/services/media/MediaRepository';
-import { migrateElvaPreferences, migrateUxPreferences } from '../../../main/ets/services/settings/SettingsMigration';
-import getDiskStorageInstance from '../../../main/ets/services/settings/DiskStorage';
+import { BackupService } from '../../../main/ets/services/BackupService';
+import { MetadataBackupRepository } from '../../../main/ets/services/storage/MetadataBackupRepository';
+import { MediaRepository } from '../../../main/ets/services/MediaRepository';
+import { migrateElvaPreferences, migrateUxPreferences } from '../../../main/ets/services/SettingsMigration';
+import getDiskStorageInstance from '../../../main/ets/services/DiskStorage';
 import localUnitTest from '../../../test/LocalUnit.test';
 
 export default function abilityTest(): void {

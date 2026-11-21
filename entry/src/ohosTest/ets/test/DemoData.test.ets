@@ -4,14 +4,14 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { TestContext } from '../testability/TestContext';
-import { Database } from '../../../main/ets/services/storage/database/Database';
-import { DemoDataRepository } from '../../../main/ets/services/storage/repositories/DemoDataRepository';
-import { MediaRepository } from '../../../main/ets/services/media/MediaRepository';
-import { CharacterRepository, CosProjectRepository, PhotoAssetRepository, RelationRepository, CosEventRepository } from '../../../main/ets/services/storage/repositories/Repositories';
-import { PlanningRepository } from '../../../main/ets/services/storage/repositories/PlanningRepository';
-import { MetadataBackupRepository } from '../../../main/ets/services/storage/repositories/MetadataBackupRepository';
+import { Database } from '../../../main/ets/services/storage/Database';
+import { DemoDataRepository } from '../../../main/ets/services/storage/DemoDataRepository';
+import { MediaRepository } from '../../../main/ets/services/MediaRepository';
+import { CharacterRepository, CosProjectRepository, PhotoAssetRepository, RelationRepository, CosEventRepository } from '../../../main/ets/services/storage/Repositories';
+import { PlanningRepository } from '../../../main/ets/services/storage/PlanningRepository';
+import { MetadataBackupRepository } from '../../../main/ets/services/storage/MetadataBackupRepository';
 import { Character, newId } from '../../../main/ets/models/Entities';
-import { checkSchedule } from '../../../main/ets/domain/schedule/Schedule';
+import { checkSchedule } from '../../../main/ets/models/Schedule';
 
 export default function demoDataTest(): void {
 

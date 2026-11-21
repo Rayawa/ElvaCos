@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@ohos/hypium';
 import { util } from '@kit.ArkTS';
-import { parseLocalDocument, DocumentBlock } from '../../../main/ets/domain/documents/LocalDocument';
-import { getApplicationState } from '../../../main/ets/state/appState';
-import { AppState } from '../../../main/ets/state/ApplicationState';
+import { parseLocalDocument, DocumentBlock } from '../../../main/ets/models/LocalDocument';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
+import { AppState } from '../../../main/ets/viewmodels/ApplicationState';
 import { TestContext } from '../testability/TestContext';
 
 export default function structureTest(): void {

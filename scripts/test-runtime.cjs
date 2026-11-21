@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
+const vm = require('node:vm');
 const studio = (process.env.DEVECO_HOME || path.join(process.env.HOME, 'Applications/DevEco-Studio.app')).replace(/\/Contents$/, '') + '/Contents';
 const compilerPath = path.join(studio, 'tools/ohpm/node_modules/typescript');
 const compiler = fs.existsSync(compilerPath) ? require(compilerPath) : require('./host-typescript.cjs');
@@ -56,12 +57,12 @@ const fresh = relative => {
 const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
 (async () => {
     for (api = 20; api <= 26; api++) {
-        fresh('config/platformCompatibility.ets');
-        const { CompatibleTabsStyle } = fresh('config/SystemCapability.ets');
+        fresh('ui/platformCompatibility.ets');
+        const { CompatibleTabsStyle } = fresh('ui/SystemCapability.ets');
         let calls = 0;
         new CompatibleTabsStyle(true, 1, 5).applyNormalAttribute({ barFloatingStyle() { calls++; }, blurStrategy() { calls++; }, cachedMaxCount(count, mode) { assert.equal(count, 5); assert.equal(mode, 1); calls++; } });
         assert.equal(calls, api >= 23 ? 3 : 0);
-        const effects = fresh('ui/feedback/visualEffects.ets');
+        const effects = fresh('ui/visualEffects.ets');
         const light = effects.pressVisualEffect(true, true);
         assert.equal(!!light, api >= 23);
         storage.set('light', 2);
@@ -70,7 +71,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
         storage.delete('light');
         console.log(`PASS API ${api}: native tab material, light field and HDR access guards`);
     }
-    const sheet = fresh('ui/sheet/sheet.ets');
+    const sheet = fresh('ui/sheet.ets');
     const entrance = { reset() {}, play() {}, finish() {} };
     let closed = 0, allow = false;
     const options = sheet.appSheetOptions(() => {}, entrance, {}, 1, async () => allow, () => closed++);
@@ -125,7 +126,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
     for (const record of records) assert.equal(index.get(record.id), record);
     assert.equal(index.get('missing'), undefined);
     console.log('PASS relation indexes preserve record identity, ordering and query results for 10,000 records');
-    const responsive = fresh('config/responsive.ets');
+    const responsive = fresh('ui/responsive.ets');
     for (const [width, photos, cards] of [[320, 2, 1], [599, 2, 1], [600, 3, 2], [839, 3, 2], [840, 4, 2], [1440, 4, 2], [599, 2, 1]]) {
         assert.equal(responsive.photoColumnCount(width), photos);
         assert.equal(responsive.cardColumnCount(width), cards);
@@ -133,7 +134,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
     assert.equal(responsive.RESPONSIVE_BREAKPOINT_MEDIUM, '600vp');
     assert.equal(responsive.RESPONSIVE_BREAKPOINT_LARGE, '840vp');
     console.log('PASS dashboard breakpoint boundaries and shrink-back layouts at 320/599/600/839/840/1440vp');
-    const { AppShortcut, resolveAppShortcut } = fresh('ui/input/shortcuts.ets');
+    const { AppShortcut, resolveAppShortcut } = fresh('ui/shortcuts.ets');
     for (let index = 0; index < 5; index++) assert.equal(resolveAppShortcut(2001 + index, true, false, false, false), index);
     assert.equal(resolveAppShortcut(2022, true, false, false, false), AppShortcut.SEARCH);
     assert.equal(resolveAppShortcut(2030, true, false, false, false), AppShortcut.CREATE);
@@ -142,7 +143,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
     for (const code of [2001, 2022, 2030, 2043, 2049, 2050]) assert.equal(resolveAppShortcut(code, false, false, false, false), AppShortcut.NONE, 'ordinary input belongs to native controls');
     for (const modifiers of [[true, true, false, false], [true, false, true, false], [true, false, false, true]]) assert.equal(resolveAppShortcut(2022, ...modifiers), AppShortcut.NONE);
     console.log('PASS keyboard commands preserve ordinary input and modified system combinations');
-    const { groupPhotoRows, indexPhotoRows, changedPhotoRows } = fresh('domain/photos/PhotoRows.ets');
+    const { groupPhotoRows, indexPhotoRows, changedPhotoRows } = fresh('models/PhotoRows.ets');
     const photos = Array.from({ length: 10000 }, (_, index) => ({ id: String(index) }));
     for (const columns of [2, 3, 4]) {
         const rows = groupPhotoRows(photos, columns), positions = indexPhotoRows(rows);
@@ -152,4 +153,39 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
         assert.deepEqual(changedPhotoRows(positions, new Set(['2']), new Set(['2'])), []);
     }
     console.log('PASS selecting photos only invalidates changed rows across all three responsive column counts');
+    const { ChartConfigurationObserver } = fresh('components/ChartConfigurationObserver.ets');
+    let readColors = 0, chartRedraws = 0, callback;
+    const observer = new ChartConfigurationObserver();
+    observer.start({
+        resourceManager: { getColorSync() { return ++readColors; } },
+        getApplicationContext: () => ({ on(_name, value) { callback = value; return 1; }, off: async () => {} })
+    }, () => chartRedraws++);
+    assert.equal(observer.color({ id: 1 }), 1);
+    assert.equal(observer.color({ id: 1 }), 1);
+    callback.onConfigurationUpdated();
+    assert.equal(observer.color({ id: 1 }), 2);
+    observer.stop();
+    callback.onConfigurationUpdated();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    assert.equal(chartRedraws, 0);
+    console.log('PASS chart colors are reused until the theme changes and late callbacks cannot redraw a hidden chart');
+
+    const entry = fs.readFileSync(path.join(root, 'index.ets'), 'utf8');
+    const lifecycle = entry.slice(entry.indexOf('    onPageShow(): void'), entry.indexOf("    @Monitor('state.preparationUndos')"))
+        .replace(/^\s*@Monitor\([^\n]+\)\s*$/gm, '');
+    const timingCode = compiler.transpileModule('class MaintenancePage { startupTimer = -1; maintenanceTimer = -1; ' +
+        'maintenanceDone = false; maintenanceRunning = false; syncDaySnack() {} scheduleClock() {} ' + lifecycle + ' } new MaintenancePage();',
+        { compilerOptions: { target: compiler.ScriptTarget.ES2021 } }).outputText;
+    let nextTimer = 0, attempts = 0;
+    const timers = new Map();
+    const currentPage = vm.runInNewContext(timingCode, { setTimeout: callback => { timers.set(++nextTimer, callback); return nextTimer; } });
+    currentPage.getUIContext = () => ({ getHostContext: () => ({}) });
+    currentPage.state = { ready: true, busy: false, staleScopes: [], tickClock() {}, start: async () => {}, maintain: async () => { attempts++; return true; } };
+    const fireTimer = async () => { const [id, run] = timers.entries().next().value; timers.delete(id); await run(); };
+    currentPage.onPageShow(); await fireTimer();
+    currentPage.state.busy = true; await fireTimer(); assert.equal(attempts, 0);
+    currentPage.state.busy = false; currentPage.state.staleScopes = ['photos']; currentPage.scheduleMaintenance(); assert.equal(timers.size, 0);
+    currentPage.state.staleScopes = []; currentPage.scheduleMaintenance(); await fireTimer();
+    currentPage.scheduleMaintenance(); assert.equal(attempts, 1); assert.equal(timers.size, 0);
+    console.log('PASS skipped startup maintenance retries after the app is idle and refreshed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

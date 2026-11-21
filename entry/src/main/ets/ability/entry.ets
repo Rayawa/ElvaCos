@@ -1,7 +1,7 @@
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
-import { getApplicationState, setReminderTarget } from '../state/appState';
+import { getApplicationState, setReminderTarget } from '../viewmodels/appState';
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
@@ -42,7 +42,7 @@ export default class EntryAbility extends UIAbility {
         } catch (error) {
             getApplicationState().reportError('设置加载失败，请重试加载本地数据');
         }
-        windowStage.loadContent('pages/Dashboard', (err) => {
+        windowStage.loadContent('index', (err) => {
             if (err.code) {
                 hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
                 return;

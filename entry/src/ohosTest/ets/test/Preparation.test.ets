@@ -2,11 +2,11 @@ import { common } from '@kit.AbilityKit';
 import { relationalStore } from '@kit.ArkData';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 import { TestContext } from '../testability/TestContext';
-import { Database } from '../../../main/ets/services/storage/database/Database';
-import { baseSchema } from '../../../main/ets/services/storage/database/Schema';
-import { CosProjectRepository, ChecklistItemRepository } from '../../../main/ets/services/storage/repositories/Repositories';
-import { PreparationRepository } from '../../../main/ets/services/storage/repositories/PreparationRepository';
-import { MetadataBackupRepository } from '../../../main/ets/services/storage/repositories/MetadataBackupRepository';
+import { Database } from '../../../main/ets/services/storage/Database';
+import { baseSchema } from '../../../main/ets/services/storage/Schema';
+import { CosProjectRepository, ChecklistItemRepository } from '../../../main/ets/services/storage/Repositories';
+import { PreparationRepository } from '../../../main/ets/services/storage/PreparationRepository';
+import { MetadataBackupRepository } from '../../../main/ets/services/storage/MetadataBackupRepository';
 import { newId, Character, CosProject } from '../../../main/ets/models/Entities';
 import { makePreparation, preparationKeys, preparationProgress } from '../../../main/ets/models/Preparation';
 interface BackupTable {

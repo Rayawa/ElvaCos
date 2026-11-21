@@ -6,7 +6,7 @@ import { KeyCode } from '@kit.InputKit';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { taskpool } from '@kit.ArkTS';
 import { describe, beforeAll, afterAll, afterEach, it, expect } from '@ohos/hypium';
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 import { Asset } from '../../../main/ets/models/Entities';
 
 interface ProcessResources {

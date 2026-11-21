@@ -1,6 +1,6 @@
 import { CosEvent } from './Entities';
-import { checkSchedule, eventEnd } from '../domain/schedule/Schedule';
-import { requiredName } from '../domain/plans/Rules';
+import { checkSchedule, eventEnd } from './Schedule';
+import { requiredName } from './Rules';
 
 export class DeviceCalendarDraft {
     title: string = '';

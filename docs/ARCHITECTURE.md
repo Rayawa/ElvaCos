@@ -44,24 +44,13 @@ RDB 保存结构化元数据，Preferences 保存主题、触觉、单手偏好�
 
 ## 目录与责任
 
-entry/src/main/ets/
-- ability/entry、backup：Stage 入口、后台与销毁清理、系统备份
-- pages/Dashboard：五个 Tab 的 HdsNavigation/NavPathStack、覆盖详情、启动与维护调度
-- pages/main/：五个一级业务页面
-- pages/detail/：角色、计划、装备、活动、照片、参考图详情
-- pages/more/：SettingsPage、DevPage、ExpenseSummaryPage、AppLogPage、LocalHtmlPage
-- component/：复用的 HDS 导航/卡片/设置、表单字段、照片网格、活动日历与 charts 下的 Canvas 图表
-- common/：appState 公共存储边界、constants 公共常量、types、主题/日期/反馈、偏好和系统能力
-- model/：ApplicationState、实体、领域规则、ProjectRoute 与 EditDraft
-- data/database/：schema、递增迁移、连接和事务
-- data/repository/：结构化持久化、关系查询与 MetadataBackupRepository 的版本化元数据/恢复事务
-- data/media/：选中媒体导入、缩略图、原文件清理
+- `entry/src/main/ets/index.ets` 注册五个 Tab 和详情路由，负责启动、维护调度与应用级弹层。
+- `ability` 提供 Stage 与备份入口。`pages` 编排页面，`views` 组合业务区块，`components` 放复用控件。
+- `viewmodels` 管理应用状态、表单及可观察的路由状态。`models` 保存实体、业务规则和派生数据。
+- `services` 封装系统能力及持久化。数据库与仓储放在 `services/storage`。
+- `ui` 管理主题、图标、反馈、原生弹层和布局能力。`utils` 放无状态格式化工具。
 
-设置使用 `component/DashboardSplitLayout`：在实际内容宽度达到 Theme.wideBreakpoint（840vp）且高度至少 600vp 时复用 Dashboard 的固定概览 / 独立滚动分栏，4:6 权重和 1440vp 最大宽度。页面仅提供业务 builder 与 Scroller，不维护另一套导航、颜色或反馈。首页在 D 阶段采用单列三区块；主路由仍为 Stack，未承诺覆盖式详情的大屏双栏。
-
-`common/scroll` 原样复用 Dashboard 的轴事件转发，五个主页与设置复用各自 Scroller；页面不访问输入设备服务或申请全局监听权限。首页与完整待办共用模型层 TaskQueue，列表动作通过带上下文的路由回到对象的家；页面不直接持有实体仓库。
-
-@ObservedV2 / @Trace 应用状态承担异步状态与 UI 刷新；实体使用明确 ArkTS 类型。表单草稿序列化使用显式普通对象快照，避免原生观察属性不可枚举导致启动与草稿恢复失败。不使用 any、动态属性或解构逃避 ArkTS 检查。
+设置与首页使用 `views/DashboardSplitLayout.ets` 编排宽屏概览与滚动内容。`ui/scroll.ets` 向页面各自的 Scroller 转发滚动轴事件。应用状态使用 @ObservedV2 / @Trace，页面通过 @Require @Param 注入。表单草稿沿用显式快照序列化，仓储负责数据写入，视图通过应用状态执行操作。
 
 ## 首版实施过程（历史）
 

@@ -4,7 +4,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { display, window } from '@kit.ArkUI';
 import { KeyCode } from '@kit.InputKit';
 import { describe, beforeAll, beforeEach, afterAll, afterEach, it, expect } from '@ohos/hypium';
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 
 // 在每个真实设备类型上分别执行；2in1 还必须实际跨越窗口断点，不能以手机画布代替。
 export default function responsiveInputTest(): void {

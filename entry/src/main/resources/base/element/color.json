@@ -79,6 +79,22 @@
     {
       "name": "v3_accent_purple",
       "value": "#FF7048E8"
+    },
+    {
+      "name": "v3_success_bg",
+      "value": "#1600875A"
+    },
+    {
+      "name": "v3_warning_bg",
+      "value": "#16B54708"
+    },
+    {
+      "name": "v3_danger_bg",
+      "value": "#16CF2634"
+    },
+    {
+      "name": "v3_notice_bg",
+      "value": "#16007D8A"
     }
   ]
 }

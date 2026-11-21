@@ -1,9 +1,9 @@
 import { deviceCalendarDraft } from '../main/ets/models/DeviceCalendar';
 import { describe, it, expect } from '@ohos/hypium';
 import { CosEvent } from '../main/ets/models/Entities';
-import { calendarDays, eventsOnDate, checkSchedule, reminderTime } from '../main/ets/domain/schedule/Schedule';
+import { calendarDays, eventsOnDate, checkSchedule, reminderTime } from '../main/ets/models/Schedule';
 import { makePreparation, preparationKeys } from '../main/ets/models/Preparation';
-import { EventSaveCoordinator } from '../main/ets/services/calendar/EventSaveCoordinator';
+import { EventSaveCoordinator } from '../main/ets/services/EventSaveCoordinator';
 
 export default function planningRulesTest(): void {
 

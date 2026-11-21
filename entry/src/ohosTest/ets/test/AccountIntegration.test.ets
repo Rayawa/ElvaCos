@@ -1,6 +1,6 @@
 import { Driver, ON } from '@kit.TestKit';
 import { describe, it, expect } from '@ohos/hypium';
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 /** Explicit opt-in boundary check; the deferred account feature never opens authentication. */
 
 export default function accountIntegrationTest(): void {

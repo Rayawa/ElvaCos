@@ -66,7 +66,7 @@ def main():
     # These two source manifests contain standard JSON, despite their json5 suffix.
     app = json.loads((ROOT / 'AppScope/app.json5').read_text())['app']
     module = json.loads((ROOT / 'entry/src/main/module.json5').read_text())['module']
-    constants = (ROOT / 'entry/src/main/ets/config/constants.ets').read_text()
+    constants = (ROOT / 'entry/src/main/ets/models/constants.ets').read_text()
     require(re.search(r"APP_VERSION = '([^']+)'", constants)[1] == app['versionName'],
             'APP_VERSION/source mismatch')
     require(int(re.search(r'APP_BUILD_NUMBER = (\d+)', constants)[1]) == app['versionCode'],

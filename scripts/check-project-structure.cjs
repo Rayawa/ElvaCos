@@ -19,23 +19,35 @@ for (const file of files) {
         assert((line.match(/^ */)[0].length % 4) === 0, `${file}:${index + 1}: indentation must use four spaces`);
     });
 }
-for (const old of ['common', 'component', 'model', 'data', 'pages/more']) assert(!fs.existsSync(path.join(root, old)), `mixed directory remains: ${old}`);
+const layers = ['ability', 'components', 'models', 'pages', 'services', 'ui', 'utils', 'viewmodels', 'views'];
+const rootEntries = fs.readdirSync(root, { withFileTypes: true });
+assert.deepEqual(rootEntries.filter(entry => entry.isFile()).map(entry => entry.name), ['index.ets']);
+assert.deepEqual(rootEntries.filter(entry => entry.isDirectory()).map(entry => entry.name).sort(), layers);
+for (const layer of layers) {
+    const subdirectories = fs.readdirSync(path.join(root, layer), { withFileTypes: true })
+        .filter(entry => entry.isDirectory()).map(entry => entry.name);
+    assert.deepEqual(subdirectories, layer === 'services' ? ['storage'] : [], `${layer}: keep the ETS layout flat`);
+}
 const read = name => fs.readFileSync(path.join(root, name), 'utf8');
-assert.match(read('pages/Dashboard.ets'), /onBackPress\(\): boolean/);
-assert.match(read('pages/Dashboard.ets'), /handleSheetBack\(\)/);
-assert.match(read('components/navigation/DetailDestination.ets'), /\.onBackPressed\(/);
-assert.match(read('components/navigation/DetailDestination.ets'), /this\.foreground = false/);
-assert.match(read('components/navigation/DetailDestination.ets'), /SUPPORTS_API_26/);
-assert.match(read('components/navigation/HdsViewTabs.ets'), /HdsTabs\(/);
-assert.match(read('pages/Dashboard.ets'), /root-action-设置/);
-assert(!read('components/common/SheetHeader.ets').includes('Text(this.hint)'), 'sheet titles must not stack a subtitle');
+const mainPages = JSON.parse(fs.readFileSync(path.resolve(root, '../resources/base/profile/main_pages.json'), 'utf8'));
+assert.deepEqual(mainPages.src, ['index']);
+assert.match(read('ability/entry.ets'), /loadContent\('index',/);
+assert.match(read('index.ets'), /^@Entry\b/m);
+assert.match(read('index.ets'), /onBackPress\(\): boolean/);
+assert.match(read('index.ets'), /handleSheetBack\(\)/);
+assert.match(read('components/DetailDestination.ets'), /\.onBackPressed\(/);
+assert.match(read('components/DetailDestination.ets'), /this\.foreground = false/);
+assert.match(read('components/DetailDestination.ets'), /SUPPORTS_API_26/);
+assert.match(read('components/HdsViewTabs.ets'), /HdsTabs\(/);
+assert.match(read('index.ets'), /root-action-设置/);
+assert(!read('components/SheetHeader.ets').includes('Text(this.hint)'), 'sheet titles must not stack a subtitle');
 for (const name of ['ProjectDetailPage', 'CharacterDetailPage']) {
-    const source = read('pages/detail/' + name + '.ets');
+    const source = read('pages/' + name + '.ets');
     for (const match of source.matchAll(/EntryCollectionView\(\{([\s\S]*?)\}\)/g)) assert.match(match[1], /embedded:\s*true/, `${name}: do not mount an editor sheet inside an owner sheet`);
 }
 // Event's collection is a full-page view, so it owns an editor host only while
 // the event's tool host is absent. Collections inside owner sheets stay embedded.
-const event = read('pages/detail/EventDetailPage.ets');
+const event = read('pages/EventDetailPage.ets');
 assert.match(event, /if \(!this\.route\.dayMode && this\.route\.section === 2 && !this\.nativeSheetVisible\(\)\) \{\s*EntryCollectionView\(\{ embedded: false/);
 assert.match(event, /EntryCollectionView\(\{ embedded: true/);
 assert.match(event, /\.bindSheet\(this\.nativeSheetVisible\(\),/);

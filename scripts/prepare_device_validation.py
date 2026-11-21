@@ -33,24 +33,24 @@ def replace_once(relative, old, new):
 
 root = 'entry/src/main/ets/'
 try:
-    replace_once(root + 'services/storage/database/Database.ets',
+    replace_once(root + 'services/storage/Database.ets',
                  "constructor(name: string = 'personal.db')",
                  f"constructor(name: string = '{namespace}.db')")
-    replace_once(root + 'services/media/MediaRepository.ets',
+    replace_once(root + 'services/MediaRepository.ets',
                  "testRoot || context.filesDir + '/media'",
                  f"testRoot || context.filesDir + '/{namespace}-media'")
     # Also isolate legacy migration reads, account, drafts and every setting.
-    constants = target / root / 'config/constants.ets'
+    constants = target / root / 'models/constants.ets'
     text = constants.read_text()
     pattern = r"(export const (?:LEGACY_APP_SETTINGS_FILE_NAME|LEGACY_PROFILE_FILE_NAME|LEGACY_SETTINGS_FILE_NAME|STORAGE_FILE_NAME) = )'([^']+)';"
     text, count = re.subn(pattern, lambda match: match[1] + "'" + namespace + "-" + match[2] + "';", text)
     if count != 4:
         raise RuntimeError('Expected all four preference file boundaries')
     constants.write_text(text)
-    replace_once(root + 'services/settings/storage.ets',
+    replace_once(root + 'services/storage.ets',
                  "getDiskStorageInstance('settings', ctx)",
                  f"getDiskStorageInstance('{namespace}-settings', ctx)")
-    replace_once(root + 'pages/Dashboard.ets',
+    replace_once(root + 'index.ets',
                  'await this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext);',
                  'await this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext);\n'
                  "            if (this.state.ready) { console.info('[ElvaCosValidation] data-ready'); }")

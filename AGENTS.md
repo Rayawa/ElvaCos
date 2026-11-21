@@ -5,7 +5,7 @@
 ## 平台与交互
 
 - 原生 HarmonyOS / ArkTS / ArkUI / Stage；目标 API26，最低兼容 API20。
-- 参照 Rayawa/dashboard 的平台判断方式。新 API 先在 `config/platformCompatibility.ets` 判断，不能在旧系统启动路径解析新枚举或调用新方法。API26 的 apiAvailable 不能用于 API20 的基础判断。
+- 参照 Rayawa/dashboard 的平台判断方式。新 API 先在 `ui/platformCompatibility.ets` 判断，不能在旧系统启动路径解析新枚举或调用新方法。API26 的 apiAvailable 不能用于 API20 的基础判断。
 - 主页面使用 HdsTabs，页内内容使用原生 SegmentButtons；二级页面内切换使用 HdsTabs。
 - 工具操作使用 HDS 标题栏菜单按钮，底部 HdsTabs 只承担视图切换。
 - 二级目的地每次显示都播放进场动画，包括缓存后返回；返回控制由入口 onBackPress 与 DetailDestination.onBackPressed 共同承担。
@@ -15,13 +15,12 @@
 
 ## 文件职责
 
-- `pages/main` 放五个根页；其他页面按 detail、settings、ledger、search、entries、tasks 归属。
-- `components/<业务>` 放组件；页面负责编排、加载、路由与生命周期。
-- `domain/<业务>` 放纯业务规则；`models` 放类型、路由与列表数据源。
-- `services/<能力>` 放系统集成与持久化；`state` 放应用状态与表单会话。
-- `ui/<用途>` 放主题、导航反馈、动画和 Sheet 生命周期；`config` 放常量与平台判断；`utils` 放非 UI 通用工具。
-- 使用四空格缩进。避免重复业务计算、页面中遍历全量关联集合、在 build 中进行 I/O。重用模型层派生数据和索引。
-- 不创建混合职责的 common、component、pages/more 目录，不把页面拆成只转发参数的包装层。
+- `index.ets` 是 ETS 根目录的唯一文件，承担五个 Tab、路由注册和页面生命周期。
+- `ability` 放 Stage 与备份入口。`pages` 放完整页面，`views` 放业务视图，`components` 放可复用控件。
+- `viewmodels` 放应用状态、表单会话和可观察的页面状态。`models` 放实体及纯业务规则。
+- `services` 放系统集成和持久化，数据库及仓储归 `services/storage`。
+- `ui` 放主题、图标、交互反馈、动画、布局及平台 UI 能力。`utils` 放无状态通用工具。
+- 目录默认平铺。使用四空格缩进，重用模型层派生数据和索引，避免在 build 中执行 I/O 或重复遍历全量关联集合。
 
 ## 数据与验证
 

@@ -1,5 +1,5 @@
 import { newId, ManagedMedia } from './Entities';
-import { safeUrl } from '../domain/plans/Rules';
+import { safeUrl } from './Rules';
 
 export const ENTRY_KINDS: string[] = ['link', 'ticket', 'map', 'note', 'idea', 'image'];
 

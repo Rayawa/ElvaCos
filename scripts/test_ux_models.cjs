@@ -20,12 +20,12 @@ let mediaControl = {};
 let shareControl = {};
 
 Module._load = function (id, parent, isMain) {
-  if (parent?.filename.endsWith('/services/share/ShareService.ets')) {
+  if (parent?.filename.endsWith('/services/ShareService.ets')) {
     if (id.endsWith('/SystemCapability')) return { SystemCapability: { share: () => shareControl.available !== false } };
     if (id === '@kit.ArkData') return { uniformTypeDescriptor: { UniformDataType: { PLAIN_TEXT: 'text/plain' } } };
     if (id === '@kit.ShareKit') return { systemShare: { SharedData: class { constructor(value) { Object.assign(this, value); } }, ShareController: class { constructor(value) { this.value = value; } async show() { if (shareControl.fail) throw new Error('share rejected'); shareControl.data = this.value; } }, SharePreviewMode: { DETAIL: 'detail' } } };
   }
-  if (parent?.filename.endsWith('/services/media/MediaRepository.ets')) {
+  if (parent?.filename.endsWith('/services/MediaRepository.ets')) {
     if (id === '@kit.MediaLibraryKit') return { photoAccessHelper: { PhotoViewPicker: class { async select(options) { mediaControl.pickerOptions = options; return { photoUris: mediaControl.selection || [] }; } }, PhotoViewMIMETypes: { IMAGE_TYPE: 'image' } } };
     if (id === '@kit.CoreFileKit') return { fileUri: { getUriFromPath: path => 'file://' + path }, fileIo: {
       OpenMode: { READ_ONLY: 1, CREATE: 2, WRITE_ONLY: 4, TRUNC: 8 },
@@ -33,7 +33,7 @@ Module._load = function (id, parent, isMain) {
       mkdir: async path => mediaControl.files.add(path), open: async (path, mode) => { if (mode === 1 && !mediaControl.files.has(path)) throw new Error('file missing'); mediaControl.files.add(path); return { fd: path }; },
       close: async () => {}, stat: async () => ({ size: 10 }), copyFile: async (fd, path) => mediaControl.files.add(path),
       write: async (fd, packed) => mediaControl.shortWrite ? packed.byteLength - 1 : packed.byteLength,
-      unlink: async path => { mediaControl.removed.push(path); mediaControl.files.delete(path); }, listFile: async dir => [...mediaControl.files].filter(path => path.startsWith(dir + '/')).map(path => path.slice(dir.length + 1))
+      unlink: async path => { if (mediaControl.unlinkDenied === path) throw new Error('unlink denied'); mediaControl.removed.push(path); mediaControl.files.delete(path); }, listFile: async dir => [...mediaControl.files].filter(path => path.startsWith(dir + '/')).map(path => path.slice(dir.length + 1))
     } };
     if (id === '@kit.ImageKit') return { image: {
       createImageSource: () => ({ getImageInfo: async () => ({ size: { width: 1000, height: 2000 } }), createPixelMap: async options => { mediaControl.desired = options.desiredSize; return { release: () => {} }; }, release: () => {} }),
@@ -41,13 +41,13 @@ Module._load = function (id, parent, isMain) {
     } };
   }
   if (id === '@kit.ArkTS') return { util: { generateRandomUUID: () => crypto.randomUUID(), TextEncoder: { create: () => ({ encodeInto: value => new Uint8Array(Buffer.from(value, 'utf8')) }) }, TextDecoder: class { decodeToString(bytes) { return Buffer.from(bytes).toString('utf8'); } } } };
-  if (id === '@kit.CoreFileKit' && parent?.filename.endsWith('/services/backup/BackupService.ets')) return { fileIo: { OpenMode: { READ_ONLY: 1, WRITE_ONLY: 2, TRUNC: 4 }, open: async () => ({ fd: 1 }), close: async fd => backupFileControl.close?.(fd), write: async (fd, buffer) => backupFileControl.write(fd, buffer), read: async (fd, buffer, options) => backupFileControl.read(fd, buffer, options), stat: async () => ({ size: backupFileControl.bytes?.length || 0 }) }, picker: { DocumentViewPicker: class { async save() { return backupFileControl.save?.() || []; } async select() { return backupFileControl.select?.() || []; } } } };
+  if (id === '@kit.CoreFileKit' && parent?.filename.endsWith('/services/BackupService.ets')) return { fileIo: { OpenMode: { READ_ONLY: 1, WRITE_ONLY: 2, TRUNC: 4 }, open: async () => ({ fd: 1 }), close: async fd => backupFileControl.close?.(fd), write: async (fd, buffer) => backupFileControl.write(fd, buffer), read: async (fd, buffer, options) => backupFileControl.read(fd, buffer, options), stat: async () => ({ size: backupFileControl.bytes?.length || 0 }) }, picker: { DocumentViewPicker: class { async save() { return backupFileControl.save?.() || []; } async select() { return backupFileControl.select?.() || []; } } } };
   if (id === '@kit.ArkData') return { relationalStore: { RdbPredicates: class {
     constructor(table) { this.table = table; this.terms = []; }
     equalTo(key, value) { this.terms.push([key, value]); return this; }
   } } };
   if (id === 'BuildProfile') return { DEBUG: false };
-  if (parent?.filename.endsWith('/state/ApplicationState.ets')) {
+  if (parent?.filename.endsWith('/viewmodels/ApplicationState.ets')) {
     if (id.endsWith('/storage')) return { setLastMetadataExport: async value => { if (failExportTime) throw new Error('preferences unavailable'); metadataExportTime = value; }, getLastMetadataExport: async () => metadataExportTime };
     if (id.endsWith('/formDrafts')) return { formDraftStore: { clear: async () => {} } };
     const nativeService = ['DeviceCalendarService', 'EventReminderService', 'SettingsService', 'AccountService', 'HapticService', 'GripService', 'BackupService', 'MediaRepository', 'DemoDataRepository'].find(name => id.endsWith('/' + name));
@@ -72,26 +72,26 @@ global.Computed = () => undefined;
 const root = path.resolve(__dirname, '../entry/src/main/ets');
 const entities = require(root + '/models/Entities.ets');
 const { CosProject, ProjectStatus, Asset, AssetStatus, ProjectAsset, ChecklistItem, PhotoAsset, PhotoStatus, CosEvent } = entities;
-const day = require(root + '/domain/schedule/DayMode.ets');
-const { PreparationUndo, PREPARATION_UNDO_MS, usablePreparationUndo, visiblePreparationUndos, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, homeTaskCapacity } = require(root + '/domain/home/HomeSummary.ets');
-const { AppState } = require(root + '/state/ApplicationState.ets');
-const { EditDraft } = require(root + '/state/forms/EditDraft.ets');
-const { FormDraftStore, formDraftKey } = require(root + '/state/forms/FormDraftStore.ets');
-const { FormSession } = require(root + '/state/forms/FormSession.ets');
-const { ScheduleRoute } = require(root + '/models/ScheduleRoute.ets');
-const { deadlineTasksOnDate, buildScheduleView, scheduleTaskRoute } = require(root + '/domain/schedule/ScheduleView.ets');
-const { scheduleGroups } = require(root + '/domain/schedule/Schedule.ets');
-const { EventSaveCoordinator } = require(root + '/services/calendar/EventSaveCoordinator.ets');
-const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/domain/tasks/TaskQueue.ets');
-const { LedgerRoute } = require(root + '/models/LedgerRoute.ets');
-const { ledgerRange, buildLedgerSummary } = require(root + '/domain/ledger/LedgerSummary.ets');
-const { PlanListRoute, filterPlanList } = require(root + '/models/PlanListRoute.ets');
+const day = require(root + '/models/DayMode.ets');
+const { PreparationUndo, PREPARATION_UNDO_MS, usablePreparationUndo, visiblePreparationUndos, homeCandidates, advanceHomeSnapshot, reconcileHomeRows, homeTaskCapacity } = require(root + '/models/HomeSummary.ets');
+const { AppState } = require(root + '/viewmodels/ApplicationState.ets');
+const { EditDraft } = require(root + '/viewmodels/EditDraft.ets');
+const { FormDraftStore, formDraftKey } = require(root + '/viewmodels/FormDraftStore.ets');
+const { FormSession } = require(root + '/viewmodels/FormSession.ets');
+const { ScheduleRoute } = require(root + '/viewmodels/ScheduleRoute.ets');
+const { deadlineTasksOnDate, buildScheduleView, scheduleTaskRoute } = require(root + '/models/ScheduleView.ets');
+const { scheduleGroups, schedulePhase } = require(root + '/models/Schedule.ets');
+const { EventSaveCoordinator } = require(root + '/services/EventSaveCoordinator.ets');
+const { buildTaskQueue, TaskRoute, filterTaskQueue } = require(root + '/models/TaskQueue.ets');
+const { LedgerRoute } = require(root + '/viewmodels/LedgerRoute.ets');
+const { ledgerRange, buildLedgerSummary } = require(root + '/models/LedgerSummary.ets');
+const { PlanListRoute, filterPlanList } = require(root + '/viewmodels/PlanListRoute.ets');
 const { PreparationTask } = require(root + '/models/Preparation.ets');
 const { Expense } = require(root + '/models/Planning.ets');
-const { buildPlanReadiness, budgetLabel } = require(root + '/domain/plans/PlanReadiness.ets');
-const { photoStage, portfolioStage } = require(root + '/domain/plans/Rules.ets');
-const { photoDistribution } = require(root + '/domain/statistics/Statistics.ets');
-const { executeOperation, operationCommitted } = require(root + '/domain/operations/OperationResult.ets');
+const { buildPlanReadiness, budgetLabel } = require(root + '/models/PlanReadiness.ets');
+const { photoStage, portfolioStage } = require(root + '/models/Rules.ets');
+const { photoDistribution } = require(root + '/models/Statistics.ets');
+const { executeOperation, operationCommitted } = require(root + '/models/OperationResult.ets');
 // A real isolated SQLite connection exercises the actual backup repository and
 // migration SQL. The adapter only translates RDB result accessors and RPC.
 const { spawn } = require('node:child_process');
@@ -156,7 +156,7 @@ const expenses = [Object.assign(new Expense(), { projectId: 'p', amountCents: 12
 const photos = Object.values(PhotoStatus).map(status => Object.assign(new PhotoAsset(), { projectId: 'p', status }));
 const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], photos, expenses, [event], '2026-12-31');
 (async () => {
-  const { globalSearch, searchRows, SearchRoute } = require(root + '/domain/search/GlobalSearch.ets');
+  const { globalSearch, searchRows, SearchRoute } = require(root + '/models/GlobalSearch.ets');
   function searchFixture() {
     const state = new AppState();
     state.characters = [Object.assign(new entities.Character(), { id: 'role-search', name: '雪', workName: 'SNOW', description: '旅行' })];
@@ -217,7 +217,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   await test('collection return paths preserve filters, unsaved capture and nearby offset; leaving results gives honest feedback', () => {
     const { CollectedEntry, InboxRoute } = require(root + '/models/CollectedEntry.ets');
-    const { EventRoute, EventReturnPath } = require(root + '/models/EventRoute.ets');
+    const { EventRoute, EventReturnPath } = require(root + '/viewmodels/EventRoute.ets');
     const route = new InboxRoute(); route.setUntriagedOnly(false); route.setKind('map'); route.content='尚未收录的想法'; route.offset=640; route.anchorId='ticket';
     const event = new EventRoute('expo'); event.returnPaths.push(new EventReturnPath('inbox',route));
     const restored=event.returnPaths[0].param; restored.restoreVersion++; restored.reconcile([Object.assign(new CollectedEntry(),{id:'ticket',kind:'map',scopeKind:'event',scopeId:'expo'})]);
@@ -225,7 +225,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     restored.reconcile([]); assert.equal(route.anchorId,''); assert.match(route.feedback,/当前范围/); assert.equal(route.offset,640); assert.equal(route.kind,'map');
     const generation=route.restoreVersion; route.setKind('invalid'); assert.equal(route.restoreVersion,generation); route.setKind('map'); assert.equal(route.offset,640);
     route.setKind('ticket'); assert.equal(route.offset,0); assert.equal(route.feedback,''); assert.equal(route.restoreVersion,generation+1); assert.equal(route.content,'尚未收录的想法');
-    const { ProjectRoute }=require(root+'/models/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/models/CharacterRoute.ets'),{ AssetRoute }=require(root+'/models/AssetRoute.ets');
+    const { ProjectRoute }=require(root+'/viewmodels/ProjectRoute.ets'),{ CharacterRoute }=require(root+'/viewmodels/CharacterRoute.ets'),{ AssetRoute }=require(root+'/viewmodels/AssetRoute.ets');
     for(const owner of [new ProjectRoute('plan'),new CharacterRoute('role'),event,new AssetRoute('equipment')]) {
       const entries=owner.entries; entries.setKind('link'); entries.content='尚未收录'; entries.offset=400;
       const roundTrip=new EventReturnPath('inbox',entries); roundTrip.param.restoreVersion++;
@@ -260,7 +260,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('actual plan timing persistence can be cleared, rejects invalid time and retains edits after write failure; committed refresh failure is never resubmitted', async () => {
-    const { db,state }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/services/storage/repositories/Repositories.ets'); const repo=new CosProjectRepository(db);
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/services/storage/Repositories.ets'); const repo=new CosProjectRepository(db);
     try {
       state.projectRepo=repo; state.characters=[Object.assign(new entities.Character(),{id:'role',name:'角色'})];
       const refresh=async()=>{state.projects=await repo.list();}; state.refresh=refresh; await refresh();
@@ -274,7 +274,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('v8 plan timing backup round trips, v7 defaults empty, and invalid or interrupted replacement preserves the original record', async () => {
-    const { db }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/services/storage/repositories/Repositories.ets'); const { MetadataBackupRepository }=require(root+'/services/storage/repositories/MetadataBackupRepository.ets'); const repo=new CosProjectRepository(db),backup=new MetadataBackupRepository(db);
+    const { db }=await wardrobeFixture(); const { CosProjectRepository }=require(root+'/services/storage/Repositories.ets'); const { MetadataBackupRepository }=require(root+'/services/storage/MetadataBackupRepository.ets'); const repo=new CosProjectRepository(db),backup=new MetadataBackupRepository(db);
     try {
       const plan=(await repo.list()).find(plan=>plan.id==='p1'); plan.shootingTime='00:00'; await repo.save(plan); const saved=await backup.exportMetadata(); assert.equal(JSON.parse(saved).version,8);
       const old=JSON.parse(saved); old.version=7; for(const row of old.tables.find(table=>table.name==='projects').rows) { delete row.shooting_time; } await backup.restoreMetadata(JSON.stringify(old)); assert.equal((await repo.list()).find(plan=>plan.id==='p1').shootingTime,'');
@@ -338,6 +338,10 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const future = Object.assign(new CosEvent(), { id: 'future', date: '2026-10-12' });
     const ended = Object.assign(new CosEvent(), { id: 'ended', date: '2026-10-01' });
     assert.deepEqual(scheduleGroups([future, ended, pending, dayEvent], '2026-10-09').map(g => g.events.map(e => e.id)), [['day'], ['future'], ['pending'], ['ended']]);
+    assert.equal(schedulePhase(dayEvent, '2026-10-09'), 'today');
+    assert.equal(schedulePhase(dayEvent, '2026-10-10'), 'today');
+    assert.equal(schedulePhase(dayEvent, '2026-10-11'), 'past');
+    assert.equal(schedulePhase(Object.assign(new CosEvent(), dayEvent, { status: 'Attended' }), '2026-10-09'), 'past');
   });
   await test('schedule route shares its selected day across modes, clamps month navigation and retains source offsets', () => {
     const route = new ScheduleRoute('2024-01-31');
@@ -493,8 +497,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
           }
         }
       };
-      const observedModule = new Module(root + '/state/forms/EditDraft.ets', module);
-      observedModule.filename = root + '/state/forms/EditDraft.ets';
+      const observedModule = new Module(root + '/viewmodels/EditDraft.ets', module);
+      observedModule.filename = root + '/viewmodels/EditDraft.ets';
       require.extensions['.ets'](observedModule, observedModule.filename);
       const NativeDraft = observedModule.exports.EditDraft, draft = new NativeDraft();
       assert.equal(Object.keys(draft).length, 0);
@@ -661,7 +665,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(portfolioStage(photos, 5).length, 2); assert.equal(portfolioStage(photos, 7)[0].status, PhotoStatus.PUBLISHED);
   });
   await test('album uses shared readiness counts and effective plan dates, including completed and undated plans', () => {
-    const { buildAlbumSummary } = require(root + '/domain/photos/AlbumSummary.ets');
+    const { buildAlbumSummary } = require(root + '/models/AlbumSummary.ets');
     const p2 = Object.assign(new CosProject(), { id: 'album-completed', name: '已完成', eventId: '', targetDate: '', status: ProjectStatus.COMPLETED });
     const scoped = photos.map(photo => Object.assign(new PhotoAsset(), photo, { projectId: project.id }));
     const second = Object.assign(new PhotoAsset(), { id: 'second-final', projectId: p2.id, status: PhotoStatus.FINAL, createdAt: Date.now() });
@@ -675,8 +679,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.deepEqual(state.albumSummary.counts, summary.counts);
   });
   await test('album queue, plan scope and portfolio all query the same photo states and one vocabulary', () => {
-    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/models/PhotoCollection.ets');
-    const { PHOTO_FILTER_LABELS, PHOTO_EDIT_STATUSES, photoStatusLabel } = require(root + '/domain/photos/PhotoStages.ets');
+    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/viewmodels/PhotoCollection.ets');
+    const { PHOTO_FILTER_LABELS, PHOTO_EDIT_STATUSES, photoStatusLabel } = require(root + '/models/PhotoStages.ets');
     const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'album-' + index, projectId: index % 2 ? 'two' : 'one' }));
     const route = new PhotoCollectionRoute();
     assert.equal(selectPhotoCollection(input, route).length, 8);
@@ -690,9 +694,9 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(photoStatusLabel(PhotoStatus.IMPORTED), photoStatusLabel(PhotoStatus.RAW));
   });
   await test('100 plans, 1000 assets and 5000 photo metadata retain shared counts, scoped filters, row order and batch recovery', () => {
-    const { buildAlbumSummary } = require(root + '/domain/photos/AlbumSummary.ets');
-    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/models/PhotoCollection.ets');
-    const { groupPhotoRows } = require(root + '/domain/photos/PhotoRows.ets');
+    const { buildAlbumSummary } = require(root + '/models/AlbumSummary.ets');
+    const { PhotoCollectionRoute, selectPhotoCollection } = require(root + '/viewmodels/PhotoCollection.ets');
+    const { groupPhotoRows } = require(root + '/models/PhotoRows.ets');
     const statuses = [PhotoStatus.IMPORTED, PhotoStatus.RAW, PhotoStatus.SELECTED, PhotoStatus.WAITING, PhotoStatus.RETOUCHED, PhotoStatus.FINAL, PhotoStatus.PUBLISHED, PhotoStatus.ARCHIVED];
     const stageIndexes = [0, 0, 1, 2, 3, 4, 4, 5];
     const plans = Array.from({ length: 100 }, (_, index) => Object.assign(new CosProject(), { id: 'scale-plan-' + index, targetDate: index % 3 ? '2026-10-08' : '', status: index % 5 ? ProjectStatus.PLANNING : ProjectStatus.COMPLETED }));
@@ -703,7 +707,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const input = Array.from({ length: 5000 }, (_, index) => {
       const planIndex = index % 100, statusIndex = Math.floor(index / 100) % 8;
       expectedCounts[planIndex][stageIndexes[statusIndex]]++;
-      return Object.assign(new PhotoAsset(), { id: 'scale-photo-' + index, projectId: plans[planIndex].id, status: statuses[statusIndex] });
+      return Object.assign(new PhotoAsset(), { id: 'scale-photo-' + index, projectId: plans[planIndex].id, status: statuses[statusIndex],
+        createdAt: Math.floor(index / 101), thumbnailPath: '/scale-thumb-' + index });
     });
     const readAll = () => plans.map(plan => buildPlanReadiness(plan, [], [], equipment, links, input, [], [], '2026-10-08'));
     const readiness = readAll(), summary = buildAlbumSummary(readiness, plans, [], input);
@@ -740,16 +745,29 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       const times = Array.from({ length: samples }, () => { const start = performance.now(); action(); return performance.now() - start; }).sort((a, b) => a - b);
       return { medianMs: +times[Math.floor(times.length / 2)].toFixed(3), p95Ms: +times[Math.ceil(times.length * .95) - 1].toFixed(3), samples };
     }
+    const { buildProjectWork, workHistory } = require(root + '/models/ProjectWork.ets');
+    const state = new AppState();
+    Object.assign(state, { projects: plans, photos: input, links, assets: equipment, team: plans.flatMap(plan => [
+      { id: plan.id + '-1', projectId: plan.id, name: 'B', role: '摄影' },
+      { id: plan.id + '-2', projectId: plan.id, name: 'A', role: '摄影' }
+    ]) });
+    Object.defineProperty(state, 'readinessById', { value: new Map(readiness.map(value => [value.id, value])) });
+    const equipmentByPlan = plans.map(plan => state.projectAssets(plan.id));
+    const unindexedWorkCards = () => workHistory(plans.map((plan, index) => buildProjectWork(plan, readiness[index],
+      undefined, undefined, undefined, input, state.team, equipmentByPlan[index])));
+    assert.deepEqual(state.workCards, unindexedWorkCards());
     const timings = {
       planReadiness100: measure(readAll),
       albumSummary: measure(() => buildAlbumSummary(readiness, plans, [], input)),
+      workCardsFullScan: measure(unindexedWorkCards),
+      workCardsIndexed: measure(() => state.workCards),
       photoFilterAndRows5000: measure(() => groupPhotoRows(selectPhotoCollection(input, route), 2)),
       selectAllAndReconcile5000: measure(() => { route.selectedIds = []; route.selectAll(input); route.reconcile(input); route.selectAll(input); }, 12)
     };
     console.log('HOST_METADATA_TIMING ' + JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch, plans: 100, assets: 1000, photos: 5000, timings, scope: 'pure functions; no native observation, rendering, media decoding or database IO' }));
   });
   await test('photo batch freezes its actual selection, preserves it on failure, clears on committed success and explains filter changes', () => {
-    const { PhotoCollectionRoute } = require(root + '/models/PhotoCollection.ets');
+    const { PhotoCollectionRoute } = require(root + '/viewmodels/PhotoCollection.ets');
     const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'batch-' + index, projectId: project.id }));
     const route = new PhotoCollectionRoute(project.id); route.selecting = true; route.targetStatus = PhotoStatus.WAITING; route.setFilter(1); route.selectAll(input);
     assert.deepEqual(route.selectedIds, ['batch-0', 'batch-1']); const submitted = route.begin(input); assert.deepEqual(submitted, route.selectedIds);
@@ -761,8 +779,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.selectAll(input); assert.equal(route.selectedIds.length, 1); route.setPlan('different'); assert.deepEqual(route.selectedIds, []);
   });
   await test('album mode and photo viewer retain separate filters, collection offsets and source thumbnail identities', () => {
-    const { AlbumRoute } = require(root + '/models/AlbumRoute.ets');
-    const { PhotoViewerRoute, returnToPhotoCollection } = require(root + '/models/PhotoCollection.ets');
+    const { AlbumRoute } = require(root + '/viewmodels/AlbumRoute.ets');
+    const { PhotoViewerRoute, returnToPhotoCollection } = require(root + '/viewmodels/PhotoCollection.ets');
     const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'return-' + index, projectId: project.id }));
     const route = new AlbumRoute(project.id); route.groupOffset = 450; route.byPlan.offset = 820; route.byPlan.setFilter(1); route.byPlan.offset = 820;
     const viewer = new PhotoViewerRoute(input[0].id, 'album', route.byPlan, input);
@@ -773,8 +791,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     input[0].status = PhotoStatus.FINAL; returnToPhotoCollection(viewer, input); assert.match(route.byPlan.feedback, /离开当前筛选/); assert.equal(route.byPlan.offset, 820);
   });
   await test('native secondary view gates keep the active photo collection during actual batch submission and release after failure or commit', async () => {
-    const { AlbumRoute } = require(root + '/models/AlbumRoute.ets');
-    const { ProjectRoute } = require(root + '/models/ProjectRoute.ets');
+    const { AlbumRoute } = require(root + '/viewmodels/AlbumRoute.ets');
+    const { ProjectRoute } = require(root + '/viewmodels/ProjectRoute.ets');
     const input = photos.map((photo, index) => Object.assign(new PhotoAsset(), photo, { id: 'view-gate-' + index, projectId: project.id }));
     const album = new AlbumRoute(project.id); album.byPlan.offset = 480; album.byPlan.filter = 1;
     const plan = new ProjectRoute(project.id, 3); plan.photos.offset = 620; plan.photos.filter = 1;
@@ -796,7 +814,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.deepEqual(album.byPlan.selectedIds, []); assert.deepEqual(plan.photos.selectedIds, []); assert.equal(plan.canShowSection(2), true);
   });
   await test('album removes only a deleted plan scope while preserving valid queue filters and restoring a reachable collection', () => {
-    const { AlbumRoute } = require(root + '/models/AlbumRoute.ets');
+    const { AlbumRoute } = require(root + '/viewmodels/AlbumRoute.ets');
     const route = new AlbumRoute('gone'); route.byPlan.filter = 5; route.byPlan.selectedIds = ['lost-photo'];
     route.queue.planId = project.id; route.queue.filter = 3; route.queue.offset = 300;
     route.reconcile([project], photos);
@@ -837,7 +855,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.characters[0].cover = ''; assert.equal(state.projectWork('finished').coverPath, '');
   });
   await test('history and recent work use actual plan dates and completed status, never import or update time', () => {
-    const { workHistory, recentWork } = require(root + '/domain/plans/ProjectWork.ets'), state = workFixture();
+    const { workHistory, recentWork } = require(root + '/models/ProjectWork.ets'), state = workFixture();
     state.projects.push(Object.assign(new CosProject(), { id: 'undated', characterId: 'role', status: ProjectStatus.ARCHIVED, updatedAt: 999999999 }));
     assert.deepEqual(workHistory(state.workCards).map(work => work.value.projectId), ['future', 'finished', 'undated']);
     assert.equal(recentWork(state.workCards, '2026-10-08').value.projectId, 'finished');
@@ -847,7 +865,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.projects[0].status = ProjectStatus.COMPLETED; assert.equal(recentWork(state.workCards, '2026-10-08').value.projectId, 'future'); assert.equal(state.projectWork('missing'), undefined);
   });
   await test('character library searches and favorites use one flag and scoped versions and all plan history', () => {
-    const { filterCharacters } = require(root + '/domain/characters/CharacterLibrary.ets'), state = workFixture(), route = new PlanListRoute();
+    const { filterCharacters } = require(root + '/models/CharacterLibrary.ets'), state = workFixture(), route = new PlanListRoute();
     const summary = state.characterSummary('role'); assert.deepEqual(summary.variants, ['冬装']); assert.equal(summary.planCount, 2); assert.equal(state.characterSummary('other').planCount, 0);
     route.favoriteOnly = true; assert.deepEqual(filterCharacters(state.characters, route).map(character => character.id), ['role']);
     route.query = '作品'; assert.deepEqual(filterCharacters(state.characters, route).map(character => character.id), ['role']);
@@ -855,8 +873,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(state.characters[1].status, 'Wishlist'); assert.equal(state.characters[1].favorite, false);
   });
   await test('character route preserves sections, offsets and version context; drafts reject foreign or deleted versions', () => {
-    const { CharacterRoute } = require(root + '/models/CharacterRoute.ets'), state = workFixture(), route = new CharacterRoute('role', 'version');
-    route.section = 1; route.offsets[1] = 600; route.restoreVersion++; route.library = new PlanListRoute(); route.library.query = '作品'; route.library.favoriteOnly = true; route.library.anchorId = 'role'; route.library.offsets[0] = 900; route.project = new (require(root + '/models/ProjectRoute.ets').ProjectRoute)('p', 0); route.project.offsets[0] = 700; route.restoreSource(); assert.equal(route.library.restoreVersion, 1); assert.equal(route.project.restoreVersion, 1); assert.equal(route.library.query, '作品'); assert.equal(route.library.favoriteOnly, true); assert.equal(route.library.offsets[0], 900); assert.equal(route.project.offsets[0], 700); route.restoreSource(true); assert.equal(route.library.anchorId, ''); assert.equal(route.variantId, 'version'); assert.equal(route.section, 1); assert.equal(route.offsets[1], 600);
+    const { CharacterRoute } = require(root + '/viewmodels/CharacterRoute.ets'), state = workFixture(), route = new CharacterRoute('role', 'version');
+    route.section = 1; route.offsets[1] = 600; route.restoreVersion++; route.library = new PlanListRoute(); route.library.query = '作品'; route.library.favoriteOnly = true; route.library.anchorId = 'role'; route.library.offsets[0] = 900; route.project = new (require(root + '/viewmodels/ProjectRoute.ets').ProjectRoute)('p', 0); route.project.offsets[0] = 700; route.restoreSource(); assert.equal(route.library.restoreVersion, 1); assert.equal(route.project.restoreVersion, 1); assert.equal(route.library.query, '作品'); assert.equal(route.library.favoriteOnly, true); assert.equal(route.library.offsets[0], 900); assert.equal(route.project.offsets[0], 700); route.restoreSource(true); assert.equal(route.library.anchorId, ''); assert.equal(route.variantId, 'version'); assert.equal(route.section, 1); assert.equal(route.offsets[1], 600);
     const draft = EditDraft.make(state, 'project', '', route.id, route.variantId); assert.equal(draft.characterId, 'role'); assert.equal(draft.variantId, 'version'); assert.equal(draft.advanced, true); assert.deepEqual(draft.issues(state), []);
     const restored = EditDraft.fromJSON(draft.serialize()); assert.equal(restored.variantId, 'version');
     state.variants[0].characterId = 'other'; assert.ok(draft.issues(state).some(issue => issue.field === 'variantId'));
@@ -864,7 +882,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const invalid = EditDraft.make(state, 'project', '', 'role', 'gone'); assert.equal(invalid.variantId, 'gone'); assert.ok(invalid.issues(state).some(issue => issue.field === 'variantId'));
   });
   await test('structured sharing reuses the work card payload, excludes local paths and reports missing context or rejected native share', async () => {
-    const { ShareService } = require(root + '/services/share/ShareService.ets'), { projectShareText } = require(root + '/domain/plans/ProjectWork.ets'), state = workFixture();
+    const { ShareService } = require(root + '/services/ShareService.ets'), { projectShareText } = require(root + '/models/ProjectWork.ets'), state = workFixture();
     const card = state.projectWork('finished'); assert.equal(ShareService.object(card), card.value); const text = projectShareText(card.value);
     assert.match(text, /冬装/); assert.match(text, /摄影：伙伴/); assert.match(text, /123.45/); assert.match(text, /未计入支出/);
     state.context = {}; shareControl = {}; assert.equal(await state.shareProject('finished'), true);
@@ -876,7 +894,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.context = {}; assert.equal(await state.shareProject('gone'), false); assert.match(state.error, /已不存在/);
   });
   await test('wardrobe composes search, type, status and exact location without inventing an empty location', () => {
-    const { WardrobeRoute, wardrobeAssets, wardrobeLocations } = require(root + '/domain/wardrobe/Wardrobe.ets');
+    const { WardrobeRoute, wardrobeAssets, wardrobeLocations } = require(root + '/models/Wardrobe.ets');
     const route = new WardrobeRoute(); const data = [
       Object.assign(new Asset(), { id: 'a', name: 'Blue 假发', brand: '店铺', type: entities.AssetType.WIG, status: AssetStatus.ORDERED, location: ' 衣柜上层 ' }),
       Object.assign(new Asset(), { id: 'b', name: '蓝假发', type: entities.AssetType.WIG, status: AssetStatus.OWNED, location: '衣柜上层' }),
@@ -891,7 +909,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.clear(); assert.equal(route.filtered, false); assert.equal(wardrobeAssets(data, route).length, 4);
   });
   await test('asset usage shares active plan semantics and counts exact packing and collection impact', () => {
-    const { buildAssetUsage, assetUsesSegments, assetRemovalKey } = require(root + '/domain/wardrobe/Wardrobe.ets');
+    const { buildAssetUsage, assetUsesSegments, assetRemovalKey } = require(root + '/models/Wardrobe.ets');
     const a = Object.assign(new Asset(), { id: 'shared', status: AssetStatus.REPAIR, priceCents: 10000 });
     const plans = [Object.assign(new CosProject(), { id: 'live' }), Object.assign(new CosProject(), { id: 'done', status: ProjectStatus.COMPLETED }), Object.assign(new CosProject(), { id: 'archive', status: ProjectStatus.ARCHIVED })];
     const links = plans.map(plan => Object.assign(new ProjectAsset(), { projectId: plan.id, assetId: a.id }));
@@ -907,8 +925,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     const brief = buildAssetUsage(a.id, [plans[0]], [links[0]], [], [], [readiness[0]]); assert.equal(assetUsesSegments(a, brief), false); a.notes = '较长资料'; assert.equal(assetUsesSegments(a, brief), true);
   });
   await test('asset return routes restore wardrobe, plan, day and task contexts without changing their views', () => {
-    const { AssetRoute } = require(root + '/models/AssetRoute.ets'), { WardrobeRoute } = require(root + '/domain/wardrobe/Wardrobe.ets');
-    const { ProjectRoute } = require(root + '/models/ProjectRoute.ets'), { EventRoute } = require(root + '/models/EventRoute.ets');
+    const { AssetRoute } = require(root + '/viewmodels/AssetRoute.ets'), { WardrobeRoute } = require(root + '/models/Wardrobe.ets');
+    const { ProjectRoute } = require(root + '/viewmodels/ProjectRoute.ets'), { EventRoute } = require(root + '/viewmodels/EventRoute.ets');
     const wardrobe = new WardrobeRoute(); Object.assign(wardrobe, { query: '假发', status: AssetStatus.REPAIR, offset: 800, anchorId: 'a' });
     const plan = new ProjectRoute('p', 2); plan.outing = true; plan.offsets[2] = 900; plan.expandedCategories = ['category'];
     const dayRoute = new EventRoute('event', true, 1); dayRoute.offsets[5] = 500;
@@ -920,9 +938,9 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     route.restoreSource(true); assert.equal(wardrobe.anchorId, ''); assert.match(wardrobe.feedback, /已删除/); assert.equal(wardrobe.offset, 800); assert.equal(route.offsets[1], 400);
   });
   async function wardrobeFixture() {
-    const { AssetRepository, RelationRepository } = require(root + '/services/storage/repositories/Repositories.ets');
-    const { EntryRepository } = require(root + '/services/storage/repositories/EntryRepository.ets'); const db = new SqliteAdapter();
-    for (const match of fs.readFileSync(root + '/services/storage/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
+    const { AssetRepository, RelationRepository } = require(root + '/services/storage/Repositories.ets');
+    const { EntryRepository } = require(root + '/services/storage/EntryRepository.ets'); const db = new SqliteAdapter();
+    for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
     await db.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
     for (const [id, status] of [['p1', 'Preparing'], ['p2', 'Completed'], ['p3', 'Preparing']]) await db.sql('INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES(?,\'role\',?,?,1,1)', [id, id, status]);
     const assets = new AssetRepository(db), relations = new RelationRepository(db), entries = new EntryRepository(db);
@@ -933,7 +951,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     state.refresh = refresh; await refresh(); return { db, assets, relations, entries, state, refresh, item };
   }
   await test('packing toggles only current owner and expected completion, preserve edited fields and never recreate deleted items', async () => {
-    const { ChecklistItemRepository } = require(root + '/services/storage/repositories/Repositories.ets');
+    const { ChecklistItemRepository } = require(root + '/services/storage/Repositories.ets');
     const { db, state, refresh } = await wardrobeFixture(), repo = new ChecklistItemRepository(db); state.checklistRepo = repo;
     try {
       const item = Object.assign(new ChecklistItem(), { id: 'guarded-pack', projectId: 'p1', assetId: 'shared', label: '旧名称', done: false, sortOrder: 1 });
@@ -988,7 +1006,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   async function shotsFixture() {
     const fixture = await wardrobeFixture(), { db, state } = fixture;
-    const { ShotRepository } = require(root + '/services/storage/repositories/ShotRepository.ets'), { MetadataBackupRepository } = require(root + '/services/storage/repositories/MetadataBackupRepository.ets');
+    const { ShotRepository } = require(root + '/services/storage/ShotRepository.ets'), { MetadataBackupRepository } = require(root + '/services/storage/MetadataBackupRepository.ets');
     await db.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('other-role','其他角色',1,1)");
     for (const [id, project, character] of [['plan-ref','p1',null], ['role-ref',null,'role'], ['foreign-ref',null,'other-role']]) await db.sql('INSERT INTO reference_images(id,project_id,character_id,source_uri,local_path,thumbnail_path,created_at) VALUES(?,?,?,?,?, ?,1)', [id,project,character,'test://' + id,'','']);
     const repo = new ShotRepository(db); state.shotRepo = repo; state.refresh = async () => { state.shots = await repo.list(); }; await state.refresh();
@@ -1021,7 +1039,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('day shots appear only for this event and obey module enablement and data-driven removal', async () => {
-    const { ProjectShot } = require(root + '/models/Shot.ets'), { hasEventShots, availableDayModules, assembledDayModules } = require(root + '/domain/schedule/DayMode.ets'), { db, state, repo } = await shotsFixture();
+    const { ProjectShot } = require(root + '/models/Shot.ets'), { hasEventShots, availableDayModules, assembledDayModules } = require(root + '/models/DayMode.ets'), { db, state, repo } = await shotsFixture();
     try {
       const event = Object.assign(new CosEvent(), { id:'scene', date:'2026-10-08', startTime:'09:00' }); state.projects[0].eventId = event.id;
       const now = new Date('2026-10-08T12:00:00').getTime(); const available = () => availableDayModules(event,state.projects,[],[],now,hasEventShots(event.id,state.projects,state.readinessPlans));
@@ -1072,7 +1090,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('shot drafts preserve reference context, support old draft records and recognize interrupted committed creation', async () => {
-    const { PlanningRepository } = require(root + '/services/storage/repositories/PlanningRepository.ets'), { db,state } = await shotsFixture();
+    const { PlanningRepository } = require(root + '/services/storage/PlanningRepository.ets'), { db,state } = await shotsFixture();
     try {
       state.references = await new PlanningRepository(db).references(); let text=''; const store = new FormDraftStore({read:async()=>text,write:async value=>{text=value;}});
       const draft = EditDraft.make(state,'shot','','p1'); const session = new FormSession(draft,store); await session.initialize(state); draft.name='合影'; draft.referenceId='role-ref'; await session.flush();
@@ -1098,8 +1116,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('role-scoped plan creation persists the selected version atomically and retains the draft after a failed write', async () => {
-    const { CosProjectRepository, CharacterRepository, CharacterVariantRepository, DiaryEntryRepository } = require(root + '/services/storage/repositories/Repositories.ets');
-    const { PreparationRepository } = require(root + '/services/storage/repositories/PreparationRepository.ets');
+    const { CosProjectRepository, CharacterRepository, CharacterVariantRepository, DiaryEntryRepository } = require(root + '/services/storage/Repositories.ets');
+    const { PreparationRepository } = require(root + '/services/storage/PreparationRepository.ets');
     const { db, state } = await wardrobeFixture();
     try {
       state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.variantRepo = new CharacterVariantRepository(db);
@@ -1114,7 +1132,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('activity replacement explains one-event ownership and effective date before actual persistence, while explicit dates survive reassociation', async () => {
-    const { db,state }=await wardrobeFixture(); const { CosProjectRepository, CosEventRepository, CharacterRepository, DiaryEntryRepository }=require(root+'/services/storage/repositories/Repositories.ets');
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository, CosEventRepository, CharacterRepository, DiaryEntryRepository }=require(root+'/services/storage/Repositories.ets');
     try {
       state.projectRepo=new CosProjectRepository(db); state.eventRepo=new CosEventRepository(db); state.characterRepo=new CharacterRepository(db); state.diaryRepo=new DiaryEntryRepository(db);
       for(const [id,name,date,dateMode] of [['old-event','原场次','2026-10-08','single'],['new-event','新场次','2026-10-10','single'],['pending-event','日期待定场次','','pending']]) await state.eventRepo.save(Object.assign(new CosEvent(),{id,name,date,dateMode}));
@@ -1136,8 +1154,8 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   await test('named removal confirmation counts match actual plan cascades and keep reassigned collections and shared wardrobe records', async () => {
     const { db, state, repo } = await shotsFixture();
-    const { CosProjectRepository, PhotoAssetRepository, DiaryEntryRepository, CharacterRepository } = require(root+'/services/storage/repositories/Repositories.ets');
-    const { PlanningRepository }=require(root+'/services/storage/repositories/PlanningRepository.ets'), { PreparationRepository }=require(root+'/services/storage/repositories/PreparationRepository.ets');
+    const { CosProjectRepository, PhotoAssetRepository, DiaryEntryRepository, CharacterRepository } = require(root+'/services/storage/Repositories.ets');
+    const { PlanningRepository }=require(root+'/services/storage/PlanningRepository.ets'), { PreparationRepository }=require(root+'/services/storage/PreparationRepository.ets');
     const plans=new CosProjectRepository(db), photosRepo=new PhotoAssetRepository(db), diaryRepo=new DiaryEntryRepository(db), planning=new PlanningRepository(db), prep=new PreparationRepository(db);
     try {
       await db.sql("INSERT INTO photos(id,project_id,source_uri,local_path,thumbnail_path,status,created_at) VALUES('impact-photo','p1','test://impact','','','Final',1)");
@@ -1166,7 +1184,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('completed plan archive preserves content and related records, keeps failed writes unchanged and never retries a committed archive after refresh failure', async () => {
-    const { db,state }=await wardrobeFixture(); const { CosProjectRepository,DiaryEntryRepository }=require(root+'/services/storage/repositories/Repositories.ets');
+    const { db,state }=await wardrobeFixture(); const { CosProjectRepository,DiaryEntryRepository }=require(root+'/services/storage/Repositories.ets');
     try {
       state.projectRepo=new CosProjectRepository(db); state.diaryRepo=new DiaryEntryRepository(db);
       await db.sql("UPDATE projects SET notes='保留说明',target_date='2026-10-08',shooting_time='09:30',budget_cents=500,budget_configured=1 WHERE id='p2'");
@@ -1183,7 +1201,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('role favorite writes preserve legacy fields and failure leaves the original flag and work history intact', async () => {
-    const { CharacterRepository } = require(root + '/services/storage/repositories/Repositories.ets'), { db, state } = await wardrobeFixture();
+    const { CharacterRepository } = require(root + '/services/storage/Repositories.ets'), { db, state } = await wardrobeFixture();
     try {
       state.characterRepo = new CharacterRepository(db); state.characters = await state.characterRepo.list(); state.refresh = async () => { state.characters = await state.characterRepo.list(); };
       const original = state.characters[0], favorite = Object.assign(new entities.Character(), original, { favorite: true });
@@ -1247,7 +1265,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { db.close(); }
   });
   await test('photo import tracks progress, preserves successes and retries only failed sources', async () => {
-    const { PhotoImportJob } = require(root + '/models/PhotoImport.ets');
+    const { PhotoImportJob } = require(root + '/viewmodels/PhotoImport.ets');
     const job = new PhotoImportJob(), committed = new Map(); let unavailable = true, readFailure = true; const calls = [], removed = [];
     const ports = {
       find: async (id, uri) => { if (uri === 'read' && readFailure) throw new Error('database read unavailable'); return committed.get(uri); },
@@ -1263,7 +1281,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(job.succeeded, 3); assert.equal(job.failures.length, 0); assert.equal(committed.size, 4); assert.equal(calls.filter(uri => uri === 'ok').length, 1);
   });
   await test('photo import processes a 300-source batch sequentially with exact progress and no duplicate records', async () => {
-    const { PhotoImportJob } = require(root + '/models/PhotoImport.ets'), job = new PhotoImportJob(); const records = new Set(); let active = 0, maximum = 0;
+    const { PhotoImportJob } = require(root + '/viewmodels/PhotoImport.ets'), job = new PhotoImportJob(); const records = new Set(); let active = 0, maximum = 0;
     job.begin('plan'); const uris = Array.from({ length: 300 }, (_, index) => 'uri-' + index);
     await job.run(uris.concat(uris[0]), { find: async () => undefined, exists: async () => false,
       import: async uri => { maximum = Math.max(maximum, ++active); await Promise.resolve(); active--; return Object.assign(new PhotoAsset(), { sourceUri: uri }); },
@@ -1271,7 +1289,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(job.total, 301); assert.equal(job.processed, 301); assert.equal(job.succeeded, 300); assert.equal(job.skipped, 1); assert.equal(records.size, 300); assert.equal(maximum, 1);
   });
   await test('photo import cancellation keeps committed items and removes only the uncommitted staged item', async () => {
-    const { PhotoImportJob } = require(root + '/models/PhotoImport.ets'); const job = new PhotoImportJob(); const committed = [], removed = [];
+    const { PhotoImportJob } = require(root + '/viewmodels/PhotoImport.ets'); const job = new PhotoImportJob(); const committed = [], removed = [];
     const ports = { find: async () => undefined, exists: async () => false,
       import: async uri => { if (uri === 'second') job.cancel(); return Object.assign(new PhotoAsset(), { sourceUri: uri }); },
       add: async photo => committed.push(photo.sourceUri), replace: async () => {}, remove: async photo => removed.push(photo.sourceUri) };
@@ -1279,7 +1297,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.deepEqual(committed, ['first']); assert.deepEqual(removed, ['second']); assert.equal(job.succeeded, 1); assert.equal(job.cancelled, 2); assert.equal(job.processed, 1); assert.equal(job.failures.length, 0);
   });
   await test('actual media inspection separates absent paths, missing files and access failure; thumbnail writes are complete', async () => {
-    const { MediaRepository } = require(root + '/services/media/MediaRepository.ets');
+    const { MediaRepository } = require(root + '/services/MediaRepository.ets');
     const repo = new MediaRepository({ filesDir: '/sandbox', cacheDir: '/cache' });
     mediaControl = { files: new Set(['/sandbox/media/original', 'test://source']), removed: [], denied: ['/denied'] };
     assert.deepEqual(await repo.inspect({ localPath: '', thumbnailPath: '/missing' }), { original: 'unlinked', thumbnail: 'missing' });
@@ -1293,12 +1311,39 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     assert.equal(await repo.exists(rebuilt), true);
     await repo.select(500); assert.equal(mediaControl.pickerOptions.maxSelectNumber, 500);
     mediaControl.files.add('/sandbox/media/version.jpg'); mediaControl.files.add('/sandbox/media/orphan.jpg');
-    await repo.collect([rebuilt], [], [], ['/sandbox/media/version.jpg']); assert.equal(mediaControl.files.has('/sandbox/media/version.jpg'), true); assert.equal(mediaControl.files.has('/sandbox/media/orphan.jpg'), false);
+    const locked = '/sandbox/media/locked.jpg';
+    mediaControl.files.add(locked); mediaControl.files.add('/sandbox/media/second-orphan.jpg'); mediaControl.unlinkDenied = locked;
+    assert.equal(await repo.collect([rebuilt], [], [], ['/sandbox/media/version.jpg']), false);
+    assert.equal(mediaControl.files.has('/sandbox/media/version.jpg'), true);
+    assert.equal(mediaControl.files.has('/sandbox/media/orphan.jpg'), false);
+    assert.equal(mediaControl.files.has('/sandbox/media/second-orphan.jpg'), false);
+    assert.equal(mediaControl.files.has(locked), true);
+  });
+  await test('reference reimport preserves metadata and moves a linked cover atomically', async () => {
+    const { PlanningRepository } = require(root + '/services/storage/PlanningRepository.ets');
+    const db = new SqliteAdapter();
+    try {
+      for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
+      await db.sql("INSERT INTO characters(id,name,cover,created_at,updated_at) VALUES('role','角色','/old-thumb',1,1)");
+      const original = { id: 'reference', characterId: 'role', sourceUri: 'source', localPath: '/old', thumbnailPath: '/old-thumb', caption: '说明', createdAt: 123 };
+      const replacement = { ...original, id: 'temporary', localPath: '/new', thumbnailPath: '/new-thumb', caption: '', createdAt: 456 };
+      const repo = new PlanningRepository(db);
+      await repo.saveReference(original);
+      db.failSql = 'UPDATE characters'; await assert.rejects(repo.replaceReferenceMedia(original, replacement), /injected/); db.failSql = '';
+      assert.equal((await repo.references())[0].localPath, '/old');
+      const state = new AppState();
+      state.characters = [{ id: 'role' }]; state.references = await repo.references(); state.planningRepo = repo;
+      state.media = { select: async () => ['source', 'source'], exists: async () => false, importReference: async () => replacement };
+      state.refresh = async scopes => { assert.deepEqual(scopes, ['references', 'characters']); };
+      assert.equal(await state.importReferences('', 'role'), true);
+      assert.deepEqual((await db.sql('SELECT id,caption,created_at,thumbnail_path FROM reference_images')).rows, [['reference', '说明', 123, '/new-thumb']]);
+      assert.deepEqual((await db.sql('SELECT cover FROM characters')).rows, [['/new-thumb']]);
+    } finally { db.close(); }
   });
   await test('media replacement is atomic and preserves photo identity, workflow, caption, time, covers and edited versions', async () => {
-    const { PhotoAssetRepository, RelationRepository } = require(root + '/services/storage/repositories/Repositories.ets'); const repairDb = new SqliteAdapter();
+    const { PhotoAssetRepository, RelationRepository } = require(root + '/services/storage/Repositories.ets'); const repairDb = new SqliteAdapter();
     try {
-      for (const match of fs.readFileSync(root + '/services/storage/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await repairDb.sql(match[1]);
+      for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await repairDb.sql(match[1]);
       await repairDb.sql("INSERT INTO characters(id,name,cover,created_at,updated_at) VALUES('role','角色','/old-thumb',1,1)");
       await repairDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
       await repairDb.sql("INSERT INTO photos VALUES('photo','plan','old-uri','/old','/old-thumb','Final','保留说明',123)");
@@ -1330,7 +1375,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       repairDb.failSql = 'UPDATE photos'; assert.equal(await state.reloadRecords(), true); repairDb.failSql = ''; assert.equal(imports, 1);
       repairDb.failSql = 'UPDATE photos'; assert.equal(await state.repairPhoto('photo', true), false); repairDb.failSql = '';
       assert.equal(removed.length, 1); assert.equal(removed[0].localPath, ''); assert.equal((await repo.list())[0].localPath, '/new');
-      const { CharacterRepository } = require(root + '/services/storage/repositories/Repositories.ets'); state.characterRepo = new CharacterRepository(repairDb); state.projects[0].characterId = 'role'; state.characters = await state.characterRepo.list();
+      const { CharacterRepository } = require(root + '/services/storage/Repositories.ets'); state.characterRepo = new CharacterRepository(repairDb); state.projects[0].characterId = 'role'; state.characters = await state.characterRepo.list();
       state.refresh = async () => { state.photos = await repo.list(); state.characters = await state.characterRepo.list(); };
       state.media.inspect = async () => ({ original: 'available', thumbnail: 'missing' });
       assert.equal(await state.setCover(state.photos[0]), false); assert.match(state.error, /缩略图不可用/);
@@ -1346,9 +1391,9 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { repairDb.close(); }
   });
   await test('AppState import partial results, source deduplication and retry stay committed across refresh failure', async () => {
-    const { PhotoAssetRepository, RelationRepository } = require(root + '/services/storage/repositories/Repositories.ets'); const importDb = new SqliteAdapter();
+    const { PhotoAssetRepository, RelationRepository } = require(root + '/services/storage/Repositories.ets'); const importDb = new SqliteAdapter();
     try {
-      for (const match of fs.readFileSync(root + '/services/storage/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await importDb.sql(match[1]);
+      for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await importDb.sql(match[1]);
       await importDb.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
       await importDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
       const repo = new PhotoAssetRepository(importDb), state = new AppState(); state.photoRepo = repo; state.relations = new RelationRepository(importDb); state.projects = [Object.assign(new CosProject(), { id: 'plan' })];
@@ -1371,11 +1416,11 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     } finally { importDb.close(); }
   });
   await test('actual photo batch repository rolls back invalid IDs and AppState refresh failure does not reapply the batch', async () => {
-    const { PhotoAssetRepository } = require(root + '/services/storage/repositories/Repositories.ets');
-    const { PhotoCollectionRoute } = require(root + '/models/PhotoCollection.ets');
+    const { PhotoAssetRepository } = require(root + '/services/storage/Repositories.ets');
+    const { PhotoCollectionRoute } = require(root + '/viewmodels/PhotoCollection.ets');
     const batchDb = new SqliteAdapter();
     try {
-      for (const match of fs.readFileSync(root + '/services/storage/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await batchDb.sql(match[1]);
+      for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await batchDb.sql(match[1]);
       await batchDb.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('role','角色',1,1)");
       await batchDb.sql("INSERT INTO projects(id,character_id,name,status,created_at,updated_at) VALUES('plan','role','照片计划','Preparing',1,1)");
       for (const id of ['photo-a', 'photo-b']) await batchDb.sql("INSERT INTO photos VALUES(?,'plan',?,'','','Raw','',1)", [id, 'test://' + id]);
@@ -1461,14 +1506,14 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
   });
   const db = new SqliteAdapter();
   try {
-    for (const match of fs.readFileSync(root + '/services/storage/database/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
+    for (const match of fs.readFileSync(root + '/services/storage/Schema.ets', 'utf8').matchAll(/`([^`]+)`/g)) await db.sql(match[1]);
     await db.sql("INSERT INTO characters(id,name,created_at,updated_at) VALUES('c','Legacy',1,1)");
     for (const [id, cents, configured] of [['zero',0,1], ['unset',0,0], ['unknown',0,null], ['positive',1234,1]]) {
       await db.sql("INSERT INTO projects(id,character_id,name,status,budget_cents,budget_configured,created_at,updated_at) VALUES(?,'c',?,'Preparing',?,?,1,1)", [id,id,cents,configured]);
     }
     await db.sql("INSERT INTO preparation_categories VALUES('waiting-category','positive','造型',0)");
     await db.sql("INSERT INTO preparation_tasks(id,project_id,category_id,label,done,due_date,waiting_on,waiting_until) VALUES('persist-wait','positive','waiting-category','等假发',1,'2026-10-01','快递','2026-10-10')");
-    const { PreparationRepository } = require(root + '/services/storage/repositories/PreparationRepository.ets');
+    const { PreparationRepository } = require(root + '/services/storage/PreparationRepository.ets');
     const preparations = new PreparationRepository(db);
     await test('waiting fields persist through the actual preparation repository without losing completion', async () => {
       const saved = (await preparations.tasks()).find(task => task.id === 'persist-wait');
@@ -1497,7 +1542,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
     });
     await test('actual home completion and undo preserve failed writes and distinguish saved-but-not-refreshed snapshots', async () => {
       const state = new AppState(); state.settings.haptic = false;
-      state.projects = [Object.assign(new CosProject(), { id: 'positive' })]; state.preparationRepo = preparations; state.shotRepo = new (require(root + '/services/storage/repositories/ShotRepository.ets').ShotRepository)(db);
+      state.projects = [Object.assign(new CosProject(), { id: 'positive' })]; state.preparationRepo = preparations; state.shotRepo = new (require(root + '/services/storage/ShotRepository.ets').ShotRepository)(db);
       const item = Object.assign(new PreparationTask(), { id: 'home-write', projectId: 'positive', categoryId: 'waiting-category', label: '带道具' });
       await preparations.saveTask(item); await state.refresh(['preparationTasks']);
       db.failSql = 'UPDATE preparation_tasks';
@@ -1526,9 +1571,9 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       await db.sql('DELETE FROM preparation_tasks WHERE id=?', [item.id]);
     });
     await test('a project draft uses its persisted IDs in the real transaction and is recognized after an interrupted cleanup', async () => {
-      const { CosProjectRepository, CharacterRepository, DiaryEntryRepository } = require(root + '/services/storage/repositories/Repositories.ets');
+      const { CosProjectRepository, CharacterRepository, DiaryEntryRepository } = require(root + '/services/storage/Repositories.ets');
       const state = new AppState();
-      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.diaryRepo = new DiaryEntryRepository(db); state.preparationRepo = preparations; state.shotRepo = new (require(root + '/services/storage/repositories/ShotRepository.ets').ShotRepository)(db);
+      state.projectRepo = new CosProjectRepository(db); state.characterRepo = new CharacterRepository(db); state.diaryRepo = new DiaryEntryRepository(db); state.preparationRepo = preparations; state.shotRepo = new (require(root + '/services/storage/ShotRepository.ets').ShotRepository)(db);
       let text = ''; const store = new FormDraftStore({ read: async () => text, write: async value => { text = value; } });
       const draft = EditDraft.make(state, 'project'); const session = new FormSession(draft, store); await session.initialize(state);
       draft.name = '恢复验证计划'; draft.characterName = '恢复验证角色'; await session.flush();
@@ -1544,7 +1589,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal(reopening.pendingRestore, undefined); assert.equal(reopening.error.includes('上次创建已保存'), true);
       await db.sql('DELETE FROM projects WHERE id=?', [id]); await db.sql('DELETE FROM characters WHERE id=?', [characterId]);
     });
-    const { MetadataBackupRepository } = require(root + '/services/storage/repositories/MetadataBackupRepository.ets');
+    const { MetadataBackupRepository } = require(root + '/services/storage/MetadataBackupRepository.ets');
     const backup = new MetadataBackupRepository(db);
     const exported = await backup.exportMetadata();
     await test('current backup round trip preserves explicit zero, unset and unknown budgets', async () => {
@@ -1639,7 +1684,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4); await backup.restoreMetadata(exported);
     });
     await test('backup file export checks UTF-8 byte counts and closes files on complete and partial writes', async () => {
-      const { BackupService: ActualBackupService } = require(root + '/services/backup/BackupService.ets');
+      const { BackupService: ActualBackupService } = require(root + '/services/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0, output;
       backupFileControl = { save: () => ['test://export'], close: () => { closes++; }, write: (fd, bytes) => { output = Buffer.from(bytes); return bytes.byteLength; } };
       assert.equal(await service.export(), true); assert.equal(closes, 1); assert.equal(JSON.parse(output.toString('utf8')).version, 8);
@@ -1649,7 +1694,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       backupFileControl.save = () => []; assert.equal(await service.export(), false); assert.equal(closes, 2);
     });
     await test('backup file selection reads chunks, closes files and only returns a validated preview', async () => {
-      const { BackupService: ActualBackupService } = require(root + '/services/backup/BackupService.ets');
+      const { BackupService: ActualBackupService } = require(root + '/services/BackupService.ets');
       const service = new ActualBackupService(db, {}); let closes = 0;
       backupFileControl = { bytes: Buffer.from(exported), select: () => ['test://import'], close: () => { closes++; }, read: (fd, buffer, options) => { const part = backupFileControl.bytes.subarray(options.offset, options.offset + Math.min(buffer.byteLength, 127)); new Uint8Array(buffer).set(part); return part.length; } };
       const selection = await service.prepareRestore(); assert.equal(selection.input, exported); assert.equal(selection.preview.version, 8); assert.equal(closes, 1);
@@ -1689,7 +1734,7 @@ const read = () => buildPlanReadiness(project, tasks, [pack], [asset], [link], p
       assert.equal((await db.sql('SELECT count(*) FROM projects')).rows[0][0], 4);
       assert.equal(await state.restoreData(), true); assert.equal(state.restorePreview, undefined); backupControl = {};
     });
-    const { EntryRepository } = require(root + '/services/storage/repositories/EntryRepository.ets');
+    const { EntryRepository } = require(root + '/services/storage/EntryRepository.ets');
     const { entryFromText, validateEntry, CollectedEntry } = require(root + '/models/CollectedEntry.ets');
     const entries = new EntryRepository(db);
     await test('capture needs no title, type selection or owner', async () => {

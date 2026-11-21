@@ -1,7 +1,7 @@
-import { AppState } from '../main/ets/state/ApplicationState';
-import { EditDraft } from '../main/ets/state/forms/EditDraft';
+import { AppState } from '../main/ets/viewmodels/ApplicationState';
+import { EditDraft } from '../main/ets/viewmodels/EditDraft';
 import { describe, it, expect } from '@ohos/hypium';
-import { requiredName, moneyToCents, validDate, projectProgress, checklistProgress, nextPlan, photoStage } from '../main/ets/domain/plans/Rules';
+import { requiredName, moneyToCents, validDate, projectProgress, checklistProgress, nextPlan, photoStage } from '../main/ets/models/Rules';
 import { Asset, AssetStatus, ProjectAsset, ChecklistItem, CosProject, CosEvent, ProjectStatus, PhotoAsset, PhotoStatus, Character } from '../main/ets/models/Entities';
 
 export default function localUnitTest(): void {

@@ -1,8 +1,8 @@
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 import { Driver, ON, MatchPattern } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
-import { monthlyExpenses, photoDistribution } from '../../../main/ets/domain/statistics/Statistics';
-import { portfolioStage } from '../../../main/ets/domain/plans/Rules';
+import { monthlyExpenses, photoDistribution } from '../../../main/ets/models/Statistics';
+import { portfolioStage } from '../../../main/ets/models/Rules';
 import { Expense } from '../../../main/ets/models/Planning';
 import { PhotoAsset, PhotoStatus } from '../../../main/ets/models/Entities';
 

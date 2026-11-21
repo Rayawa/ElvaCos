@@ -1,5 +1,5 @@
 import { captureScreenshot } from '../testability/UiEvidence';
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 import { Driver, ON, Rect } from '@kit.TestKit';
 import { describe, beforeAll, afterAll, it, expect } from '@ohos/hypium';
 class LayoutView {

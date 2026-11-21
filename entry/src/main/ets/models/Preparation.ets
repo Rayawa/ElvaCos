@@ -1,5 +1,5 @@
 import { TaskTemplate } from './types';
-import { PREPARATION_TEMPLATES } from '../config/constants';
+import { PREPARATION_TEMPLATES } from './constants';
 import { newId, ProjectProgress } from './Entities';
 
 export class PreparationCategory {

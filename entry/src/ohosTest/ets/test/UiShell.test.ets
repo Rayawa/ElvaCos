@@ -1,12 +1,12 @@
 import { captureScreenshot } from '../testability/UiEvidence';
-import { getApplicationState } from '../../../main/ets/state/appState';
+import { getApplicationState } from '../../../main/ets/viewmodels/appState';
 import { window } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { KeyCode } from '@kit.InputKit';
-import { DeviceCalendarService } from '../../../main/ets/services/calendar/DeviceCalendarService';
+import { DeviceCalendarService } from '../../../main/ets/services/DeviceCalendarService';
 import { CollectedEntry } from '../../../main/ets/models/CollectedEntry';
 import { CosEvent, CosProject, Character, ChecklistItem, PhotoAsset, PhotoStatus, ProjectStatus } from '../../../main/ets/models/Entities';
-import { localDay } from '../../../main/ets/domain/schedule/DayMode';
+import { localDay } from '../../../main/ets/models/DayMode';
 import { Component, Driver, ON, On, Rect, abilityDelegatorRegistry } from '@kit.TestKit';
 import { describe, beforeAll, beforeEach, afterAll, afterEach, it, expect } from '@ohos/hypium';
 
