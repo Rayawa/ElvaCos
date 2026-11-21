@@ -84,6 +84,7 @@ export struct ExpenseSummary {
         .visualEffect(this.feedback.effect('expense-category:' + category.name, true))
         .compositingFilter(this.feedback.filter('expense-category:' + category.name, true))
         .attributeModifier(this.feedback.control('expense-category:' + category.name, true))
+        .onDisAppear((): void => { this.feedback.release('expense-category:' + category.name); })
     }, (category: ExpenseCategory): string => category.name)
   }
 
@@ -107,9 +108,11 @@ export struct ExpenseSummary {
           .visualEffect(this.feedback.effect('edit-expense:' + expense.id))
           .compositingFilter(this.feedback.filter('edit-expense:' + expense.id))
           .attributeModifier(this.feedback.control('edit-expense:' + expense.id))
+          .onDisAppear((): void => { this.feedback.release('edit-expense:' + expense.id); })
         Button('−').backgroundColor(Theme.bg).fontColor(Theme.muted).enabled(!this.state.busy)
           .onClick((): void => { vibration.dotVibration(); this.remove('expense', expense.id); })
           .accessibilityText('删除花费 ' + expense.name).visualEffect(this.feedback.effect('remove-expense:' + expense.id)).compositingFilter(this.feedback.filter('remove-expense:' + expense.id)).attributeModifier(this.feedback.control('remove-expense:' + expense.id))
+          .onDisAppear((): void => { this.feedback.release('remove-expense:' + expense.id); })
       }.id('expense-record:' + expense.id).padding(14).width('100%').backgroundColor(Theme.surface).borderRadius(Theme.cardRadius)
     }, (expense: Expense): string => expense.id)
     if (this.records.length === 0) {

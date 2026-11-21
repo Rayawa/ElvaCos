@@ -38,13 +38,11 @@ export struct FormEditor {
   @Event saved: (kind: string, id: string, created: boolean) => void = () => {};
   @Event done: () => void = () => {};
   private async save(): Promise<void> {
-    const created = !this.draft.id;
-    try { if (await this.draft.save(this.state)) {
-      this.done(); this.saved(this.draft.kind, this.draft.id, created);
-      if (this.draft.kind === 'event' && this.draft.deviceCalendar) {
-        const event = this.state.events.find((event: CosEvent) => event.id === this.draft.id);
-        if (event) { await this.state.addEventToCalendar(event); }
-      }
+    const draft = this.draft;
+    const created = !draft.id;
+    try { if (await draft.save(this.state)) {
+      this.done(); this.saved(draft.kind, draft.id, created);
+      if (draft.deviceCalendar && draft.savedEvent) { await this.state.addEventToCalendar(draft.savedEvent); }
     } }
     catch (error) { this.state.reportError((error as Error).message); }
   }

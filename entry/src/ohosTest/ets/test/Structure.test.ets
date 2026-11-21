@@ -35,6 +35,18 @@ export default function structureTest(): void {
       expect(state.ready).assertFalse();
       expect(state.busy).assertFalse();
     });
+    it('committedWriteSurvivesRefreshFailureWithoutReplayingAction', 0, async () => {
+      const state = new AppState();
+      let writes = 0;
+      const action = async (): Promise<void> => { writes++; };
+      // The unopened database injects a read failure after the write callback completes.
+      expect(await state.perform(action)).assertTrue();
+      expect(state.refreshPending).assertTrue();
+      expect(await state.perform(action)).assertFalse();
+      expect(await state.retryRefresh()).assertFalse();
+      expect(state.refreshPending).assertTrue();
+      expect(writes).assertEqual(1);
+    });
     it('documentSkipsNestedHiddenTemplatesScriptsAndExternalMarkup', 0, () => {
       const html = '<html><head><style>#permissions { display:none }</style></head><body>' +
         '<h1>声明</h1><p>可见<span>正文</span>&amp;内容</p>' +

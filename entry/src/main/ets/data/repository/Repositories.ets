@@ -12,6 +12,7 @@ import {
   ChecklistItem,
   PhotoAsset,
   DiaryEntry,
+  ManagedMedia,
   ProjectAsset,
   ProjectStatus,
   AssetStatus,
@@ -309,6 +310,14 @@ export class PhotoAssetRepository {
   async save(item: PhotoAsset): Promise<void> {
     await this.db.getStore().executeSql('INSERT INTO photos (id, project_id, source_uri, local_path, thumbnail_path, status, caption, created_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET project_id=excluded.project_id, source_uri=excluded.source_uri, local_path=excluded.local_path, thumbnail_path=excluded.thumbnail_path, status=excluded.status, caption=excluded.caption, created_at=excluded.created_at', [item.id, item.projectId, item.sourceUri, item.localPath, item.thumbnailPath, item.status, item.caption, item.createdAt]);
   }
+  async repairMedia(photo: PhotoAsset, media: ManagedMedia): Promise<void> {
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      await tx.execute('UPDATE photos SET local_path=?,thumbnail_path=? WHERE id=?', [media.localPath, media.thumbnailPath, photo.id]);
+      await tx.execute("UPDATE characters SET cover=? WHERE cover=? AND cover<>''", [media.thumbnailPath, photo.thumbnailPath]);
+      await tx.execute("UPDATE photo_versions SET rendered_path=? WHERE photo_id=? AND ((rendered_path=? AND rendered_path<>'') OR (rendered_path='' AND name='Original' AND recipe='{}'))",
+        [media.localPath, photo.id, photo.localPath]);
+    });
+  }
   async setStatuses(ids: string[], status: PhotoStatus): Promise<void> {
     if (ids.length === 0) { throw new Error('请先选择照片'); }
     await this.db.transaction(async (tx: WriteTransaction) => {
@@ -375,10 +384,22 @@ export class RelationRepository {
   }
   async link(projectId: string, asset: Asset): Promise<void> {
     await this.db.transaction(async (tx: WriteTransaction) => {
-      await tx.execute('INSERT OR IGNORE INTO project_assets VALUES (?,?)', [projectId, asset.id]);
-      // The partial unique index makes repeated automatic generation idempotent.
-      const item = new ChecklistItem();
-      await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, asset.name]);
+      await this.linkWithChecklist(tx, projectId, asset);
+    });
+  }
+  private async linkWithChecklist(tx: WriteTransaction, projectId: string, asset: Asset): Promise<void> {
+    await tx.execute('INSERT OR IGNORE INTO project_assets VALUES (?,?)', [projectId, asset.id]);
+    const item = new ChecklistItem();
+    await tx.execute('INSERT OR IGNORE INTO checklist_items(id,project_id,asset_id,label,done,sort_order) VALUES (?,?,?,?,0,0)', [item.id, projectId, asset.id, asset.name]);
+  }
+  async generateChecklist(projectId: string, assets: Asset[]): Promise<void> {
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      for (const asset of assets) { await this.linkWithChecklist(tx, projectId, asset); }
+      for (const label of ['手机', '充电宝', '补妆', '门票', '身份证件', '发网']) {
+        const item = new ChecklistItem();
+        await tx.execute('INSERT INTO checklist_items(id,project_id,label,sort_order) SELECT ?,?,?,10 WHERE NOT EXISTS (SELECT 1 FROM checklist_items WHERE project_id=? AND label=?)',
+          [item.id, projectId, label, projectId, label]);
+      }
     });
   }
   async unlink(projectId: string, assetId: string): Promise<void> {

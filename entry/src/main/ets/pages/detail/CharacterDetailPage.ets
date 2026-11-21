@@ -89,6 +89,7 @@ export struct CharacterDetail {
                 .visualEffect(this.feedback.effect('button-3' + ":" + v.id))
                 .compositingFilter(this.feedback.filter('button-3' + ":" + v.id))
                 .attributeModifier(this.feedback.control('button-3' + ":" + v.id))
+                .onDisAppear((): void => { this.feedback.release('button-3' + ":" + v.id); })
               Button('−')
                 .backgroundColor(Theme.bg)
                 .fontColor(Theme.muted)
@@ -97,8 +98,10 @@ export struct CharacterDetail {
                 .visualEffect(this.feedback.effect('button-4' + ":" + v.id))
                 .compositingFilter(this.feedback.filter('button-4' + ":" + v.id))
                 .attributeModifier(this.feedback.control('button-4' + ":" + v.id))
+                .onDisAppear((): void => { this.feedback.release('button-4' + ":" + v.id); })
             }.
           width('100%').padding(16).backgroundColor(Theme.surface).borderRadius(18).visualEffect(this.feedback.effect('row-2' + ":" + v.id, true)).compositingFilter(this.feedback.filter('row-2' + ":" + v.id, true)).attributeModifier(this.feedback.control('row-2' + ":" + v.id, true))
+          .onDisAppear((): void => { this.feedback.release('row-2' + ":" + v.id); })
           }, (v: CharacterVariant) => v.id)
           SectionHeading({ title: '登场计划', trailing: this.projects().length + ' 份' })
           ForEach(this.projects(), (p: CosProject) => { ProjectCard({ state: this.state, project: p, open: () => this.open('project', p.id) }) }, (p: CosProject) => p.id)

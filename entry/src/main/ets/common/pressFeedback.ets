@@ -31,7 +31,8 @@ class PressModifier extends AttributeUpdater<CommonAttribute> {
   }
 
   private clearRelease(): void { if (this.releaseTimer >= 0) { clearTimeout(this.releaseTimer); this.releaseTimer = -1; } }
-  onComponentChanged(instance: CommonAttribute): void { this.clearRelease(); this.state.pressed = false; this.initializeModifier(instance); }
+  reset(): void { this.clearRelease(); this.state.pressed = false; }
+  onComponentChanged(instance: CommonAttribute): void { this.reset(); this.initializeModifier(instance); }
 
   applyNormalAttribute(instance: CommonAttribute): void { this.render(instance); }
 
@@ -64,6 +65,10 @@ export class PressFeedback {
     let modifier = this.modifiers.get(key);
     if (!modifier) { modifier = new PressModifier(this.context, large); this.modifiers.set(key, modifier); }
     return modifier;
+  }
+  release(key: string): void {
+    this.modifiers.get(key)?.reset();
+    this.modifiers.delete(key);
   }
   effect(key: string, large: boolean = false): VisualEffect { return this.control(key, large).effect(); }
   filter(key: string, large: boolean = false): uiEffect.Filter { return this.control(key, large).filter(); }

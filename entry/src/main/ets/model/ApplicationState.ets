@@ -54,11 +54,14 @@ export interface SettingsSelection {
   hand?: string;
 }
 
+type RefreshScope = 'all' | 'photos' | 'checklist' | 'preparation' | 'expenses';
+
 @ObservedV2
 export class AppState {
   @Trace pendingEventId: string = '';
   @Trace ready: boolean = false;
   @Trace busy: boolean = false;
+  @Trace refreshPending: boolean = false;
   @Trace settingsBusy: boolean = false;
   @Trace error: string = '';
   @Trace notice: string = '';
@@ -98,10 +101,13 @@ export class AppState {
   private settingsQueue: Promise<void> = Promise.resolve();
   private pendingSettings: number = 0;
   private grip = new GripService();
+  private foreground: boolean = false;
+  private outingActive: boolean = false;
   private context?: common.UIAbilityContext;
   private media?: MediaRepository;
   private startTask?: Promise<void>;
   private operationTask?: Promise<boolean>;
+  private recoveryScope: RefreshScope = 'all';
   private disposeTask?: Promise<void>;
   private preferencesTask?: Promise<void>;
 
@@ -144,18 +150,20 @@ export class AppState {
       this.ready = true;
     }, false);
   }
-  async maintain(): Promise<void> {
-    if (!this.ready || this.busy) { return; }
-    await this.perform(async () => {
-      await this.media?.collect(this.photos, this.references);
+  async maintain(): Promise<boolean> {
+    if (!this.ready || this.refreshPending) { return false; }
+    return this.perform(async () => {
+      const mediaCleaned = !this.media || await this.media.collect(this.photos, this.references);
       try { await this.reminder.reconcile(this.events); }
       catch (error) { this.reportNotice('系统提醒暂未核对，可重新打开应用后重试'); }
+      if (!mediaCleaned) { this.reportNotice((this.notice ? this.notice + '。' : '') + '部分图片副本暂未清理'); }
     }, false);
   }
 
   dispose(): Promise<void> {
     if (!this.disposeTask) {
-      this.suspend();
+      this.setOutingActive(false);
+      this.setForeground(false);
       this.disposeTask = this.closeAfterTasks().finally((): void => { this.disposeTask = undefined; });
     }
     return this.disposeTask;
@@ -174,6 +182,7 @@ export class AppState {
       try { await this.db.close(); }
       catch (error) { this.reportError('数据库关闭未完成，下次启动将重新加载'); }
       this.ready = false;
+      this.refreshPending = false;
       this.context = undefined;
       this.media = undefined;
       this.preferencesTask = undefined;
@@ -228,31 +237,85 @@ export class AppState {
       this.busy = false; this.accountBusy = false;
     }
   }
-  async refresh(): Promise<void> {
-    this.team = await this.planningRepo.team();
-    this.expenses = await this.planningRepo.expenses();
-    this.references = await this.planningRepo.references();
-    this.characters = await this.characterRepo.list(); this.variants = await this.variantRepo.list();
-    this.projects = await this.projectRepo.list(); this.assets = await this.assetRepo.list();
-    this.preparationCategories = await this.preparationRepo.categories(); this.preparationTasks = await this.preparationRepo.tasks();
-    this.events = await this.eventRepo.list(); this.checklist = await this.checklistRepo.list();
-    this.photos = await this.photoRepo.list(); this.links = await this.relations.links(); this.diary = await this.diaryRepo.list();
+  private async refresh(scope: RefreshScope = 'all'): Promise<void> {
+    if (scope === 'photos') { this.photos = await this.photoRepo.list(); return; }
+    if (scope === 'checklist') { this.checklist = await this.checklistRepo.list(); return; }
+    if (scope === 'expenses') { this.expenses = await this.planningRepo.expenses(); return; }
+    if (scope === 'preparation') {
+      const categories = await this.preparationRepo.categories();
+      const tasks = await this.preparationRepo.tasks();
+      this.preparationCategories = categories;
+      this.preparationTasks = tasks;
+      return;
+    }
+    const team = await this.planningRepo.team();
+    const expenses = await this.planningRepo.expenses();
+    const references = await this.planningRepo.references();
+    const characters = await this.characterRepo.list();
+    const variants = await this.variantRepo.list();
+    const projects = await this.projectRepo.list();
+    const assets = await this.assetRepo.list();
+    const categories = await this.preparationRepo.categories();
+    const tasks = await this.preparationRepo.tasks();
+    const events = await this.eventRepo.list();
+    const checklist = await this.checklistRepo.list();
+    const photos = await this.photoRepo.list();
+    const links = await this.relations.links();
+    const diary = await this.diaryRepo.list();
+    this.team = team;
+    this.expenses = expenses;
+    this.references = references;
+    this.characters = characters;
+    this.variants = variants;
+    this.projects = projects;
+    this.assets = assets;
+    this.preparationCategories = categories;
+    this.preparationTasks = tasks;
+    this.events = events;
+    this.checklist = checklist;
+    this.photos = photos;
+    this.links = links;
+    this.diary = diary;
+  }
+  async retryRefresh(): Promise<boolean> {
+    if (!this.refreshPending) { return true; }
+    return this.perform(async (): Promise<void> => {
+      try { await this.refresh(this.recoveryScope); }
+      catch (error) { throw new Error('更改已保存，仍无法刷新记录，请稍后重试'); }
+      this.refreshPending = false;
+    }, false);
   }
   reportError(message: string): void { this.error = message; this.feedbackVersion++; }
   reportNotice(message: string): void { this.notice = message; this.feedbackVersion++; }
-  perform(action: () => Promise<void>, refresh: boolean = true): Promise<boolean> {
-    if (this.busy || this.disposeTask) { return Promise.resolve(false); }
+  perform(action: () => Promise<void>, refresh: false | RefreshScope = 'all'): Promise<boolean> {
+    if (this.busy || this.operationTask || this.disposeTask) { return Promise.resolve(false); }
+    if (refresh !== false && this.refreshPending) {
+      this.reportError('请刷新已保存的记录，再继续修改');
+      return Promise.resolve(false);
+    }
     this.operationTask = this.runOperation(action, refresh).finally((): void => { this.operationTask = undefined; });
     return this.operationTask;
   }
 
-  private async runOperation(action: () => Promise<void>, refresh: boolean): Promise<boolean> {
+  private async runOperation(action: () => Promise<void>, refresh: false | RefreshScope): Promise<boolean> {
     this.busy = true; this.error = ''; this.notice = '';
-    try { await action(); if (refresh) { await this.refresh(); } return true; }
-    catch (error) {
-      const code = (error as BusinessError).code;
-      this.reportError(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error)
-        .message || '操作失败，请重试'); return false;
+    try {
+      try { await action(); }
+      catch (error) {
+        const code = (error as BusinessError).code;
+        this.reportError(code ? (code === 14800029 || code === 13900028 ? '设备空间不足，请释放空间后重试' : '本地操作未完成，请重试。仍有问题时可重新打开应用。') : (error as Error)
+          .message || '操作失败，请重试');
+        return false;
+      }
+      if (refresh !== false) {
+        try { await this.refresh(refresh); }
+        catch (error) {
+          this.recoveryScope = refresh;
+          this.refreshPending = true;
+          this.reportError('更改已保存，列表刷新未完成，请重试刷新');
+        }
+      }
+      return true;
     }
     finally { this.busy = false; }
   }
@@ -319,7 +382,7 @@ export class AppState {
     });
   }
   async saveTeam(item: TeamMember): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveTeam(item); }); }
-  async saveExpense(item: Expense): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveExpense(item); }); }
+  async saveExpense(item: Expense): Promise<boolean> { return this.perform(async () => { await this.planningRepo.saveExpense(item); }, 'expenses'); }
   async saveReference(item: ReferenceImage): Promise<boolean> {
     return this.perform(async () => {
       await this.planningRepo.saveReference(item);
@@ -333,12 +396,13 @@ export class AppState {
       const uris = await this.media.select(); let count = 0; let failed = 0;
       for (const uri of uris) {
         const old = this.references.find((r: ReferenceImage) => r.projectId === projectId && r.characterId === characterId && r.sourceUri === uri);
-        if (old && await this.media.exists(old)) { continue; }
         let imported: ReferenceImage | undefined;
         try {
+          if (old && await this.media.exists(old)) { continue; }
           imported = await this.media.importReference(uri, projectId, characterId);
-          if (old) { imported.id = old.id; imported.caption = old.caption; }
-          await this.planningRepo.saveReference(imported); count++;
+          if (old) { await this.planningRepo.repairReference(old, imported); }
+          else { await this.planningRepo.saveReference(imported); }
+          count++;
         } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
       }
       if (uris.length > 0) { this.reportNotice('已添加 ' + count + ' 张参考图' + (failed > 0 ? '，' + failed + ' 张失败，请检查格式或空间后重试' : '')); }
@@ -352,10 +416,10 @@ export class AppState {
     });
   }
   async savePreparationCategory(item: PreparationCategory): Promise<boolean> {
-    return this.perform(async () => { await this.preparationRepo.saveCategory(item); });
+    return this.perform(async () => { await this.preparationRepo.saveCategory(item); }, 'preparation');
   }
   async savePreparationTask(item: PreparationTask): Promise<boolean> {
-    return this.perform(async () => { await this.preparationRepo.saveTask(item); });
+    return this.perform(async () => { await this.preparationRepo.saveTask(item); }, 'preparation');
   }
   async togglePreparation(item: PreparationTask): Promise<boolean> {
     return this.perform(async () => {
@@ -363,13 +427,13 @@ export class AppState {
       if (!item.done) {
         await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
       }
-    });
+    }, 'preparation');
   }
   async addPreparationTemplate(projectId: string, keys: string[]): Promise<boolean> {
     return this.perform(async () => {
       await this.preparationRepo.addTemplate(makePreparation(projectId, keys));
       this.reportNotice('已补入所选模板任务，原有进度保留');
-    });
+    }, 'preparation');
   }
   preparationPercent(projectId: string): number { return preparationProgress(projectId, this.preparationTasks).percent; }
   async addChecklist(projectId: string, label: string): Promise<boolean> {
@@ -379,13 +443,13 @@ export class AppState {
       item.label = requiredName(label);
       item.sortOrder = this.checklist.length;
       await this.checklistRepo.save(item);
-    });
+    }, 'checklist');
   }
   async toggleChecklist(item: ChecklistItem): Promise<boolean> {
     return this.perform(async () => {
       const copy = JSON.parse(JSON.stringify(item)) as ChecklistItem; copy.done = !item.done;
       await this.checklistRepo.save(copy); if (copy.done) { await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel); }
-    });
+    }, 'checklist');
   }
   async linkAsset(projectId: string, asset: Asset): Promise<boolean> {
     return this.perform(async () => { await this.relations.link(projectId, asset); });
@@ -395,17 +459,8 @@ export class AppState {
   }
   async generateChecklist(projectId: string): Promise<boolean> {
     return this.perform(async () => {
-      for (const asset of this.projectAssets(projectId)) { await this.relations.link(projectId, asset); }
-      for (const label of ['手机', '充电宝', '补妆', '门票', '身份证件', '发网']) {
-        if (!this.checklist.some((c: ChecklistItem) => c.projectId === projectId && c.label === label)) {
-          const item = new ChecklistItem();
-          item.projectId = projectId;
-          item.label = label;
-          item.sortOrder = 10;
-          await this.checklistRepo.save(item);
-        }
-      }
-    });
+      await this.relations.generateChecklist(projectId, this.projectAssets(projectId));
+    }, 'checklist');
   }
   async remove(kind: string, id: string): Promise<boolean> {
     return this.perform(async () => {
@@ -468,16 +523,11 @@ export class AppState {
       const uris = await this.media.select(); let count = 0; let failed = 0;
       for (const uri of uris) {
         const existing = this.photos.find((p: PhotoAsset) => p.projectId === projectId && p.sourceUri === uri);
-        if (existing && await this.media.exists(existing)) { continue; }
         let imported: PhotoAsset | undefined;
         try {
+          if (existing && await this.media.exists(existing)) { continue; }
           imported = await this.media.import(uri, projectId);
-          if (existing) {
-            imported.id = existing.id;
-            imported.status = existing.status;
-            imported.caption = existing.caption;
-            await this.photoRepo.save(imported);
-          }
+          if (existing) { await this.photoRepo.repairMedia(existing, imported); }
           else { await this.relations.addPhoto(imported); }
           count++;
         } catch (error) { if (imported) { await this.media.remove(imported); } failed++; }
@@ -493,14 +543,14 @@ export class AppState {
       if (status === PhotoStatus.SELECTED) {
         await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
       }
-    });
+    }, 'photos');
   }
   async setPhotoStatuses(ids: string[], status: PhotoStatus): Promise<boolean> {
     return this.perform(async () => {
       await this.photoRepo.setStatuses(ids, status);
       this.reportNotice('已更新 ' + ids.length + ' 张照片');
       await HapticService.confirm(this.settings.haptic, this.settings.hapticLevel);
-    });
+    }, 'photos');
   }
   async setCover(photo: PhotoAsset): Promise<boolean> {
     const project = this.projects.find((p: CosProject) => p.id === photo.projectId);
@@ -536,21 +586,28 @@ export class AppState {
           try { await this.grip.authorize(this.context); }
           catch (error) { this.grip.stop(); this.sensedHand = 'auto'; throw error as Error; }
         }
+        const gripChanged = settings.grip !== this.settings.grip;
         await this.preference.save(this.context, settings, this.settings); this.settings = settings;
-        if (!settings.grip) { this.grip.stop(); this.sensedHand = 'auto'; }
+        if (gripChanged) { this.syncGrip(); }
       }
     });
   }
-  suspend(): void { this.grip.stop(); this.sensedHand = 'auto'; }
-  async resume(): Promise<void> {
-    if (this.settings.grip && this.context) {
-      try {
-        await this.grip.start(this.context, (hand: string) => {
-          this.sensedHand = hand;
-        });
-      } catch (error) {
-        this.sensedHand = 'auto';
-      }
+  setForeground(foreground: boolean): void {
+    if (this.foreground === foreground) { return; }
+    this.foreground = foreground;
+    this.syncGrip();
+  }
+  setOutingActive(active: boolean): void {
+    if (this.outingActive === active) { return; }
+    this.outingActive = active;
+    this.syncGrip();
+  }
+  private syncGrip(): void {
+    this.sensedHand = 'auto';
+    if (this.foreground && this.outingActive && this.settings.grip && this.context && !this.disposeTask) {
+      this.grip.start(this.context, (hand: string) => { this.sensedHand = hand; }).catch((): void => {});
+    } else {
+      this.grip.stop();
     }
   }
   async shareProject(id: string): Promise<boolean> {
@@ -598,7 +655,13 @@ export class AppState {
     return canceled;
   }
   async clearData(): Promise<boolean> {
-    return this.perform(async () => { await this.relations.clear(); await this.cancelEventReminders(); await this.media?.collect([]); });
+    return this.perform(async () => {
+      await this.relations.clear();
+      await this.cancelEventReminders();
+      if (this.media && !(await this.media.collect([]))) {
+        this.reportNotice((this.notice ? this.notice + '。' : '') + '记录已清空，部分图片副本暂未清理');
+      }
+    });
   }
   projectAssets(id: string): Asset[] {
     const ids = this.links.filter((p: ProjectAsset) => p.projectId === id)

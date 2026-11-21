@@ -6,7 +6,6 @@ import { MainEntranceSession, StaggerEntrance } from '../common/motion';
 export struct DetailDestination {
   @Param titleOptions: HdsNavigationTitleBarOptions = {};
   @Event back: () => void = () => {};
-  @Event hidden: () => void = () => {};
   @BuilderParam content: (entrance: StaggerEntrance) => void = this.emptyContent;
   @Local entrance: StaggerEntrance = new StaggerEntrance();
   @Param entranceSession: MainEntranceSession | undefined = undefined;
@@ -39,7 +38,7 @@ export struct DetailDestination {
       .ignoreLayoutSafeArea([LayoutSafeAreaType.SYSTEM], [LayoutSafeAreaEdge.TOP, LayoutSafeAreaEdge.BOTTOM])
       .onWillShow((): void => { this.prepareEntrance(); })
       .onShown((): void => { this.showEntrance(); })
-      .onHidden((): void => { this.releaseEntrance(); this.hidden(); })
+      .onHidden((): void => { this.releaseEntrance(); })
       .onBackPressed((): boolean => { this.back(); return true; })
   }
 }

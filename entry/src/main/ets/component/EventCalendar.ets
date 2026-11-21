@@ -81,6 +81,7 @@ export struct EventCalendar {
                 .visualEffect(this.feedback.effect('button-4' + ":" + day.date))
                 .compositingFilter(this.feedback.filter('button-4' + ":" + day.date))
                 .attributeModifier(this.feedback.control('button-4' + ":" + day.date))
+                .onDisAppear((): void => { this.feedback.release('button-4' + ":" + day.date); })
           }
         }, (day: CalendarDay) => day.date)
       }.
@@ -102,6 +103,7 @@ export struct EventCalendar {
           .visualEffect(this.feedback.effect('button-5' + ":" + event.id, true))
           .compositingFilter(this.feedback.filter('button-5' + ":" + event.id, true))
           .attributeModifier(this.feedback.control('button-5' + ":" + event.id, true))
+          .onDisAppear((): void => { this.feedback.release('button-5' + ":" + event.id); })
       }, (event: CosEvent) => event.id)
       if (eventsOnDate(this.state.events, this.selected).length === 0) { EmptyState({
           title: '这天还没有安排',

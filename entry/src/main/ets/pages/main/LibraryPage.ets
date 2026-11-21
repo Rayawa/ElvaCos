@@ -53,6 +53,7 @@ export struct LibraryPage {
         .visualEffect(this.feedback.effect('asset-type:' + a.id))
         .compositingFilter(this.feedback.filter('asset-type:' + a.id))
         .attributeModifier(this.feedback.control('asset-type:' + a.id))
+        .onDisAppear((): void => { this.feedback.release('asset-type:' + a.id); })
       Column({ space: 7 }) { Text(a.name)
         .fontSize(19)
         .fontWeight(FontWeight.Medium)

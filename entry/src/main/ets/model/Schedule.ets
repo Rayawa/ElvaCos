@@ -29,6 +29,11 @@ export function checkSchedule(event: CosEvent): void {
   if (![-1, 0, 30, 60, 1440].includes(event.reminderMinutes)) { throw new Error('提醒提前时间无效'); }
 }
 export function eventEnd(event: CosEvent): string { return event.dateMode === 'multiple' ? event.endDate : event.date; }
+export function eventPhase(event: CosEvent, date: string): 'pending' | 'upcoming' | 'ongoing' | 'past' {
+  if (event.dateMode === 'pending') { return 'pending'; }
+  if (event.status === 'Attended' || eventEnd(event) < date) { return 'past'; }
+  return event.date > date ? 'upcoming' : 'ongoing';
+}
 export function eventDateLabel(event: CosEvent): string {
   return event.dateMode === 'pending' ? '日期待定' : event.date + (event.dateMode === 'multiple' ? ' ～ ' + event.endDate : '');
 }

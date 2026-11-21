@@ -95,6 +95,12 @@ export class PlanningRepository {
   async saveReference(r: ReferenceImage): Promise<void> {
     await this.db.getStore().executeSql('INSERT INTO reference_images(id,project_id,character_id,source_uri,local_path,thumbnail_path,caption,created_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET local_path=excluded.local_path,thumbnail_path=excluded.thumbnail_path,caption=excluded.caption', [r.id, r.projectId || null, r.characterId || null, r.sourceUri, r.localPath, r.thumbnailPath, r.caption, r.createdAt]);
   }
+  async repairReference(reference: ReferenceImage, media: ReferenceImage): Promise<void> {
+    await this.db.transaction(async (tx: WriteTransaction) => {
+      await tx.execute('UPDATE reference_images SET local_path=?,thumbnail_path=? WHERE id=?', [media.localPath, media.thumbnailPath, reference.id]);
+      await tx.execute("UPDATE characters SET cover=? WHERE cover=? AND cover<>''", [media.thumbnailPath, reference.thumbnailPath]);
+    });
+  }
   async setReferenceCover(r: ReferenceImage, characterId: string): Promise<void> {
     await this.db.getStore().executeSql('UPDATE characters SET cover=?,updated_at=? WHERE id=?', [r.thumbnailPath, Date.now(), characterId]);
   }

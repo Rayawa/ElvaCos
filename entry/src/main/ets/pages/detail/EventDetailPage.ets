@@ -1,7 +1,7 @@
-import { daysUntil } from '../../common/format';
+import { daysUntil, today } from '../../common/format';
 import { PressFeedback } from '../../common/pressFeedback';
 import { StaggerEntrance } from '../../common/motion';
-import { eventDateLabel, eventTimeLabel, reminderTime } from '../../model/Schedule';
+import { eventDateLabel, eventPhase, eventTimeLabel, reminderTime } from '../../model/Schedule';
 import { pageTransition } from '../../common/motion';
 import { appSheetOptions } from '../../common/sheet';
 import { SheetHeader } from '../../component/SheetHeader';
@@ -48,7 +48,8 @@ export struct EventDetail {
             .accessibilityText('关联计划 ' + p.name)
             .visualEffect(this.feedback.effect('link-project:' + p.id, true))
             .compositingFilter(this.feedback.filter('link-project:' + p.id, true))
-            .attributeModifier(this.feedback.control('link-project:' + p.id, true)) }
+            .attributeModifier(this.feedback.control('link-project:' + p.id, true))
+            .onDisAppear((): void => { this.feedback.release('link-project:' + p.id); }) }
         }, (p: CosProject) => p.id)
       }.layoutWeight(1).width('100%').opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
       if (!this.state.projects.some((p: CosProject) => !p.eventId)) { Text('没有待关联的计划，可以为本次活动新建计划。').fontSize(13).fontColor(Theme.muted) }
@@ -66,6 +67,13 @@ export struct EventDetail {
     }.padding(Theme.pagePadding).width('100%').height('100%').backgroundColor(Theme.surface)
   }
 
+  private scheduleLabel(): string {
+    const phase = eventPhase(this.event, today());
+    if (phase === 'pending') { return '日期待定'; }
+    if (phase === 'ongoing') { return '进行中'; }
+    return phase === 'upcoming' ? `还有 ${daysUntil(this.event.date)} 天` : '已留下的回忆';
+  }
+
   @Builder header() {
     Row({ space: 10 }) {
       Text(this.event.name)
@@ -77,7 +85,7 @@ export struct EventDetail {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       StatusPill({ label: this.event.ticketPurchased ? '门票已准备' : '门票待确认' })
     }.width('100%').alignItems(VerticalAlign.Center)
-    Text(this.event.dateMode === 'pending' ? '日期待定' : daysUntil(this.event.date) >= 0 ? `还有 ${daysUntil(this.event.date)} 天` : '已留下的回忆')
+    Text(this.scheduleLabel())
       .fontSize(13)
       .fontColor(Theme.accent)
   }

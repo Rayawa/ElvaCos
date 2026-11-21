@@ -26,4 +26,4 @@ trap 'rm -f "$TASK_REPORT"' EXIT
 run_hdc shell aa test -b top.rayawa.elvacos -m entry_test -s unittest OpenHarmonyTestRunner -s timeout 45000 > "$TASK_REPORT"
 cat "$TASK_REPORT"
 # aa test exits zero even for failed cases: inspect Hypium's report.
-rg 'Tests run: 55, Failure: 0, Error: 0, Pass: 55, Ignore: 0' "$TASK_REPORT"
+rg 'Tests run: 56, Failure: 0, Error: 0, Pass: 56, Ignore: 0' "$TASK_REPORT"

@@ -74,6 +74,9 @@ import { EmptyState } from '../component/Surfaces';
   private maintenanceTimer: number = -1;
   private visible: boolean = false;
   private maintenanceDone: boolean = false;
+  private maintenanceRunning: boolean = false;
+  private outingRoute?: ProjectRoute;
+  private pendingProjectId: string = '';
 
   onPageShow(): void {
     this.visible = true;
@@ -81,40 +84,54 @@ import { EmptyState } from '../component/Surfaces';
     this.startupTimer = setTimeout(async (): Promise<void> => {
       this.startupTimer = -1;
       await this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext);
-      if (this.visible && this.state.ready && !this.maintenanceDone) {
-        this.maintenanceTimer = setTimeout((): void => {
-          this.maintenanceTimer = -1;
-          if (!this.state.busy) { this.maintenanceDone = true; this.state.maintain(); }
-        }, 300);
-      }
+      this.scheduleMaintenance();
     }, 0);
+  }
+
+  @Monitor('state.ready', 'state.busy', 'state.refreshPending')
+  private scheduleMaintenance(): void {
+    if (!this.visible || !this.state.ready || this.state.busy || this.state.refreshPending ||
+      this.maintenanceDone || this.maintenanceRunning || this.maintenanceTimer >= 0) { return; }
+    this.maintenanceTimer = setTimeout(async (): Promise<void> => {
+      this.maintenanceTimer = -1;
+      if (!this.visible || this.state.busy || this.state.refreshPending) { return; }
+      this.maintenanceRunning = true;
+      try { this.maintenanceDone = await this.state.maintain(); }
+      finally { this.maintenanceRunning = false; }
+    }, 300);
   }
 
   private cancelTasks(): void {
     this.visible = false;
     if (this.startupTimer >= 0) { clearTimeout(this.startupTimer); this.startupTimer = -1; }
     if (this.maintenanceTimer >= 0) { clearTimeout(this.maintenanceTimer); this.maintenanceTimer = -1; }
-    this.state.suspend();
   }
 
-  aboutToDisappear(): void { this.cancelTasks(); }
-  @Monitor('state.ready', 'state.pendingEventId')
+  aboutToDisappear(): void { this.cancelTasks(); this.setOuting(); }
+  @Monitor('state.ready', 'state.pendingEventId', 'state.refreshPending')
   openPendingEvent(): void {
-    if (!this.state.ready || !this.state.pendingEventId) { return; }
+    if (!this.state.ready || this.state.refreshPending || !this.state.pendingEventId) { return; }
     const id = this.state.pendingEventId; this.state.pendingEventId = '';
     if (this.state.events.some((e: CosEvent) => e.id === id)) { this.open('event', id); }
   }
   onPageHide(): void { this.cancelTasks(); }
 
+  private setOuting(route?: ProjectRoute): void {
+    if (this.outingRoute && this.outingRoute !== route) { this.outingRoute.outing = false; }
+    this.outingRoute = route;
+    if (route) { route.outing = true; }
+    this.state.setOutingActive(route !== undefined);
+  }
+
   /** 二级页面返回：Dashboard AppDetailPage 的 closePage 语义 + 显式返回振动。 */
   private closeDetail(): void {
     HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
-    if (this.detailStack.size() > 0) { this.detailStack.pop(); }
+    if (this.detailStack.size() > 0) { this.setOuting(); this.detailStack.pop(); }
   }
   private open(kind: string, id: string): void {
     if (!id) { return; }
     HapticService.confirm(this.state.settings.haptic);
-    this.state.suspend();
+    this.setOuting();
     if (kind === 'project' || kind === 'packing' || kind === 'projectPhotos') {
       const section = kind === 'packing' ? 1 : kind === 'projectPhotos' ? 2 : 0;
       this.detailStack.pushPathByName('project', new ProjectRoute(id, section));
@@ -125,10 +142,11 @@ import { EmptyState } from '../component/Surfaces';
 
   /** 开发者选项入口：设置页连点版本号五次，按需求不振动。 */
   private openDeveloper(): void {
-    this.state.suspend();
+    this.setOuting();
     this.detailStack.pushPathByName('developer', 'developer');
   }
   private edit(kind: string, id: string = '', parent: string = ''): void {
+    if (this.state.refreshPending) { return; }
     HapticService.confirm(this.state.settings.haptic);
     this.state.error = '';
     this.rootSheetKind = 'form';
@@ -153,8 +171,10 @@ import { EmptyState } from '../component/Surfaces';
     const accepted = await confirm(this.getUIContext(), '确认删除？', messages.get(kind) || '记录将删除。', '删除');
     if (accepted && await this.state.remove(kind, id)) {
       if (kind === 'project' || kind === 'character') {
+        this.setOuting();
         this.detailStack.clear();
       } else if (!['variant', 'checklist', 'preparation', 'category', 'team', 'expense'].includes(kind)) {
+        this.setOuting();
         this.detailStack.pop();
       }
     }
@@ -170,7 +190,7 @@ import { EmptyState } from '../component/Surfaces';
     );
     if (accepted) {
       const changed = kind === 'restore' ? await this.state.restoreData() : await this.state.clearData();
-      if (changed) { this.detailStack.clear(); }
+      if (changed) { this.setOuting(); this.detailStack.clear(); }
     }
   }
 
@@ -182,7 +202,12 @@ import { EmptyState } from '../component/Surfaces';
       entrance: this.sheetEntrance,
       state: this.state, draft: this.draft,
       done: (): void => { this.formOpen = false; },
-      saved: (kind: string, id: string, created: boolean): void => { if (kind === 'project' && created) { this.open('project', id); } },
+      saved: (kind: string, id: string, created: boolean): void => {
+        if (kind === 'project' && created) {
+          if (this.state.refreshPending) { this.pendingProjectId = id; }
+          else { this.open('project', id); }
+        }
+      },
     })
   }
 
@@ -315,10 +340,6 @@ import { EmptyState } from '../component/Surfaces';
           (): void => { this.closeDetail(); },
         ),
         back: (): void => { this.closeDetail(); },
-        hidden: (): void => {
-          if (kind === 'project') { (param as ProjectRoute).outing = false; }
-          this.state.suspend();
-        },
         content: this.destinationBody.bind(this, kind, param),
       })
     }
@@ -378,6 +399,7 @@ import { EmptyState } from '../component/Surfaces';
             .visualEffect(this.feedback.effect('import-project:' + p.id, true))
             .compositingFilter(this.feedback.filter('import-project:' + p.id, true))
             .attributeModifier(this.feedback.control('import-project:' + p.id, true))
+            .onDisAppear((): void => { this.feedback.release('import-project:' + p.id); })
           }
         }, (p: CosProject) => p.id)
       }.layoutWeight(1).width('100%').opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
@@ -424,7 +446,7 @@ import { EmptyState } from '../component/Surfaces';
         items: this.buildSegmentItems(['准备', '打包', '照片']),
         selectedIndexes: [route.section],
         experimentalWidth: Theme.titleSegmentWidth,
-        onSelectedIndexChanged: (selected: number): void => { route.section = selected; route.outing = false; this.state.suspend(); },
+        onSelectedIndexChanged: (selected: number): void => { route.section = selected; this.setOuting(); },
         onItemClicked: (): void => { HapticService.confirm(this.state.settings.haptic); },
       }).margin({ top: 8 })
     }.width('100%').height('100%').justifyContent(FlexAlign.Center)
@@ -450,12 +472,7 @@ import { EmptyState } from '../component/Surfaces';
         { value: '常用物品', icon: Icons.check, action: () => this.state.generateChecklist(id) },
         {
           value: route.outing ? '结束出门' : '出门模式', icon: Icons.check, action: () => {
-            route.outing = !route.outing;
-            if (route.outing) {
-              this.state.resume();
-            } else {
-              this.state.suspend();
-            }
+            this.setOuting(route.outing ? undefined : route);
           }
         }];
       }
@@ -548,6 +565,19 @@ import { EmptyState } from '../component/Surfaces';
   @Builder loadingOverlay() {
     if (this.state.busy) {
       LoadingProgress().width(40).height(40).color(Theme.brand).hitTestBehavior(HitTestMode.None).accessibilityText('操作进行中')
+    } else if (this.state.refreshPending) {
+      EmptyState({
+        title: '更改已保存',
+        message: '刷新记录后可继续修改。',
+        button: '重试刷新',
+        action: async (): Promise<void> => {
+          if (await this.state.retryRefresh() && this.pendingProjectId) {
+            const id = this.pendingProjectId;
+            this.pendingProjectId = '';
+            if (this.state.projects.some((project: CosProject) => project.id === id)) { this.open('project', id); }
+          }
+        }
+      }).width('85%').constraintSize({ maxWidth: 360 })
     }
   }
 
@@ -681,7 +711,7 @@ import { EmptyState } from '../component/Surfaces';
       })
       .onChange((index: number): void => {
         this.tab = index;
-        this.state.suspend();
+        this.setOuting();
         HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
       })
       .height(LayoutPolicy.matchParent).width('100%')
@@ -698,7 +728,10 @@ import { EmptyState } from '../component/Surfaces';
     }.mode(NavigationMode.Stack).hideTitleBar(true).hideToolBar(true)
       .navDestination(this.destination)
       .customNavContentTransition((_from: NavContentInfo, _to: NavContentInfo, operation: NavigationOperation) => {
-        if (operation === NavigationOperation.POP) { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); }
+        if (operation === NavigationOperation.POP) {
+          this.setOuting();
+          HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
+        }
         return undefined;
       })
       .width('100%').height(LayoutPolicy.matchParent)

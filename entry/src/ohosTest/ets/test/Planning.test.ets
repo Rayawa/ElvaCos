@@ -84,14 +84,28 @@ export default function planningTest(): void {
       const packer = image.createImagePacker(); const file = await fs.open(source, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
       try { await packer.packToFile(pixel, file.fd, { format: 'image/jpeg', quality: 80 }); } finally { await fs.close(file); pixel.release(); packer.release(); }
       let imported: ReferenceImage | undefined;
+      let replacement: ReferenceImage | undefined;
       try {
         imported = await media.importReference(source, project.id, ''); await repo.saveReference(imported); await repo.setReferenceCover(imported, role.id);
         await media.collect([], [imported]); expect(await media.exists(imported)).assertTrue();
         await backup.restoreMetadata(await backup.exportMetadata()); expect((await repo.references())[0].localPath).assertEqual(imported.localPath);
+        replacement = await media.importReference(source, project.id, '');
+        await repo.repairReference(imported, replacement);
+        imported = (await repo.references())[0];
+        expect(imported.thumbnailPath).assertEqual(replacement.thumbnailPath);
+        const updatedCover = await db.getStore().querySql('SELECT cover FROM characters WHERE id=?', [role.id]);
+        try { updatedCover.goToFirstRow(); expect(updatedCover.getString(0)).assertEqual(replacement.thumbnailPath); }
+        finally { updatedCover.close(); }
         await repo.removeReference(imported);
         const rows = await db.getStore().querySql('SELECT cover FROM characters WHERE id=?', [role.id]); try { rows.goToFirstRow(); expect(rows.getString(0)).assertEqual(''); } finally { rows.close(); }
         await media.collect([], []); expect(await media.exists(imported)).assertFalse();
-      } finally { if (imported) { await repo.removeReference(imported); await media.remove(imported); } if (await fs.access(root)) { await fs.rmdir(root); } await fs.unlink(source); }
+      } finally {
+        if (imported) { await repo.removeReference(imported); }
+        if (replacement) { await media.remove(replacement); }
+        await media.collect([]);
+        if (await fs.access(root)) { await fs.rmdir(root); }
+        await fs.unlink(source);
+      }
     });
     it('v2BackupKeepsPreparationAndDefaultsNewScheduleFields', 0, async () => {
       const saved = await backup.exportMetadata(); const doc = JSON.parse(saved) as BackupDocument; doc.version = 2; doc.tables = doc.tables.slice(0, 12);

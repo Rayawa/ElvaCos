@@ -66,6 +66,7 @@ export struct AssetDetail {
             .width('100%').backgroundColor(Theme.tint).constraintSize({ minHeight: 52 })
             .onClick((): void => { vibration.dotVibration(); this.open('project', p.id); })
             .accessibilityText('打开计划 ' + p.name).visualEffect(this.feedback.effect('button-2' + ":" + p.id)).compositingFilter(this.feedback.filter('button-2' + ":" + p.id)).attributeModifier(this.feedback.control('button-2' + ":" + p.id))
+            .onDisAppear((): void => { this.feedback.release('button-2' + ":" + p.id); })
           }, (p: CosProject) => p.id)
         }.
       width('100%').alignItems(HorizontalAlign.Start).opacity(this.entrance.step >= 2 ? 1 : 0).translate({ y: this.entrance.step >= 2 ? 0 : 20 })

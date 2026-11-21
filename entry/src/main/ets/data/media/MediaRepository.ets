@@ -119,14 +119,23 @@ export class MediaRepository {
       if (path.startsWith(this.mediaRoot + '/')) { try { await fs.unlink(path); } catch (error) { } }
     }
   }
-  async collect(photos: PhotoAsset[], references: ReferenceImage[] = []): Promise<void> {
-    const dir = this.mediaRoot;
-    const keep: string[] = [];
-    photos.forEach((p: PhotoAsset) => { keep.push(p.localPath); keep.push(p.thumbnailPath); });
-    references.forEach((r: ReferenceImage) => { keep.push(r.localPath); keep.push(r.thumbnailPath); });
+  async collect(photos: PhotoAsset[], references: ReferenceImage[] = []): Promise<boolean> {
+    let names: string[];
     try {
-      const names = await fs.listFile(dir);
-      for (const name of names) { const path = dir + '/' + name; if (!keep.includes(path)) { await fs.unlink(path); } }
-    } catch (error) { /* A fresh installation has no media directory. Retry on next launch. */ }
+      if (!(await fs.access(this.mediaRoot))) { return true; }
+      names = await fs.listFile(this.mediaRoot);
+    } catch (error) { return false; }
+    const keep = new Set<string>();
+    for (const photo of photos) { keep.add(photo.localPath); keep.add(photo.thumbnailPath); }
+    for (const reference of references) { keep.add(reference.localPath); keep.add(reference.thumbnailPath); }
+    let cleaned = true;
+    for (const name of names) {
+      const path = this.mediaRoot + '/' + name;
+      if (!keep.has(path)) {
+        try { await fs.unlink(path); }
+        catch (error) { cleaned = false; }
+      }
+    }
+    return cleaned;
   }
 }

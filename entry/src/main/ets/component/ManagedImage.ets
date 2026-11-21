@@ -23,7 +23,7 @@ export struct ManagedImage {
   build() {
     Stack() {
       if (this.sourcePath && !this.failed) {
-        Image(this.uri()).width('100%').height('100%').objectFit(this.fit)
+        Image(this.uri()).width('100%').height('100%').objectFit(this.fit).autoResize(this.large)
           .onComplete((event) => { if (event && event.width > 0 && event.height > 0) { this.loadedRatio = event.width / event.height; } this.loading = false; })
           .onError(() => { this.loading = false; this.failed = true; this.onFailure(); })
           .accessibilityText(this.label).accessibilityDescription(this.loading ? '照片加载中' : '照片已加载')

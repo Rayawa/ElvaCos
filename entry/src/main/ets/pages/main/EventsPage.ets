@@ -3,7 +3,7 @@ import { PressFeedback } from '../../common/pressFeedback';
 import { MainEntranceSession } from '../../common/motion';
 import { scrollByAxis } from '../../common/scroll';
 import { EventCalendar } from '../../component/EventCalendar';
-import { eventEnd, eventDateLabel, eventTimeLabel } from '../../model/Schedule';
+import { eventPhase, eventDateLabel, eventTimeLabel } from '../../model/Schedule';
 import { vibration } from '../../common/vibration';
 import { AppState } from '../../model/ApplicationState';
 import { Theme } from '../../common/Theme';
@@ -38,8 +38,20 @@ export struct EventsPage {
     this.enterTimers = startStaggerEnterAnimation(this.getUIContext(), 2, (step: number): void => { this.animStep = step; });
   }
   aboutToDisappear(): void { cancelStaggerEnterAnimation(this.enterTimers); this.enterTimers = []; this.animStep = 2; }
-  private events(): CosEvent[] { return this.state.events.filter((e: CosEvent) => this.filter === 2 ? e.dateMode === 'pending' : this.filter === 1 ? e.dateMode !== 'pending' && (e.status === 'Attended' || eventEnd(e) < today()) : e.dateMode !== 'pending' && e.status !== 'Attended' && eventEnd(e) >= today())
-    .sort((a: CosEvent, b: CosEvent) => this.filter === 1 ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)); }
+  private events(): CosEvent[] {
+    const date = today();
+    return this.state.events.filter((event: CosEvent): boolean => {
+      const phase = eventPhase(event, date);
+      return this.filter === 2 ? phase === 'pending' : this.filter === 1 ? phase === 'past' : phase === 'upcoming' || phase === 'ongoing';
+    }).sort((a: CosEvent, b: CosEvent) => this.filter === 1 ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+  }
+  private statusLabel(event: CosEvent): string {
+    if (event.ticketPurchased) { return '已购票'; }
+    const phase = eventPhase(event, today());
+    if (phase === 'pending') { return '日期待定'; }
+    if (phase === 'ongoing') { return '进行中'; }
+    return phase === 'upcoming' ? daysUntil(event.date) + ' 天后' : '已结束';
+  }
   @Builder content(e: CosEvent) {
     Row({ space: 18 }) {
       Column({ space: 4 }) { Text(e.dateMode === 'pending' ? '日期' : e.date.slice(5, 7) + '月')
@@ -53,9 +65,7 @@ export struct EventsPage {
         .fontWeight(FontWeight.Bold)
         .fontColor(Theme.ink); Text(eventDateLabel(e) + ' · ' + (e.city || e.venue || '地点待定'))
         .fontSize(13)
-        .fontColor(Theme.muted); StatusPill({
-          label: e.ticketPurchased ? '已购票' : e.dateMode === 'pending' ? '日期待定' : daysUntil(e.date) >= 0 ? daysUntil(e.date) + ' 天后' : eventEnd(e) >= today() ? '进行中' : '已结束'
-        }) }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        .fontColor(Theme.muted); StatusPill({ label: this.statusLabel(e) }) }.alignItems(HorizontalAlign.Start).layoutWeight(1)
     }.width('100%')
   }
   build() {

@@ -47,6 +47,7 @@ export struct ReferenceGallery {
               .visualEffect(this.feedback.effect('button-2' + ":" + r.id))
               .compositingFilter(this.feedback.filter('button-2' + ":" + r.id))
               .attributeModifier(this.feedback.control('button-2' + ":" + r.id))
+              .onDisAppear((): void => { this.feedback.release('button-2' + ":" + r.id); })
           }, (r: ReferenceImage) => r.id)
         }.alignItems(VerticalAlign.Top)
       }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%')

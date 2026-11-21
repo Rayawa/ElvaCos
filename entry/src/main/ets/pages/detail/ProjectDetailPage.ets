@@ -73,6 +73,7 @@ export struct ProjectDetail {
               .visualEffect(this.feedback.effect('link-asset:' + asset.id, true))
               .compositingFilter(this.feedback.filter('link-asset:' + asset.id, true))
               .attributeModifier(this.feedback.control('link-asset:' + asset.id, true))
+              .onDisAppear((): void => { this.feedback.release('link-asset:' + asset.id); })
           }
         }, (asset: Asset) => asset.id)
       }.layoutWeight(1).width('100%').opacity(this.sheetEntrance.step >= 2 ? 1 : 0).translate({ y: this.sheetEntrance.step >= 2 ? 0 : 20 })
@@ -114,6 +115,7 @@ export struct ProjectDetail {
         .visualEffect(this.feedback.effect('packing-confirm:' + item.id))
         .compositingFilter(this.feedback.filter('packing-confirm:' + item.id))
         .attributeModifier(this.feedback.control('packing-confirm:' + item.id))
+        .onDisAppear((): void => { this.feedback.release('packing-confirm:' + item.id); })
   }
 
   @Builder activeSheet() {
@@ -280,6 +282,7 @@ export struct ProjectDetail {
             .visualEffect(this.feedback.effect('button-11' + ":" + category.id))
             .compositingFilter(this.feedback.filter('button-11' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-11' + ":" + category.id))
+            .onDisAppear((): void => { this.feedback.release('button-11' + ":" + category.id); })
           Button('编辑')
             .backgroundColor(Theme.bg)
             .fontColor(Theme.muted)
@@ -289,6 +292,7 @@ export struct ProjectDetail {
             .visualEffect(this.feedback.effect('button-12' + ":" + category.id))
             .compositingFilter(this.feedback.filter('button-12' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-12' + ":" + category.id))
+            .onDisAppear((): void => { this.feedback.release('button-12' + ":" + category.id); })
           Button('＋')
             .backgroundColor(Theme.tint)
             .fontColor(Theme.accent)
@@ -297,6 +301,7 @@ export struct ProjectDetail {
             .visualEffect(this.feedback.effect('button-13' + ":" + category.id))
             .compositingFilter(this.feedback.filter('button-13' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-13' + ":" + category.id))
+            .onDisAppear((): void => { this.feedback.release('button-13' + ":" + category.id); })
           Button('−')
             .backgroundColor(Theme.bg)
             .fontColor(Theme.muted)
@@ -306,6 +311,7 @@ export struct ProjectDetail {
             .visualEffect(this.feedback.effect('button-14' + ":" + category.id))
             .compositingFilter(this.feedback.filter('button-14' + ":" + category.id))
             .attributeModifier(this.feedback.control('button-14' + ":" + category.id))
+            .onDisAppear((): void => { this.feedback.release('button-14' + ":" + category.id); })
         }.width('100%')
         ForEach(this.visibleTasks(category.id), (task: PreparationTask) => {
           Row({ space: 8 }) {
@@ -319,6 +325,7 @@ export struct ProjectDetail {
                 .visualEffect(this.feedback.effect('button-15' + ":" + category.id + ":" + task.id))
                 .compositingFilter(this.feedback.filter('button-15' + ":" + category.id + ":" + task.id))
                 .attributeModifier(this.feedback.control('button-15' + ":" + category.id + ":" + task.id))
+                .onDisAppear((): void => { this.feedback.release('button-15' + ":" + category.id + ":" + task.id); })
             Column({ space: 4 }) {
               Text(task.label)
                 .fontSize(15)
@@ -333,6 +340,7 @@ export struct ProjectDetail {
               .visualEffect(this.feedback.effect('column-16' + ":" + category.id + ":" + task.id))
               .compositingFilter(this.feedback.filter('column-16' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('column-16' + ":" + category.id + ":" + task.id))
+              .onDisAppear((): void => { this.feedback.release('column-16' + ":" + category.id + ":" + task.id); })
             Button('−')
               .backgroundColor(Theme.bg)
               .fontColor(Theme.muted)
@@ -342,6 +350,7 @@ export struct ProjectDetail {
               .visualEffect(this.feedback.effect('button-17' + ":" + category.id + ":" + task.id))
               .compositingFilter(this.feedback.filter('button-17' + ":" + category.id + ":" + task.id))
               .attributeModifier(this.feedback.control('button-17' + ":" + category.id + ":" + task.id))
+              .onDisAppear((): void => { this.feedback.release('button-17' + ":" + category.id + ":" + task.id); })
           }.width('100%')
         }, (task: PreparationTask) => task.id)
         if (this.tasks(category.id).length === 0) { Text('点击 ＋ 添加第一项任务').fontSize(12).fontColor(Theme.muted) }
@@ -353,6 +362,7 @@ export struct ProjectDetail {
         .visualEffect(this.feedback.effect('column-10' + ":" + category.id, true))
         .compositingFilter(this.feedback.filter('column-10' + ":" + category.id, true))
         .attributeModifier(this.feedback.control('column-10' + ":" + category.id, true))
+        .onDisAppear((): void => { this.feedback.release('column-10' + ":" + category.id); })
     }, (category: PreparationCategory) => category.id)
   }
 
@@ -368,6 +378,7 @@ export struct ProjectDetail {
           .alignItems(HorizontalAlign.Start)
           .onClick((): void => { vibration.dotVibration(); this.open('asset', asset.id); })
           .accessibilityText(asset.name + '，打开装备详情').visualEffect(this.feedback.effect('column-19' + ":" + asset.id)).compositingFilter(this.feedback.filter('column-19' + ":" + asset.id)).attributeModifier(this.feedback.control('column-19' + ":" + asset.id))
+          .onDisAppear((): void => { this.feedback.release('column-19' + ":" + asset.id); })
         Button('移除')
           .backgroundColor(Theme.bg)
           .fontColor(Theme.muted)
@@ -377,8 +388,10 @@ export struct ProjectDetail {
           .visualEffect(this.feedback.effect('button-20' + ":" + asset.id))
           .compositingFilter(this.feedback.filter('button-20' + ":" + asset.id))
           .attributeModifier(this.feedback.control('button-20' + ":" + asset.id))
+          .onDisAppear((): void => { this.feedback.release('button-20' + ":" + asset.id); })
       }.
     width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(18).visualEffect(this.feedback.effect('row-18' + ":" + asset.id, true)).compositingFilter(this.feedback.filter('row-18' + ":" + asset.id, true)).attributeModifier(this.feedback.control('row-18' + ":" + asset.id, true))
+    .onDisAppear((): void => { this.feedback.release('row-18' + ":" + asset.id); })
     }, (asset: Asset) => asset.id)
     if (this.state.projectAssets(this.project.id).length === 0) {
       Row({ space: 8 }) { Text('还没有关联装备，可以新建或从衣柜复用。')
@@ -428,6 +441,7 @@ export struct ProjectDetail {
           .visualEffect(this.feedback.effect('column-24' + ":" + m.id))
           .compositingFilter(this.feedback.filter('column-24' + ":" + m.id))
           .attributeModifier(this.feedback.control('column-24' + ":" + m.id))
+          .onDisAppear((): void => { this.feedback.release('column-24' + ":" + m.id); })
         Button('−')
           .backgroundColor(Theme.bg)
           .fontColor(Theme.muted)
@@ -437,8 +451,10 @@ export struct ProjectDetail {
           .visualEffect(this.feedback.effect('button-25' + ":" + m.id))
           .compositingFilter(this.feedback.filter('button-25' + ":" + m.id))
           .attributeModifier(this.feedback.control('button-25' + ":" + m.id))
+          .onDisAppear((): void => { this.feedback.release('button-25' + ":" + m.id); })
       }.
     width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-23' + ":" + m.id, true)).compositingFilter(this.feedback.filter('row-23' + ":" + m.id, true)).attributeModifier(this.feedback.control('row-23' + ":" + m.id, true))
+    .onDisAppear((): void => { this.feedback.release('row-23' + ":" + m.id); })
     }, (m: TeamMember) => m.id)
     if (!this.state.team.some((m: TeamMember) => m.projectId === this.project.id)) { Text('记录毛娘、妆娘、摄影、后勤和后期的人选。').fontColor(Theme.muted).fontSize(13) }
     Row({ space: 8 }) {
@@ -470,6 +486,7 @@ export struct ProjectDetail {
           .visualEffect(this.feedback.effect('column-28' + ":" + e.id))
           .compositingFilter(this.feedback.filter('column-28' + ":" + e.id))
           .attributeModifier(this.feedback.control('column-28' + ":" + e.id))
+          .onDisAppear((): void => { this.feedback.release('column-28' + ":" + e.id); })
         Button('−')
           .backgroundColor(Theme.bg)
           .fontColor(Theme.muted)
@@ -479,8 +496,10 @@ export struct ProjectDetail {
           .visualEffect(this.feedback.effect('button-29' + ":" + e.id))
           .compositingFilter(this.feedback.filter('button-29' + ":" + e.id))
           .attributeModifier(this.feedback.control('button-29' + ":" + e.id))
+          .onDisAppear((): void => { this.feedback.release('button-29' + ":" + e.id); })
       }.
     width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(16).visualEffect(this.feedback.effect('row-27' + ":" + e.id, true)).compositingFilter(this.feedback.filter('row-27' + ":" + e.id, true)).attributeModifier(this.feedback.control('row-27' + ":" + e.id, true))
+    .onDisAppear((): void => { this.feedback.release('row-27' + ":" + e.id); })
     }, (e: Expense) => e.id)
     Button('查看全部花费统计')
       .accessibilityText('查看全部花费统计')
@@ -529,10 +548,12 @@ export struct ProjectDetail {
           .accessibilityText('删除清单项 ' + item.label)
           .visualEffect(this.feedback.effect('button-32' + ":" + item.id))
           .compositingFilter(this.feedback.filter('button-32' + ":" + item.id))
-          .attributeModifier(this.feedback.control('button-32' + ":" + item.id)) }
+          .attributeModifier(this.feedback.control('button-32' + ":" + item.id))
+          .onDisAppear((): void => { this.feedback.release('button-32' + ":" + item.id); }) }
         if (this.state.hand() !== 'left') { this.checkButton(item) }
       }.
     width('100%').padding(14).backgroundColor(Theme.surface).borderRadius(20).visualEffect(this.feedback.effect('row-31' + ":" + item.id, true)).compositingFilter(this.feedback.filter('row-31' + ":" + item.id, true)).attributeModifier(this.feedback.control('row-31' + ":" + item.id, true))
+    .onDisAppear((): void => { this.feedback.release('row-31' + ":" + item.id); })
     }, (item: ChecklistItem) => item.id)
   }
 
@@ -559,6 +580,6 @@ export struct ProjectDetail {
       .align(Alignment.Top)
       .transition(pageTransition())
       .bindSheet(this.route.preparing || this.route.linking, this.activeSheet(), appSheetOptions((): void => { this.route.preparing = false; this.route.linking = false; }, this.sheetEntrance, this.getUIContext()))
-      .onDisAppear((): void => { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); this.state.suspend(); })
+      .onDisAppear((): void => { HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel); })
   }
 }

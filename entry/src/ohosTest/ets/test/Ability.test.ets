@@ -42,6 +42,9 @@ export default function abilityTest(): void {
     it('assetAssociationAndChecklistGenerationAreIdempotent', 0, async () => {
       await relations.link(project.id, asset); await relations.link(project.id, asset);
       expect((await relations.links()).length).assertEqual(1); expect((await checklist.list()).length).assertEqual(1);
+      await relations.generateChecklist(project.id, [asset]);
+      await relations.generateChecklist(project.id, [asset]);
+      expect((await checklist.list()).length).assertEqual(7);
     });
     it('foreignKeysProtectLinkedCharacters', 0, async () => {
       let rejected = false; try { await characters.remove(character.id); } catch (error) { rejected = true; }
@@ -71,19 +74,36 @@ export default function abilityTest(): void {
       const packer = image.createImagePacker();
       const file = await fs.open(sourcePath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
       try { await packer.packToFile(pixel, file.fd, { format: 'image/jpeg', quality: 80 }); } finally { await fs.close(file); pixel.release(); packer.release(); }
-      const media = new MediaRepository(context);
+      const root = context.filesDir + '/verification-media-' + newId();
+      const media = new MediaRepository(context, root);
       const imported = await media.import(sourcePath, project.id);
+      let replacement: PhotoAsset | undefined;
       try {
         expect(imported.localPath !== sourcePath).assertTrue(); expect((await fs.stat(imported.localPath)).size > 0).assertTrue();
         const thumb = image.createImageSource(imported.thumbnailPath);
         try { expect((await thumb.getImageInfo()).size.width <= 480).assertTrue(); } finally { thumb.release(); }
         await relations.addPhoto(imported);
+        await db.getStore().executeSql('UPDATE characters SET cover=? WHERE id=?', [imported.thumbnailPath, character.id]);
         expect((await photos.list()).length).assertEqual(1);
         const backup = new BackupService(db, context);
         await backup.restoreMetadata(await backup.exportMetadata());
         expect((await photos.list())[0].localPath).assertEqual(imported.localPath);
+        replacement = await media.import(sourcePath, project.id);
+        await photos.repairMedia(imported, replacement);
+        const repaired = (await photos.list())[0];
+        expect(repaired.id).assertEqual(imported.id);
+        expect(repaired.localPath).assertEqual(replacement.localPath);
+        expect((await characters.list())[0].cover).assertEqual(replacement.thumbnailPath);
+        const version = await db.getStore().querySql('SELECT rendered_path FROM photo_versions WHERE photo_id=?', [imported.id]);
+        try { version.goToFirstRow(); expect(version.getString(0)).assertEqual(replacement.localPath); }
+        finally { version.close(); }
         await photos.remove(imported.id);
-      } finally { await media.remove(imported); await fs.unlink(sourcePath); }
+      } finally {
+        if (replacement) { await media.remove(replacement); }
+        await media.remove(imported);
+        await fs.rmdir(root);
+        await fs.unlink(sourcePath);
+      }
     });
     it('preferencesMigratePersistAndPreserveExistingValues', 0, async () => {
       const oldName = 'verification-old-' + newId();

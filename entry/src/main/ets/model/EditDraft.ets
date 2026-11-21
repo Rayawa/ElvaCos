@@ -7,6 +7,7 @@ import { moneyToCents, validDate } from './Rules';
 
 @ObservedV2
 export class EditDraft {
+  savedEvent?: CosEvent;
   @Trace kind: string = '';
   @Trace id: string = '';
   @Trace parentId: string = '';
@@ -219,6 +220,7 @@ export class EditDraft {
       const saved = await state.saveEvent(e);
       if (saved) {
         this.id = e.id;
+        this.savedEvent = e;
       }
       return saved;
     }

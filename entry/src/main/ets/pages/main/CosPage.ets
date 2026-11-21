@@ -61,7 +61,8 @@ export struct CosPage {
         .accessibilityLevel('no')
         .visualEffect(this.feedback.effect('character-placeholder:' + character.id))
         .compositingFilter(this.feedback.filter('character-placeholder:' + character.id))
-        .attributeModifier(this.feedback.control('character-placeholder:' + character.id)) }
+        .attributeModifier(this.feedback.control('character-placeholder:' + character.id))
+        .onDisAppear((): void => { this.feedback.release('character-placeholder:' + character.id); }) }
       Column({ space: 6 }) {
         Text(character.name + (character.favorite ? ' ★' : '')).fontSize(21).fontWeight(FontWeight.Bold).fontColor(Theme.ink)
         Text(character.workName || '所属作品待补充').fontSize(13).fontColor(Theme.muted)

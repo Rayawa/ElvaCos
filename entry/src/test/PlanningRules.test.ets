@@ -1,7 +1,7 @@
 import { deviceCalendarDraft } from '../main/ets/model/DeviceCalendar';
 import { describe, it, expect } from '@ohos/hypium';
 import { CosEvent } from '../main/ets/model/Entities';
-import { calendarDays, eventsOnDate, checkSchedule, reminderTime } from '../main/ets/model/Schedule';
+import { calendarDays, eventPhase, eventsOnDate, checkSchedule, reminderTime } from '../main/ets/model/Schedule';
 import { makePreparation, preparationKeys } from '../main/ets/model/Preparation';
 import { EventSaveCoordinator } from '../main/ets/common/EventSaveCoordinator';
 
@@ -40,6 +40,13 @@ export default function planningRulesTest(): void {
       const pending = new CosEvent(); pending.dateMode = 'pending';
       for (const date of ['2026-10-07', '2026-10-08', '2026-10-09']) { expect(eventsOnDate([multiple, pending], date).length).assertEqual(1); }
       expect(eventsOnDate([multiple, pending], '2026-10-10').length).assertEqual(0);
+      expect(eventPhase(multiple, '2026-10-06')).assertEqual('upcoming');
+      expect(eventPhase(multiple, '2026-10-08')).assertEqual('ongoing');
+      expect(eventPhase(multiple, '2026-10-09')).assertEqual('ongoing');
+      expect(eventPhase(multiple, '2026-10-10')).assertEqual('past');
+      expect(eventPhase(pending, '2026-10-08')).assertEqual('pending');
+      multiple.status = 'Attended';
+      expect(eventPhase(multiple, '2026-10-08')).assertEqual('past');
     });
     it('scheduleRejectsInvalidDatesTimesAndPendingReminders', 0, () => {
       const event = new CosEvent(); event.date = '2026-10-07'; event.dateMode = 'multiple'; event.endDate = '2026-10-06';
