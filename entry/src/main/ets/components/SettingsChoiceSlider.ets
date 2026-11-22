@@ -13,6 +13,7 @@ export struct SettingsChoiceSlider {
     @Param labels: string[] = [];
     @Param accessibilityLabel: string = '';
     @Param isEnabled: boolean = true;
+    @Param sliderWidth: number = 176;
     @Event changed: (index: number) => Promise<boolean> = async () => true;
     @Local private current: number = 0;
     @Local private selected: number = 0;
@@ -39,7 +40,7 @@ export struct SettingsChoiceSlider {
     }
 
     private controlWidth(): number {
-        return 190;
+        return this.sliderWidth;
     }
 
     private maxIndex(): number {
@@ -47,7 +48,7 @@ export struct SettingsChoiceSlider {
     }
 
     private labelWidth(label: string): number {
-        return label.length > 2 ? 64 : 40;
+        return label.length > 2 ? 56 : 36;
     }
 
     private async choose(position: number): Promise<void> {
@@ -100,7 +101,7 @@ export struct SettingsChoiceSlider {
                         .fontColor(position === this.selected ? Theme.accent : Theme.muted)
                         .width(this.labelWidth(label))
                         .textAlign(TextAlign.Center)
-                        .maxLines(2)
+                        .maxLines(1)
                         .enabled(this.isEnabled)
                         .onClick((): void => {
                             this.choose(position);

@@ -27,7 +27,7 @@ export struct ThemeColorPicker {
         Row() {
             ForEach(THEME_PALETTES, (palette: ThemePalette) => {
                 Button({ type: ButtonType.Normal }) {
-                    Column({ space: 4 }) {
+                    Column({ space: 2 }) {
                         Stack() {
                             Column().width(22).height(22).backgroundColor(palette.brand).borderRadius(11)
                             if (palette.id === this.paletteId) {
@@ -37,7 +37,7 @@ export struct ThemeColorPicker {
                             .border({ width: palette.id === this.paletteId ? 1 : 0, color: Theme.muted, radius: 13 })
                         Text(palette.label).fontSize(12).fontColor(Theme.muted).maxLines(1)
                     }
-                }.width(34).constraintSize({ minHeight: 52 }).padding(0)
+                }.width(32).constraintSize({ minHeight: 46 }).padding(0)
                     .backgroundColor(Theme.transparent).borderRadius(12)
                     .enabled(this.isEnabled && !this.saving)
                     .id('theme-color-' + palette.id)
@@ -47,6 +47,6 @@ export struct ThemeColorPicker {
                     .accessibilityText(palette.label + '色主题')
                     .accessibilitySelected(palette.id === this.paletteId)
             }, (palette: ThemePalette) => palette.id)
-        }.width(190).justifyContent(FlexAlign.SpaceBetween).accessibilityGroup(false)
+        }.width(176).justifyContent(FlexAlign.SpaceBetween).accessibilityGroup(false)
     }
 }

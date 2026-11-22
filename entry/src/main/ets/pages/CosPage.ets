@@ -7,7 +7,6 @@ import { vibration } from '../ui/vibration';
 import { scrollByAxis } from '../ui/scroll';
 import { PlanListRoute, filterPlanList } from '../viewmodels/PlanListRoute';
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../models/constants';
-import { DashboardSearch } from '../components/DashboardSearch';
 import { ManagedImage } from '../components/ManagedImage';
 import { AppState } from '../viewmodels/ApplicationState';
 import { Theme } from '../ui/Theme';
@@ -259,15 +258,6 @@ export struct CosPage {
     @Builder controls() {
         Column({ space: 10 }) {
             Blank().height(this.topInset).width('100%')
-            DashboardSearch({
-                value: this.route.query,
-                placeholder: this.projects ? '搜索计划 / 角色' : '搜索角色 / 作品',
-                label: this.projects ? '搜索计划' : '搜索角色',
-                changed: (value: string): void => {
-                    this.route.query = value;
-                    this.resetPosition();
-                },
-            })
             if (this.projects) {
                 this.planSectionChips()
                 Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {

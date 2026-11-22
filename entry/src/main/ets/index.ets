@@ -53,7 +53,8 @@ import { HomePage } from './pages/HomePage';
 import { CosPage } from './pages/CosPage';
 import { EventsPage } from './pages/EventsPage';
 import { LibraryPage } from './pages/LibraryPage';
-import { WardrobeSearchPage } from './pages/WardrobeSearchPage';
+import { QuickAddPage, QuickAddAiResult } from './pages/QuickAddPage';
+import { pressVisualEffect, pressLightFieldFilter } from './ui/visualEffects';
 import lazy { SettingsPage } from './pages/SettingsPage';
 import lazy { CharacterDetail } from './pages/CharacterDetailPage';
 import lazy { ProjectDetail } from './pages/ProjectDetailPage';
@@ -93,9 +94,6 @@ struct Dashboard {
     @Local planTabMode: number = 0;
     @Local planListRoute: PlanListRoute = new PlanListRoute();
     @Local wardrobeRoute: WardrobeRoute = new WardrobeRoute();
-    @Local wardrobeSearchOpen: boolean = false;
-    @Local wardrobeSearchPressed: boolean = false;
-    private readonly wardrobeSearchGeometryId: string = 'wardrobe-search-shared';
     @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
     @Local albumRoute: AlbumRoute = new AlbumRoute();
     @Local rootSheetKind: string = 'form';
@@ -113,11 +111,25 @@ struct Dashboard {
     @Local settingsSection: number = 0;
     private settingsOffsets: number[] = [0, 0, 0];
     @Local viewportWidth: number = 360;
+    @Local viewportHeight: number = 800;
     private daySnackBar?: HdsSnackBar;
     private daySnackKey: string = '';
     @Local rootVisible: boolean = true;
     private closingDaySnack: boolean = false;
     @Local daySnackReservation: number = 0;
+    @Local fabOnRight: boolean = false;
+    @Local fabY: number = -1;
+    @Local fabTranslateX: number = 0;
+    @Local fabScale: number = 1;
+    @Local fabOpacity: number = 1;
+    @Local fabPressed: boolean = false;
+    private gripMonitoringActive: boolean = false;
+    private lastFabSwitchAt: number = 0;
+    private fabSwitchTimer: number = -1;
+    private fabSwitchRevision: number = 0;
+    private fabDragStartY: number = 0;
+    private fabDragging: boolean = false;
+    private fabDragged: boolean = false;
     @Computed
     private get mainContentTop(): number {
         return Theme.contentTop + (NATIVE_SNACKBAR_AT_TOP ? this.daySnackReservation : 0);
@@ -144,6 +156,8 @@ struct Dashboard {
         this.startupTimer = setTimeout(async (): Promise<void> => {
             this.startupTimer = -1;
             await this.state.start(this.getUIContext().getHostContext() as common.UIAbilityContext);
+            this.syncFabSide(false);
+            this.syncGripMonitoring();
             this.scheduleMaintenance();
         }, 0);
     }
@@ -221,9 +235,15 @@ struct Dashboard {
             clearTimeout(this.maintenanceTimer);
             this.maintenanceTimer = -1;
         }
+        if (this.fabSwitchTimer >= 0) {
+            clearTimeout(this.fabSwitchTimer);
+            this.fabSwitchTimer = -1;
+        }
+        this.fabSwitchRevision++;
         if (this.formOpen) {
             void this.formSession.flush();
         }
+        this.gripMonitoringActive = false;
         this.state.suspend();
     }
 
@@ -272,11 +292,6 @@ struct Dashboard {
             this.closeDetail();
             return true;
         }
-        if (this.wardrobeSearchOpen) {
-            HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
-            this.closeWardrobeSearch();
-            return true;
-        }
         if (this.tab === 4 && this.albumRoute.collection.selecting) {
             if (!this.albumRoute.collection.submitting) {
                 this.albumRoute.collection.selecting = false;
@@ -305,7 +320,7 @@ struct Dashboard {
             return false;
         }
         if (shortcut === AppShortcut.BACK) {
-            const canReturn = this.formOpen || this.importOpen || this.restoreOpen || this.detailStack.size() > 0 || this.wardrobeSearchOpen;
+            const canReturn = this.formOpen || this.importOpen || this.restoreOpen || this.detailStack.size() > 0;
             return canReturn ? this.onBackPress() : false;
         }
         if (!this.state.ready || this.state.busy || this.state.staleScopes.length || this.formOpen || this.importOpen || this.restoreOpen) {
@@ -385,12 +400,134 @@ struct Dashboard {
         }
     }
 
+    private suspendGrip(): void {
+        this.gripMonitoringActive = false;
+        this.state.suspend();
+    }
+
+    private syncGripMonitoring(): void {
+        const shouldMonitor = this.visible && this.rootVisible && this.state.ready &&
+            this.state.settings.hand === 'auto' && this.detailStack.size() === 0;
+        if (shouldMonitor && !this.gripMonitoringActive) {
+            this.gripMonitoringActive = true;
+            void this.state.resume();
+        } else if (!shouldMonitor && this.gripMonitoringActive) {
+            this.suspendGrip();
+        }
+    }
+
+    private targetFabRight(): boolean {
+        if (this.state.settings.hand === 'left') {
+            return false;
+        }
+        if (this.state.settings.hand === 'right') {
+            return true;
+        }
+        if (this.state.sensedHand === 'left') {
+            return false;
+        }
+        if (this.state.sensedHand === 'right') {
+            return true;
+        }
+        return this.fabOnRight;
+    }
+
+    private fabTopLimit(): number {
+        return Theme.contentTop + 12;
+    }
+
+    private fabBottomLimit(): number {
+        return Math.max(this.fabTopLimit(), this.viewportHeight - (Theme.mainTabsHeight + Theme.mainTabsBottomMargin + 16 + this.daySnackBottomInset + 56));
+    }
+
+    private resolvedFabY(): number {
+        const top = this.fabTopLimit();
+        const bottom = this.fabBottomLimit();
+        if (this.fabY < 0) {
+            return bottom;
+        }
+        return Math.min(bottom, Math.max(top, this.fabY));
+    }
+
+    private resolvedFabX(): number {
+        return this.fabOnRight ? Math.max(16, this.viewportWidth - 56 - 20) : 20;
+    }
+
+    private syncFabSide(animate: boolean = true): void {
+        if (this.fabDragging) {
+            return;
+        }
+        const targetRight = this.targetFabRight();
+        if (targetRight === this.fabOnRight) {
+            return;
+        }
+        if (this.fabSwitchTimer >= 0) {
+            clearTimeout(this.fabSwitchTimer);
+            this.fabSwitchTimer = -1;
+        }
+        const revision = ++this.fabSwitchRevision;
+        if (!animate) {
+            this.fabOnRight = targetRight;
+            this.fabTranslateX = 0;
+            this.fabScale = 1;
+            this.fabOpacity = 1;
+            return;
+        }
+        const now = Date.now();
+        if (this.state.settings.hand === 'auto' && now - this.lastFabSwitchAt < 1200) {
+            return;
+        }
+        this.lastFabSwitchAt = now;
+        const exitX = this.fabOnRight ? 120 : -120;
+        const enterX = targetRight ? 120 : -120;
+        this.getUIContext().animateTo({
+            duration: 200,
+            curve: Curve.FastOutSlowIn,
+            onFinish: (): void => {
+                if (revision !== this.fabSwitchRevision) {
+                    return;
+                }
+                this.fabOnRight = targetRight;
+                this.fabTranslateX = enterX;
+                this.fabSwitchTimer = setTimeout((): void => {
+                    this.fabSwitchTimer = -1;
+                    if (revision !== this.fabSwitchRevision) {
+                        return;
+                    }
+                    this.getUIContext().animateTo({
+                        duration: 300,
+                        curve: curves.springMotion(0.4, 0.8),
+                    }, (): void => {
+                        this.fabTranslateX = 0;
+                        this.fabScale = 1;
+                        this.fabOpacity = 1;
+                    });
+                }, 16);
+            },
+        }, (): void => {
+            this.fabTranslateX = exitX;
+            this.fabScale = 0.3;
+            this.fabOpacity = 0;
+        });
+    }
+
+    @Monitor('state.ready', 'state.settings', 'rootVisible')
+    private gripSettingChanged(): void {
+        this.syncGripMonitoring();
+        this.syncFabSide(this.state.ready && this.rootVisible);
+    }
+
+    @Monitor('state.sensedHand')
+    private sensedHandChanged(): void {
+        this.syncFabSide(true);
+    }
+
     private open(kind: string, id: string): void {
         if (!id) {
             return;
         }
         HapticService.confirm(this.state.settings.haptic);
-        this.state.suspend();
+        this.suspendGrip();
         if (kind === 'search') {
             this.detailStack.pushPathByName('search', new SearchRoute());
             return;
@@ -507,7 +644,7 @@ struct Dashboard {
             return;
         }
         if (current.kind === 'character') {
-            this.state.suspend();
+            this.suspendGrip();
             this.detailStack.pushPathByName('character', new CharacterRoute(current.id, current.variantId));
             return;
         }
@@ -518,7 +655,7 @@ struct Dashboard {
                 this.detailStack.pushPathByName('inbox', inbox);
             } else {
                 if (current.ownerKind === 'asset') {
-                    this.state.suspend();
+                    this.suspendGrip();
                     this.detailStack.pushPathByName('asset', new AssetRoute(current.ownerId, 'collection', '', this.tab), false);
                 }
                 this.open('inbox', current.ownerKind + '|' + current.ownerId);
@@ -548,12 +685,12 @@ struct Dashboard {
             route.wardrobe = this.wardrobeRoute;
             route.wardrobe.anchorId = id;
         }
-        this.state.suspend();
+        this.suspendGrip();
         this.detailStack.pushPathByName('asset', route);
     }
 
     private openPhoto(route: PhotoViewerRoute): void {
-        this.state.suspend();
+        this.suspendGrip();
         this.detailStack.pushPathByName('photo', route);
     }
 
@@ -654,18 +791,22 @@ struct Dashboard {
     /** 开发者选项入口：设置页连点版本号五次，按需求不振动。 */
 
     private openDeveloper(): void {
-        this.state.suspend();
+        this.suspendGrip();
         this.detailStack.pushPathByName('developer', 'developer');
     }
 
     private edit(kind: string, id: string = '', parent: string = '', variant: string = '', shotRoute?: ProjectRoute, forImport: boolean = false): void {
+        this.openDraftForm(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent, variant), shotRoute, forImport, false);
+    }
+
+    private openDraftForm(draft: EditDraft, shotRoute?: ProjectRoute, forImport: boolean = false, skipRestore: boolean = false): void {
         if (this.formOpen || this.checkingFormClose) {
             return;
         }
         if (this.rootSheetMounted && !this.importOpen && !this.restoreOpen) {
             // Native dismiss finishes after the visible controls leave the tree.
             // Reopening now lets the old onDisappear erase the next form session.
-            this.pendingRootEdit = (): void => this.edit(kind, id, parent, variant, shotRoute, forImport);
+            this.pendingRootEdit = (): void => this.openDraftForm(draft, shotRoute, forImport, skipRestore);
             return;
         }
         if (!this.state.staleScopes.length) {
@@ -675,9 +816,76 @@ struct Dashboard {
         this.editingShotRoute = shotRoute;
         this.pendingImportPlanId = '';
         this.rootSheetKind = 'form';
-        this.formSession = new FormSession(EditDraft.make(this.state, kind === 'eventProject' ? 'project' : kind, id, parent, variant), formDraftStore);
-        void this.formSession.initialize(this.state);
+        this.formSession = new FormSession(draft, formDraftStore);
+        if (skipRestore) {
+            this.formSession.loading = false;
+            this.formSession.ignoreRecovery();
+        } else {
+            void this.formSession.initialize(this.state);
+        }
         this.formOpen = true;
+    }
+
+    private triggerQuickAddOption(option: string): void {
+        if (option === 'photo') {
+            this.chooseImport('');
+            return;
+        }
+        if (option === 'inbox') {
+            this.open('inbox', 'global|');
+            return;
+        }
+        this.edit(option);
+    }
+
+    private applyAiQuickAdd(result: QuickAddAiResult): void {
+        if (result.kind === 'photo') {
+            showToastSafely(this.getUIContext().getPromptAction(), 'AI 已识别为导入照片，请选择所属计划', 2200, 'QuickAdd');
+            this.chooseImport('');
+            return;
+        }
+        if (result.kind === 'inbox') {
+            showToastSafely(this.getUIContext().getPromptAction(), 'AI 已识别为收录条目，已打开收录箱', 2200, 'QuickAdd');
+            this.open('inbox', 'global|');
+            return;
+        }
+        const draft = EditDraft.make(this.state, result.kind, '', '', '');
+        if (result.name) {
+            draft.name = result.name;
+        }
+        if (result.notes) {
+            draft.notes = result.notes;
+        }
+        if (result.date) {
+            draft.date = result.date;
+            if (result.kind === 'event') {
+                draft.dateMode = 'single';
+            }
+        }
+        if (result.startTime && result.kind === 'event') {
+            draft.startTime = result.startTime;
+            draft.timeMode = 'start';
+        }
+        if (result.money) {
+            draft.money = result.money;
+            if (result.kind === 'project') {
+                draft.budgetEdited = true;
+            }
+        }
+        if (result.type) {
+            draft.type = result.type;
+        }
+        if (result.city && result.kind === 'event') {
+            draft.city = result.city;
+        }
+        if (result.location && result.kind === 'asset') {
+            draft.location = result.location;
+        }
+        if (result.kind === 'project' && (result.date || result.money || result.notes)) {
+            draft.advanced = true;
+        }
+        showToastSafely(this.getUIContext().getPromptAction(), 'AI 已识别为' + result.kindLabel + '，请核对后保存', 2200, 'QuickAdd');
+        this.openDraftForm(draft, undefined, false, true);
     }
 
     private async remove(kind: string, id: string, onSettled?: () => void): Promise<void> {
@@ -1281,6 +1489,19 @@ struct Dashboard {
                     }
                 }).margin({ top: Theme.detailTop })
             }
+        } else if (kind === 'quickAdd') {
+            QuickAddPage({
+                state: this.state,
+                entrance: entrance,
+                topInset: Theme.detailTop,
+                bottomInset: Theme.detailBottom,
+                onSelectOption: (option: string): void => {
+                    this.triggerQuickAddOption(option);
+                },
+                onAiSubmit: (result: QuickAddAiResult): void => {
+                    this.applyAiQuickAdd(result);
+                },
+            })
         } else if (kind === 'developer') {
             DevPage({ entrance: entrance, state: this.state })
         } else {
@@ -1360,7 +1581,7 @@ struct Dashboard {
                     }
                 },
                 hidden: (): void => {
-                    this.state.suspend();
+                    this.suspendGrip();
                 },
                 content: (entrance: StaggerEntrance): void => {
                     this.destinationBody(kind, param, entrance);
@@ -1379,6 +1600,9 @@ struct Dashboard {
     private destinationTitle(kind: string, id: string): string {
         if (kind === 'search') {
             return '全局搜索';
+        }
+        if (kind === 'quickAdd') {
+            return '添加';
         }
         if (kind === 'album') {
             return '相册';
@@ -1557,38 +1781,21 @@ struct Dashboard {
         if (index === 0) {
             return [];
         }
-        if (index === 1) {
-            return this.planTabMode === 1 ?
-                [{ value: '添加角色', icon: Icons.add, action: (): void => {
-                        this.edit('character');
-                    }
-                }] :
-                [{ value: '新建计划', icon: Icons.add, action: (): void => {
-                        this.edit('project');
-                    }
-                }];
-        }
-        if (index === 2) {
-            return [{ value: '添加活动', icon: Icons.add, action: (): void => {
-                        this.edit('event');
-                    }
-                }];
-        }
-        if (index === 3) {
-            return [{ value: '添加装备', icon: Icons.add, action: (): void => {
-                        this.edit('asset');
-                    }
-                }];
+        if (index === 1 || index === 2 || index === 3) {
+            return [{ value: '搜索', icon: Icons.search, action: (): void => {
+                    this.open('search', 'all');
+                }
+            }];
         }
         if (index === 4 && this.albumRoute.collection.selecting) {
             return this.photoTools(this.albumRoute.collection);
         }
         if (index === 4) {
             const items: ToolbarItem[] = [{
-                value: '导入照片',
-                icon: Icons.add,
+                value: '搜索',
+                icon: Icons.search,
                 action: (): void => {
-                    this.chooseImport(this.albumRoute.collection.planId);
+                    this.open('search', 'all');
                 }
             }];
             return items.concat(this.photoTools(this.albumRoute.collection));
@@ -1774,7 +1981,7 @@ struct Dashboard {
     }
 
     private hasRootSegment(index: number): boolean {
-        return index === 1 || index === 2 || index === 3 || (index === 4 && !this.albumRoute.collection.selecting);
+        return index === 1 || index === 2 || (index === 4 && !this.albumRoute.collection.selecting);
     }
 
     private rootSegmentIndex(index: number): number {
@@ -1808,77 +2015,12 @@ struct Dashboard {
         }).align(Alignment.Center).margin({ top: 8 })
     }
 
-    private openWardrobeSearch(): void {
-        if (this.wardrobeSearchOpen) {
-            return;
-        }
-        this.wardrobeSearchPressed = false;
-        HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
-        this.getUIContext().animateTo({ curve: curves.interpolatingSpring(0, 1, 342, 38) }, (): void => {
-            this.wardrobeSearchOpen = true;
-        });
-        this.syncDaySnack();
-    }
-
-    private closeWardrobeSearch(): void {
-        if (!this.wardrobeSearchOpen) {
-            return;
-        }
-        try {
-            this.getUIContext().getFocusController().clearFocus();
-        } catch (_error) {
-        }
-        this.getUIContext().animateTo({ curve: curves.interpolatingSpring(0, 1, 342, 38) }, (): void => {
-            this.wardrobeSearchOpen = false;
-        });
-        this.syncDaySnack();
-    }
-
     @Builder titleSegment(index: number) {
         Column() {
             if (index === 1) {
                 this.rootSegment(1, this.planSegmentItems)
             } else if (index === 2) {
                 this.rootSegment(2, this.scheduleSegmentItems)
-            } else if (index === 3) {
-                if (!this.wardrobeSearchOpen) {
-                    Stack({ alignContent: Alignment.Center }) {
-                        Search({ value: this.wardrobeRoute.query, placeholder: '搜索装备 / 位置' })
-                            .width('100%')
-                            .height('100%')
-                            .backgroundColor(Theme.tint)
-                            .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
-                            .borderRadius(Theme.pillRadius)
-                            .placeholderFont({ size: 13 })
-                            .textFont({ size: 13 })
-                            .defaultFocus(false)
-                            .enableKeyboardOnFocus(false)
-                            .focusable(false)
-                            .hitTestBehavior(HitTestMode.None)
-                    }.id('wardrobe-titlebar-search')
-                        .width('56%')
-                        .constraintSize({ minWidth: 152, maxWidth: 340 })
-                        .height(36)
-                        .margin({ top: 6 })
-                        .scale({
-                            x: this.wardrobeSearchPressed ? 0.985 : 1,
-                            y: this.wardrobeSearchPressed ? 0.985 : 1,
-                        })
-                        .animation({ duration: 120, curve: Curve.EaseOut })
-                        .geometryTransition(this.wardrobeSearchGeometryId, { follow: true })
-                        .transition(TransitionEffect.OPACITY)
-                        .onTouch((event: TouchEvent): void => {
-                            if (event.type === TouchType.Down) {
-                                this.wardrobeSearchPressed = true;
-                            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                                this.wardrobeSearchPressed = false;
-                            }
-                        })
-                        .onClick((): void => {
-                            this.openWardrobeSearch();
-                        })
-                        .accessibilityText('搜索衣柜')
-                }
             } else if (index === 4) {
                 this.rootSegment(4, this.albumSegmentItems)
             }
@@ -2185,10 +2327,7 @@ struct Dashboard {
             })
             .onChange((index: number): void => {
                 this.tab = index;
-                if (this.wardrobeSearchOpen && index !== 3) {
-                    this.wardrobeSearchOpen = false;
-                }
-                this.state.suspend();
+                this.syncGripMonitoring();
                 HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
             })
             .width('100%').height('100%')
@@ -2197,6 +2336,10 @@ struct Dashboard {
             .accessibilityText('首页、计划、日程、衣柜、相册五个标签页')
             .onAreaChange((_, area: Area): void => {
                 this.viewportWidth = Number(area.width);
+                this.viewportHeight = Number(area.height);
+                if (this.fabY >= 0) {
+                    this.fabY = this.resolvedFabY();
+                }
                 this.syncDaySnack();
             })
     }
@@ -2214,7 +2357,7 @@ struct Dashboard {
         }
     }
 
-    @Monitor('state.todayEvents', 'state.ready', 'formOpen', 'importOpen', 'restoreOpen', 'wardrobeSearchOpen', 'state.settings')
+    @Monitor('state.todayEvents', 'state.ready', 'formOpen', 'importOpen', 'restoreOpen', 'state.settings')
     daySnackChanged(): void {
         this.syncDaySnack();
     }
@@ -2239,7 +2382,7 @@ struct Dashboard {
             return;
         }
         const event = this.state.todayEvents[0];
-        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.rootSheetMounted || this.formOpen || this.importOpen || this.restoreOpen || this.wardrobeSearchOpen || this.closingDaySnack) {
+        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.rootSheetMounted || this.formOpen || this.importOpen || this.restoreOpen || this.closingDaySnack) {
             this.hideDaySnack();
             return;
         }
@@ -2288,34 +2431,101 @@ struct Dashboard {
         }
     }
 
+    @Computed
+    private get showGlobalAddFab(): boolean {
+        return this.state.ready && this.rootVisible && this.detailStack.size() === 0 &&
+            !this.rootSheetMounted && !this.formOpen && !this.importOpen && !this.restoreOpen &&
+            !(this.tab === 4 && this.albumRoute.collection.selecting);
+    }
+
+    @Builder globalAddFab() {
+        Column() {
+            Button({ type: ButtonType.Circle, stateEffect: false }) {
+                SymbolGlyph(Icons.add)
+                    .fontSize(24)
+                    .fontColor([Theme.onAccent])
+                    .accessibilityLevel('no')
+            }.id('global-add-fab')
+                .width(56)
+                .height(56)
+                .backgroundColor(Theme.brand)
+                .borderRadius(Theme.pillRadius)
+                .shadow({ radius: 16, color: Theme.shadow, offsetX: 0, offsetY: 6 })
+                .scale({
+                    x: this.fabPressed ? 0.92 : 1,
+                    y: this.fabPressed ? 0.92 : 1,
+                })
+                .animation({ duration: 120, curve: Curve.EaseOut })
+                .visualEffect(pressVisualEffect(this.state.settings.effects && this.fabPressed, false, 6, 96))
+                .compositingFilter(pressLightFieldFilter(this.state.settings.effects && this.fabPressed))
+                .onTouch((event: TouchEvent): void => {
+                    if (event.type === TouchType.Down) {
+                        this.fabDragged = false;
+                        this.fabPressed = true;
+                    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                        this.fabPressed = false;
+                    }
+                })
+                .onClick((): void => {
+                    if (this.fabDragged) {
+                        this.fabDragged = false;
+                        return;
+                    }
+                    HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
+                    this.open('quickAdd', 'add');
+                })
+                .accessibilityText('添加')
+        }.position({
+            x: this.resolvedFabX(),
+            y: this.resolvedFabY(),
+        })
+            .translate({ x: this.fabTranslateX })
+            .scale({ x: this.fabScale, y: this.fabScale })
+            .opacity(this.fabOpacity)
+            .gesture(
+                PanGesture({ direction: PanDirection.Vertical, distance: 6 })
+                    .onActionStart((): void => {
+                        this.fabDragging = true;
+                        this.fabDragged = true;
+                        this.fabPressed = false;
+                        this.fabDragStartY = this.resolvedFabY();
+                    })
+                    .onActionUpdate((event: GestureEvent): void => {
+                        const top = this.fabTopLimit();
+                        const bottom = this.fabBottomLimit();
+                        this.fabY = Math.min(bottom, Math.max(top, this.fabDragStartY + event.offsetY));
+                    })
+                    .onActionEnd((): void => {
+                        this.fabDragging = false;
+                        const top = this.fabTopLimit();
+                        const bottom = this.fabBottomLimit();
+                        if (this.fabY >= bottom) {
+                            showToastSafely(this.getUIContext().getPromptAction(), '不能再往下啦', 600, 'QuickAddFab');
+                        } else if (this.fabY <= top) {
+                            showToastSafely(this.getUIContext().getPromptAction(), '不能再往上啦', 600, 'QuickAddFab');
+                        }
+                        this.syncFabSide(true);
+                    })
+                    .onActionCancel((): void => {
+                        this.fabDragging = false;
+                    })
+            )
+            .zIndex(50)
+    }
+
     build() {
         WithTheme({ theme: Theme.nativeTheme }) {
             HdsNavigation(this.detailStack) {
-                Stack() {
+                Stack({ alignContent: Alignment.TopStart }) {
                     this.mainTabs()
-                    if (this.wardrobeSearchOpen) {
-                        WardrobeSearchPage({
-                            state: this.state,
-                            route: this.wardrobeRoute,
-                            geometryId: this.wardrobeSearchGeometryId,
-                            onClose: (): void => {
-                                this.closeWardrobeSearch();
-                            },
-                            open: (k: string, id: string): void => this.open(k, id),
-                            edit: (k: string, id: string, parent: string): void => this.edit(k, id, parent),
-                            remove: (k: string, id: string): void => {
-                                void this.remove(k, id);
-                            },
-                        }).width('100%')
-                            .height('100%')
-                            .zIndex(100)
-                            .transition(TransitionEffect.OPACITY)
+                    if (this.showGlobalAddFab) {
+                        this.globalAddFab()
                     }
                 }.width('100%').height('100%')
             }.mode(NavigationMode.Stack)
                 .titleMode(HdsNavigationTitleMode.MINI)
                 .hideBackButton(true)
-                .hideTitleBar(this.wardrobeSearchOpen)
+                .hideTitleBar(false)
                 .hideToolBar(true)
                 .titleBar(SystemCapability.titleBar(
                     MAIN_PAGE_TITLES[this.tab],

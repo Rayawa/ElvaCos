@@ -1,4 +1,4 @@
-import { STORAGE_KEY_APPEARANCE, STORAGE_KEY_THEME_COLOR, DEFAULT_THEME_COLOR, APPEARANCE_LABELS, APPEARANCE_VALUES, DEFAULT_APPEARANCE } from '../models/constants';
+import { STORAGE_KEY_APPEARANCE, STORAGE_KEY_THEME_COLOR, STORAGE_KEY_HAND, DEFAULT_THEME_COLOR, APPEARANCE_LABELS, APPEARANCE_VALUES, DEFAULT_APPEARANCE, HAND_VALUES, DEFAULT_HAND } from '../models/constants';
 import { Theme } from '../ui/Theme';
 import { Icons } from '../ui/Icons';
 import { SettingsSelection } from '../viewmodels/ApplicationState';
@@ -11,6 +11,7 @@ import { ThemeColorPicker } from '../components/ThemeColorPicker';
 export struct PreferenceSettings {
     @StorageLink(STORAGE_KEY_APPEARANCE) appearance: string = DEFAULT_APPEARANCE;
     @StorageLink(STORAGE_KEY_THEME_COLOR) themeColor: string = DEFAULT_THEME_COLOR;
+    @StorageLink(STORAGE_KEY_HAND) hand: string = DEFAULT_HAND;
     @Prop isEnabled: boolean = true;
     save: (changes: SettingsSelection) => Promise<boolean> = async () => false;
     @LocalBuilder themeControl() {
@@ -31,6 +32,16 @@ export struct PreferenceSettings {
         })
     }
 
+    @LocalBuilder handControl() {
+        SettingsChoiceSlider({
+            index: Math.max(0, HAND_VALUES.indexOf(this.hand)),
+            labels: ['左', '智能', '右'],
+            accessibilityLabel: '智感握持',
+            isEnabled: this.isEnabled,
+            changed: (index: number): Promise<boolean> => this.save({ hand: HAND_VALUES[index] }),
+        })
+    }
+
     @Builder divider() {
         Divider().color(Theme.divider).strokeWidth(0.5).margin({ left: 16, right: 16 })
     }
@@ -40,6 +51,8 @@ export struct PreferenceSettings {
             SettingsPreferenceRow({ label: '主题配色', icon: Icons.theme, control: this.themeControl })
             this.divider()
             SettingsPreferenceRow({ label: '应用外观', icon: Icons.light, control: this.appearanceControl })
+            this.divider()
+            SettingsPreferenceRow({ label: '智感握持', icon: Icons.hand, control: this.handControl })
         }.width('100%')
     }
 }

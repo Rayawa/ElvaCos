@@ -242,7 +242,6 @@ export struct SettingsPage {
                 SettingsValueRow({
                     label: '云同步',
                     value: '尚未接入',
-                    hint: '记录保存在本机，可查看备份方式',
                     icon: Icons.cloud,
                     actionLabel: '说明',
                     isEnabled: !this.state.busy,

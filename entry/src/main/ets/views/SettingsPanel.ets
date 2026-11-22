@@ -12,7 +12,7 @@ import { HdsListItemCard, IconSize, PrefixIcon } from '@kit.UIDesignKit';
 @Component
 struct UsernameEditor {
     @Prop @Watch('onInitialUsernameChanged') initialUsername: string = '';
-    @Prop narrow: boolean = false;
+    @Prop controlWidth: number = 190;
     onCommit?: (value: string) => void;
     @StorageLink(STORAGE_KEY_VIBRATION_LEVEL) vibrationLevel: number = 1;
     @State private draftUsername: string = '';
@@ -44,25 +44,23 @@ struct UsernameEditor {
     }
 
     build() {
-        Flex({
-            wrap: FlexWrap.Wrap,
-            justifyContent: FlexAlign.SpaceBetween,
-            alignItems: ItemAlign.Center
-        }) {
+        Row({ space: 8 }) {
             Text('用户名')
-                .width(this.narrow ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
-                .maxLines(2)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
                 .accessibilityText('用户名')
-            Row({ space: 8 }) {
+            Row({ space: 6 }) {
                 TextInput({
                     text: this.draftUsername,
                     placeholder: getDeviceName()
                 })
                     .layoutWeight(1)
-                    .constraintSize({ minWidth: 120 })
-                    .height(40)
+                    .constraintSize({ minWidth: 100 })
+                    .height(38)
+                    .borderRadius(Theme.controlRadius)
                     .enableKeyboardOnFocus(false)
                     .backgroundColor(Theme.tint)
                     .onChange((value: string): void => {
@@ -91,10 +89,11 @@ struct UsernameEditor {
                         },
                     })
                     .accessibilityText('查看用户名说明')
-            }.width(this.narrow ? '100%' : 204)
-                .margin({ top: this.narrow ? 4 : 0 })
-        }.padding({ right: 7 })
+            }.width(this.controlWidth)
+                .alignItems(VerticalAlign.Center)
+        }.padding({ right: 4 })
             .width('100%')
+            .alignItems(VerticalAlign.Center)
             .accessibilityGroup(false)
             .accessibilityLevel('no')
     }
@@ -116,9 +115,6 @@ export struct SettingsPanel {
     @State handlePopupTrash: boolean = false;
     @State cacheSize: string = '计算中…';
     @State private contentWidth: number = 0;
-    @State private vibrationHeight: number = 44;
-    @State private materialHeight: number = 44;
-    @State private usernameHeight: number = 44;
     private readonly vibrationSupported: boolean = vibration.isSupported();
     private cacheSizeTimer: number = -1;
     private cacheRevision: number = 0;
@@ -303,8 +299,12 @@ export struct SettingsPanel {
             .accessibilityLevel('no')
     }
 
-    private isNarrowSettings(): boolean {
-        return this.contentWidth > 0 && this.contentWidth < 420;
+    private controlWidth(): number {
+        return this.contentWidth > 0 && this.contentWidth < 360 ? 172 : 190;
+    }
+
+    private usernameControlWidth(): number {
+        return this.contentWidth > 0 && this.contentWidth < 360 ? 176 : 204;
     }
 
     private vibrationLevelName(): string {
@@ -326,7 +326,7 @@ export struct SettingsPanel {
                     this.vibrationLevelContent()
                 },
             },
-            cardHeight: Math.max(68, this.vibrationHeight + 24),
+            cardHeight: 68,
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -341,16 +341,13 @@ export struct SettingsPanel {
 
     @Builder
     private vibrationLevelContent(): void {
-        Flex({
-            wrap: FlexWrap.Wrap,
-            justifyContent: FlexAlign.SpaceBetween,
-            alignItems: ItemAlign.Center
-        }) {
+        Row({ space: 8 }) {
             Text('振动强度')
-                .width(this.isNarrowSettings() ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
-                .maxLines(2)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
                 .accessibilityText('振动强度')
             Column({ space: 1 }) {
                 Slider({
@@ -360,7 +357,7 @@ export struct SettingsPanel {
                     step: 1,
                     style: SliderStyle.InSet,
                 })
-                    .width(190)
+                    .width(this.controlWidth())
                     .selectedColor(Theme.brand)
                     .trackColor(Theme.tint)
                     .blockBorderColor(Theme.surface)
@@ -389,15 +386,12 @@ export struct SettingsPanel {
                     this.vibrationLevelLabel('关闭', 0)
                     this.vibrationLevelLabel('灵动', 1)
                     this.vibrationLevelLabel('硬朗', 2)
-                }.width(190)
+                }.width(this.controlWidth())
                     .justifyContent(FlexAlign.SpaceBetween)
-            }.width(190)
-                .margin({
-                    top: this.isNarrowSettings() ? 4 : 0
-                })
+            }.width(this.controlWidth())
         }.width('100%')
+            .alignItems(VerticalAlign.Center)
             .padding({ right: 2 })
-            .onAreaChange((_, area: Area): void => { this.vibrationHeight = Number(area.height); })
             .accessibilityGroup(true)
             .accessibilityText(
                 `振动强度，当前${this.vibrationLevelName()}`
@@ -408,6 +402,7 @@ export struct SettingsPanel {
     private vibrationLevelLabel(label: string, level: number): void {
         Text(label)
             .fontSize(12)
+            .maxLines(1)
             .fontWeight(
                 this.vibrationLevel === level ?
                 FontWeight.Medium :
@@ -418,7 +413,7 @@ export struct SettingsPanel {
                 Theme.accent :
                 Theme.muted
             )
-            .width(40)
+            .width(36)
             .textAlign(TextAlign.Center)
             .accessibilityText(
                 `${label}振动${this.vibrationLevel === level ? '，已选择' : ''}`
@@ -444,7 +439,7 @@ export struct SettingsPanel {
                     this.materialLevelContent()
                 },
             },
-            cardHeight: Math.max(68, this.materialHeight + 24),
+            cardHeight: 68,
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -459,16 +454,13 @@ export struct SettingsPanel {
 
     @Builder
     private materialLevelContent(): void {
-        Flex({
-            wrap: FlexWrap.Wrap,
-            justifyContent: FlexAlign.SpaceBetween,
-            alignItems: ItemAlign.Center
-        }) {
+        Row({ space: 8 }) {
             Text('材质等级')
-                .width(this.isNarrowSettings() ? '100%' : 80)
                 .fontSize(16)
                 .fontColor(Theme.ink)
-                .maxLines(2)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
                 .accessibilityText('材质等级')
             Column({ space: 1 }) {
                 Slider({
@@ -478,7 +470,7 @@ export struct SettingsPanel {
                     step: 1,
                     style: SliderStyle.InSet,
                 })
-                    .width(190)
+                    .width(this.controlWidth())
                     .selectedColor(Theme.brand)
                     .trackColor(Theme.tint)
                     .blockBorderColor(Theme.surface)
@@ -511,15 +503,12 @@ export struct SettingsPanel {
                     this.materialLevelLabel('流畅', 2)
                     this.materialLevelLabel('轻柔', 1)
                     this.materialLevelLabel('精美', 0)
-                }.width(190)
+                }.width(this.controlWidth())
                     .justifyContent(FlexAlign.SpaceBetween)
-            }.width(190)
-                .margin({
-                    top: this.isNarrowSettings() ? 4 : 0
-                })
+            }.width(this.controlWidth())
         }.width('100%')
+            .alignItems(VerticalAlign.Center)
             .padding({ right: 2 })
-            .onAreaChange((_, area: Area): void => { this.materialHeight = Number(area.height); })
             .accessibilityGroup(true)
             .accessibilityText(
                 `材质等级，当前${this.materialLevelName()}`
@@ -530,6 +519,7 @@ export struct SettingsPanel {
     private materialLevelLabel(label: string, level: number): void {
         Text(label)
             .fontSize(12)
+            .maxLines(1)
             .fontWeight(
                 this.immersiveMaterialLevel === level ?
                 FontWeight.Medium :
@@ -540,7 +530,7 @@ export struct SettingsPanel {
                 Theme.accent :
                 Theme.muted
             )
-            .width(40)
+            .width(36)
             .textAlign(TextAlign.Center)
             .accessibilityText(
                 `${label}材质${
@@ -560,7 +550,7 @@ export struct SettingsPanel {
                     this.usernameContent()
                 },
             },
-            cardHeight: Math.max(68, this.usernameHeight + 24),
+            cardHeight: 68,
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -577,9 +567,9 @@ export struct SettingsPanel {
     private usernameContent(): void {
         UsernameEditor({
             initialUsername: this.username,
-            narrow: this.isNarrowSettings(),
+            controlWidth: this.usernameControlWidth(),
             onCommit: (value: string): void => this.persistUsername(value),
-        }).onAreaChange((_, area: Area): void => { this.usernameHeight = Number(area.height); })
+        })
     }
 
     @Builder
@@ -595,7 +585,7 @@ export struct SettingsPanel {
                 vibration.dotVibration();
                 this.trash();
             },
-            cardHeight: 52,
+            cardHeight: 56,
             cardBackgroundColor: Theme.surface,
             cardBorderRadius: 0,
             hoverBorderRadius: 12,
@@ -610,24 +600,25 @@ export struct SettingsPanel {
 
     @Builder
     private trashContent(): void {
-        Flex({
-            justifyContent: FlexAlign.SpaceBetween,
-            alignItems: ItemAlign.Center
-        }) {
+        Row({ space: 8 }) {
             Text('清除缓存')
                 .fontSize(16)
                 .fontColor(Theme.ink)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1)
                 .accessibilityText('清除缓存')
-            Row({ space: 8 }) {
-                Text(`缓存文件总大小：${this.cacheSize}`)
+            Row({ space: 6 }) {
+                Text(this.cacheSize)
                     .fontSize(13)
                     .fontColor(Theme.muted)
+                    .maxLines(1)
                     .accessibilityText(
                         `缓存文件总大小${this.cacheSize}`
                     )
                 Image(Icons.help)
-                    .height(24)
-                    .width(24)
+                    .height(22)
+                    .width(22)
                     .objectFit(ImageFit.Contain)
                     .accessibilityText('查看清除缓存说明')
                     .onClick(() => {
@@ -647,9 +638,10 @@ export struct SettingsPanel {
                             }
                         }
                     })
-            }
+            }.alignItems(VerticalAlign.Center)
         }.width('100%')
-            .padding({ right: 7 })
+            .alignItems(VerticalAlign.Center)
+            .padding({ right: 4 })
             .accessibilityGroup(false)
             .accessibilityLevel('no')
     }

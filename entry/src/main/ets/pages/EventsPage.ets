@@ -36,6 +36,10 @@ export struct EventsPage {
     private restoreTimer: number = -1;
     @Local animStep: number = 0;
     @Local contentWidth: number = 360;
+    @Local activeSwipeKey: string = '';
+    @Local activeStartKey: string = '';
+    @Local activeDeleteKey: string = '';
+    @Local activePullExtra: number = 0;
     private enterPlayed: boolean = false;
     private enterTimers: number[] = [];
 
@@ -274,9 +278,29 @@ export struct EventsPage {
     }
 
     private closeSwipes(): void {
+        this.activeSwipeKey = '';
+        this.activeStartKey = '';
+        this.activeDeleteKey = '';
+        this.activePullExtra = 0;
         try {
             this.scroller.closeAllSwipeActions();
         } catch (error) {
+        }
+    }
+
+    private updateSwipeOffset(key: string, offset: number): void {
+        if (offset === 0 && this.activeSwipeKey === key) {
+            this.activeSwipeKey = '';
+            this.activePullExtra = 0;
+            return;
+        }
+        if (offset < 0) {
+            this.activeSwipeKey = key;
+            const baseWidth = 98 + Theme.pagePadding;
+            const nextExtra = offset < -baseWidth ? Math.min(120, Math.round(-offset - baseWidth)) : 0;
+            if (nextExtra !== this.activePullExtra) {
+                this.activePullExtra = nextExtra;
+            }
         }
     }
 
@@ -285,6 +309,8 @@ export struct EventsPage {
             done: event.status === 'Attended',
             label: event.status === 'Attended' ? '标为未完成' : '标为已完成',
             writable: this.writable(),
+            actionActive: this.activeStartKey === 'event:' + event.id,
+            edgePadding: Theme.pagePadding,
             action: (): void => {
                 this.closeSwipes();
                 void toggleEventAttendance(this.state, event);
@@ -297,6 +323,9 @@ export struct EventsPage {
             editLabel: '编辑活动',
             deleteLabel: '删除活动',
             writable: this.writable(),
+            deleteActive: this.activeDeleteKey === 'event:' + event.id,
+            pullExtra: this.activeSwipeKey === 'event:' + event.id ? this.activePullExtra : 0,
+            edgePadding: Theme.pagePadding,
             onEdit: (): void => {
                 this.closeSwipes();
                 this.edit('event', event.id, '');
@@ -331,6 +360,7 @@ export struct EventsPage {
                     .opacity(this.animStep >= 2 ? 1 : 0)
             }.layoutWeight(7)
                 .height('100%')
+                .padding({ left: Theme.pagePadding })
                 .align(Alignment.Top)
                 .scrollBar(BarState.Off)
                 .edgeEffect(EdgeEffect.Spring)
@@ -342,7 +372,8 @@ export struct EventsPage {
                     tasks: this.view.selectedTasks,
                     topInset: this.topInset,
                     bottomInset: this.bottomInset,
-                    horizontalPadding: 0,
+                    horizontalPadding: Theme.pagePadding,
+                    leadingPadding: 0,
                     scroller: this.wideDayScroller,
                     showTopContent: false,
                     open: (kind: string, id: string): void => {
@@ -366,7 +397,6 @@ export struct EventsPage {
         }.width('100%')
             .height('100%')
             .constraintSize({ maxWidth: Theme.contentMaxWidth })
-            .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             .alignItems(VerticalAlign.Top)
     }
 
@@ -380,57 +410,69 @@ export struct EventsPage {
                 }
             }
             ListItem() {
-                this.filterControls()
+                Column() {
+                    this.filterControls()
+                }.width('100%')
+                    .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             }
             if (this.events().length > 0) {
                 ListItem() {
-                    Text('右滑标记完成，左滑编辑或删除，长按更多操作')
+                    Text('右滑标记完成，左滑可编辑、继续左拉到底删除，长按更多操作')
+                        .width('100%')
                         .fontSize(11)
                         .fontColor(Theme.muted)
+                        .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
                 }
             }
             ForEach(this.groups(), (group: ScheduleGroup) => {
                 if (group.events.length > 0) {
                     ListItem() {
-                        SectionHeading({
-                            title: group.label,
-                            trailing: group.events.length + ' 场',
-                            icon: Icons.event,
-                        })
+                        Column() {
+                            SectionHeading({
+                                title: group.label,
+                                trailing: group.events.length + ' 场',
+                                icon: Icons.event,
+                            })
+                        }.width('100%')
+                            .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
                     }
                     ForEach(group.events, (event: CosEvent, index: number) => {
                         if (event.dateMode !== 'pending' && (index === 0 || eventDateLabel(group.events[index - 1]) !== eventDateLabel(event))) {
                             ListItem() {
                                 Text(eventDateLabel(event))
+                                    .width('100%')
                                     .fontSize(13)
                                     .fontWeight(FontWeight.Medium)
                                     .fontColor(Theme.muted)
-                                    .padding({ top: 4, bottom: 2 })
+                                    .padding({ left: Theme.pagePadding, right: Theme.pagePadding, top: 4, bottom: 2 })
                             }
                         }
                         ListItem() {
-                            ScheduleEventCard({
-                                state: this.state,
-                                event: event,
-                                phaseMode: true,
-                                open: (): void => {
-                                    this.open('event', event.id);
-                                },
-                                onToggleDone: (): void => {
-                                    this.closeSwipes();
-                                    void toggleEventAttendance(this.state, event);
-                                },
-                                onEdit: (): void => {
-                                    this.closeSwipes();
-                                    this.edit('event', event.id, '');
-                                },
-                                onDelete: (): void => {
-                                    this.closeSwipes();
-                                    this.remove('event', event.id, (): void => {
+                            Column() {
+                                ScheduleEventCard({
+                                    state: this.state,
+                                    event: event,
+                                    phaseMode: true,
+                                    open: (): void => {
+                                        this.open('event', event.id);
+                                    },
+                                    onToggleDone: (): void => {
                                         this.closeSwipes();
-                                    });
-                                },
-                            })
+                                        void toggleEventAttendance(this.state, event);
+                                    },
+                                    onEdit: (): void => {
+                                        this.closeSwipes();
+                                        this.edit('event', event.id, '');
+                                    },
+                                    onDelete: (): void => {
+                                        this.closeSwipes();
+                                        this.remove('event', event.id, (): void => {
+                                            this.closeSwipes();
+                                        });
+                                    },
+                                })
+                            }.width('100%')
+                                .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
                         }.swipeAction(createScheduleSwipeActionOptions(
                             (): void => {
                                 this.eventSwipeStart(event);
@@ -450,27 +492,39 @@ export struct EventsPage {
                                     });
                                 }
                             },
+                            (active: boolean): void => {
+                                this.activeStartKey = active ? 'event:' + event.id : (this.activeStartKey === 'event:' + event.id ? '' : this.activeStartKey);
+                            },
+                            (active: boolean): void => {
+                                this.activeDeleteKey = active ? 'event:' + event.id : (this.activeDeleteKey === 'event:' + event.id ? '' : this.activeDeleteKey);
+                            },
+                            (offset: number): void => {
+                                this.updateSwipeOffset('event:' + event.id, offset);
+                            },
                         ))
                     }, (event: CosEvent) => eventRowKey(event))
                 }
             }, (group: ScheduleGroup) => group.label + ':' + group.events.map((event: CosEvent) => eventRowKey(event)).join('|'))
             if (this.events().length === 0) {
                 ListItem() {
-                    EmptyState({
-                        title: this.state.events.length ? '没有匹配的活动' : '下一场见面，值得期待',
-                        message: this.state.events.length ? '可以清除日期和类型筛选，查看全部活动。' : '记录活动日期，关联准备中的计划。',
-                        button: this.state.events.length ? '清除筛选' : '添加活动',
-                        icon: Icons.event,
-                        action: (): void => {
-                            if (this.state.events.length) {
-                                this.route.eventType = '';
-                                this.route.clearDate();
-                                this.resetPosition();
-                            } else {
-                                this.add('event', '');
-                            }
-                        },
-                    })
+                    Column() {
+                        EmptyState({
+                            title: this.state.events.length ? '没有匹配的活动' : '下一场见面，值得期待',
+                            message: this.state.events.length ? '可以清除日期和类型筛选，查看全部活动。' : '记录活动日期，关联准备中的计划。',
+                            button: this.state.events.length ? '清除筛选' : '添加活动',
+                            icon: Icons.event,
+                            action: (): void => {
+                                if (this.state.events.length) {
+                                    this.route.eventType = '';
+                                    this.route.clearDate();
+                                    this.resetPosition();
+                                } else {
+                                    this.add('event', '');
+                                }
+                            },
+                        })
+                    }.width('100%')
+                        .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
                 }
             }
             ListItem() {
@@ -482,7 +536,6 @@ export struct EventsPage {
             .width('100%')
             .height('100%')
             .constraintSize({ maxWidth: Theme.readingMaxWidth })
-            .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
             .scrollBar(BarState.Off)
             .edgeEffect(EdgeEffect.Spring)
             .onDidScroll((): void => {

@@ -49,6 +49,9 @@ export function createScheduleSwipeActionOptions(
     endBuilder: CustomBuilder,
     onFullStart: () => void,
     onFullEnd: () => void,
+    onStartZoneChange?: (active: boolean) => void,
+    onEndZoneChange?: (active: boolean) => void,
+    onOffset?: (offset: number) => void,
 ): SwipeActionOptions {
     return {
         start: {
@@ -56,13 +59,19 @@ export function createScheduleSwipeActionOptions(
             actionAreaDistance: 84,
             onEnterActionArea: (): void => {
                 vibration.lightVibration();
+                onStartZoneChange?.(true);
             },
             onExitActionArea: (): void => {
                 vibration.lightVibration();
+                onStartZoneChange?.(false);
             },
             onStateChange: (swipeState: SwipeActionState): void => {
                 if (swipeState === SwipeActionState.EXPANDED) {
                     vibration.lightVibration();
+                }
+                if (swipeState === SwipeActionState.COLLAPSED) {
+                    onStartZoneChange?.(false);
+                    onOffset?.(0);
                 }
             },
             onAction: (): void => {
@@ -72,16 +81,22 @@ export function createScheduleSwipeActionOptions(
         },
         end: {
             builder: endBuilder,
-            actionAreaDistance: 84,
+            actionAreaDistance: 72,
             onEnterActionArea: (): void => {
                 vibration.lightVibration();
+                onEndZoneChange?.(true);
             },
             onExitActionArea: (): void => {
                 vibration.lightVibration();
+                onEndZoneChange?.(false);
             },
             onStateChange: (swipeState: SwipeActionState): void => {
                 if (swipeState === SwipeActionState.EXPANDED) {
                     vibration.lightVibration();
+                }
+                if (swipeState === SwipeActionState.COLLAPSED) {
+                    onEndZoneChange?.(false);
+                    onOffset?.(0);
                 }
             },
             onAction: (): void => {
@@ -90,78 +105,151 @@ export function createScheduleSwipeActionOptions(
             },
         },
         edgeEffect: SwipeEdgeEffect.Spring,
+        onOffsetChange: (offset: number): void => {
+            onOffset?.(offset);
+        },
     };
 }
 
-/** 左侧滑出（右滑触发）：完成 / 取消完成圆形按钮，与右侧编辑/删除分居两侧。 */
+/** 左侧滑出（右滑触发）：完成 / 取消完成胶囊按钮，拉到头时平滑展开提示。 */
 @ComponentV2
 export struct ScheduleSwipeStartAction {
     @Param done: boolean = false;
     @Param label: string = '标为已完成';
     @Param writable: boolean = true;
+    @Param actionActive: boolean = false;
+    @Param edgePadding: number = Theme.pagePadding;
     @Event action: () => void = () => {};
 
     build() {
         Row() {
-            Button({ type: ButtonType.Circle, stateEffect: false }) {
-                SymbolGlyph(this.done ? Icons.pending : Icons.done)
-                    .fontSize(20)
-                    .fontColor([Theme.onAccent])
-                    .accessibilityLevel('no')
-            }.width(44)
+            Button({ type: ButtonType.Capsule, stateEffect: false }) {
+                Row({ space: 6 }) {
+                    SymbolGlyph(this.done ? Icons.pending : Icons.done)
+                        .fontSize(20)
+                        .fontColor([Theme.onAccent])
+                        .accessibilityLevel('no')
+                    if (this.actionActive) {
+                        Text(this.done ? '取消完成' : '松手完成')
+                            .fontSize(13)
+                            .fontWeight(FontWeight.Medium)
+                            .fontColor(Theme.onAccent)
+                            .maxLines(1)
+                    }
+                }.padding({ left: 12, right: 12 })
+            }.width(this.actionActive ? 112 : 44)
                 .height(44)
+                .borderRadius(Theme.pillRadius)
                 .backgroundColor(this.done ? Theme.warning : Theme.success)
+                .animation({ duration: 160, curve: Curve.EaseOut })
                 .enabled(this.writable)
                 .onClick((): void => {
                     vibration.dotVibration();
                     this.action();
                 })
                 .accessibilityText(this.label)
-        }.padding({ right: 10 })
+        }.padding({ left: this.edgePadding, right: 0 })
             .alignItems(VerticalAlign.Center)
     }
 }
 
-/** 右侧滑出（左滑触发）：编辑与删除圆形按钮。 */
+/** 右侧滑出（左滑触发）：短滑点击为品牌色编辑圆钮，继续左拉编辑随手势平滑淡出，红色删除胶囊连续拉宽并渐变到松手删除。 */
 @ComponentV2
 export struct ScheduleSwipeEndActions {
     @Param editLabel: string = '编辑';
     @Param deleteLabel: string = '删除';
     @Param writable: boolean = true;
+    @Param deleteActive: boolean = false;
+    @Param pullExtra: number = 0;
+    @Param edgePadding: number = Theme.pagePadding;
     @Event onEdit: () => void = () => {};
     @Event onDelete: () => void = () => {};
 
+    private editProgress(): number {
+        return this.deleteActive ? 1 : Math.min(1, this.pullExtra / 36);
+    }
+
+    private deleteWidth(): number {
+        return Math.min(176, 44 + Math.round(this.pullExtra * 1.15));
+    }
+
+    private deleteLabelWidth(): number {
+        return Math.max(0, Math.min(58, this.deleteWidth() - 50));
+    }
+
+    private deleteTextOpacity(): number {
+        if (this.deleteActive) {
+            return 0;
+        }
+        return Math.min(1, Math.max(0, (this.pullExtra - 12) / 18));
+    }
+
     build() {
-        Row({ space: 8 }) {
-            Button({ type: ButtonType.Circle, stateEffect: false }) {
-                SymbolGlyph(Icons.edit)
-                    .fontSize(20)
-                    .fontColor([Theme.onAccent])
-                    .accessibilityLevel('no')
-            }.width(44)
+        Row() {
+            Stack({ alignContent: Alignment.End }) {
+                Button({ type: ButtonType.Circle, stateEffect: false }) {
+                    SymbolGlyph(Icons.edit)
+                        .fontSize(20)
+                        .fontColor([Theme.onAccent])
+                        .accessibilityLevel('no')
+                }.width(44)
+                    .height(44)
+                    .margin({ right: 54 })
+                    .backgroundColor(Theme.brand)
+                    .borderRadius(Theme.pillRadius)
+                    .opacity(1 - this.editProgress())
+                    .scale({
+                        x: 1 - this.editProgress() * 0.45,
+                        y: 1 - this.editProgress() * 0.45,
+                    })
+                    .hitTestBehavior(this.editProgress() > 0.6 ? HitTestMode.None : HitTestMode.Default)
+                    .enabled(this.writable && this.editProgress() <= 0.6)
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        this.onEdit();
+                    })
+                    .accessibilityText(this.editLabel)
+                Button({ type: ButtonType.Capsule, stateEffect: false }) {
+                    Row({ space: this.deleteLabelWidth() > 0 ? 6 : 0 }) {
+                        SymbolGlyph(Icons.remove)
+                            .fontSize(20)
+                            .fontColor([Theme.onAccent])
+                            .accessibilityLevel('no')
+                        if (this.deleteLabelWidth() > 0) {
+                            Stack({ alignContent: Alignment.Start }) {
+                                Text('删除')
+                                    .fontSize(13)
+                                    .fontWeight(FontWeight.Medium)
+                                    .fontColor(Theme.onAccent)
+                                    .maxLines(1)
+                                    .opacity(this.deleteTextOpacity())
+                                    .animation({ duration: 150, curve: Curve.EaseOut })
+                                Text('松手删除')
+                                    .fontSize(13)
+                                    .fontWeight(FontWeight.Medium)
+                                    .fontColor(Theme.onAccent)
+                                    .maxLines(1)
+                                    .opacity(this.deleteActive ? 1 : 0)
+                                    .animation({ duration: 150, curve: Curve.EaseOut })
+                            }.width(this.deleteLabelWidth())
+                                .height(20)
+                                .clip(true)
+                        }
+                    }.padding({ left: 12, right: 12 })
+                }.width(this.deleteWidth())
+                    .height(44)
+                    .backgroundColor(Theme.danger)
+                    .borderRadius(Theme.pillRadius)
+                    .clip(true)
+                    .enabled(this.writable)
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        this.onDelete();
+                    })
+                    .accessibilityText(this.deleteLabel)
+            }.width(Math.max(98, this.deleteWidth()))
                 .height(44)
-                .backgroundColor(Theme.brand)
-                .enabled(this.writable)
-                .onClick((): void => {
-                    vibration.dotVibration();
-                    this.onEdit();
-                })
-                .accessibilityText(this.editLabel)
-            Button({ type: ButtonType.Circle, stateEffect: false }) {
-                SymbolGlyph(Icons.remove)
-                    .fontSize(20)
-                    .fontColor([Theme.onAccent])
-                    .accessibilityLevel('no')
-            }.width(44)
-                .height(44)
-                .backgroundColor(Theme.danger)
-                .enabled(this.writable)
-                .onClick((): void => {
-                    vibration.dotVibration();
-                    this.onDelete();
-                })
-                .accessibilityText(this.deleteLabel)
-        }.padding({ left: 10 })
+        }.padding({ left: 0, right: this.edgePadding })
             .alignItems(VerticalAlign.Center)
     }
 }
@@ -532,6 +620,7 @@ export struct ScheduleDayList {
     @Param bottomInset: number = 24;
     @Param maxWidth: number = Theme.contentMaxWidth;
     @Param horizontalPadding: number = 0;
+    @Param leadingPadding: number = -1;
     @Param listId: string = 'schedule-day-list';
     @Param scroller: ListScroller = new ListScroller();
     @Event open: (kind: string, id: string) => void = () => {};
@@ -543,6 +632,10 @@ export struct ScheduleDayList {
     @Param showTopContent: boolean = false;
     @BuilderParam topContent: () => void = this.emptyTopContent;
     @Local taskError: string = '';
+    @Local activeSwipeKey: string = '';
+    @Local activeStartKey: string = '';
+    @Local activeDeleteKey: string = '';
+    @Local activePullExtra: number = 0;
 
     @Builder emptyTopContent() {
     }
@@ -551,10 +644,38 @@ export struct ScheduleDayList {
         return !this.state.busy && !this.state.staleScopes.length;
     }
 
+    private leftPad(): number {
+        return this.leadingPadding >= 0 ? this.leadingPadding : this.horizontalPadding;
+    }
+
+    private rightPad(): number {
+        return this.horizontalPadding;
+    }
+
     private closeSwipes(): void {
+        this.activeSwipeKey = '';
+        this.activeStartKey = '';
+        this.activeDeleteKey = '';
+        this.activePullExtra = 0;
         try {
             this.scroller.closeAllSwipeActions();
         } catch (error) {
+        }
+    }
+
+    private updateSwipeOffset(key: string, offset: number): void {
+        if (offset === 0 && this.activeSwipeKey === key) {
+            this.activeSwipeKey = '';
+            this.activePullExtra = 0;
+            return;
+        }
+        if (offset < 0) {
+            this.activeSwipeKey = key;
+            const baseWidth = 98 + Math.max(8, this.rightPad());
+            const nextExtra = offset < -baseWidth ? Math.min(120, Math.round(-offset - baseWidth)) : 0;
+            if (nextExtra !== this.activePullExtra) {
+                this.activePullExtra = nextExtra;
+            }
         }
     }
 
@@ -581,6 +702,8 @@ export struct ScheduleDayList {
             done: event.status === 'Attended',
             label: event.status === 'Attended' ? '标为未完成' : '标为已完成',
             writable: this.writable(),
+            actionActive: this.activeStartKey === 'event:' + event.id,
+            edgePadding: Math.max(8, this.leftPad()),
             action: (): void => {
                 this.closeSwipes();
                 void toggleEventAttendance(this.state, event);
@@ -593,6 +716,9 @@ export struct ScheduleDayList {
             editLabel: '编辑活动',
             deleteLabel: '删除活动',
             writable: this.writable(),
+            deleteActive: this.activeDeleteKey === 'event:' + event.id,
+            pullExtra: this.activeSwipeKey === 'event:' + event.id ? this.activePullExtra : 0,
+            edgePadding: Math.max(8, this.rightPad()),
             onEdit: (): void => {
                 this.closeSwipes();
                 this.edit('event', event.id, '');
@@ -611,6 +737,8 @@ export struct ScheduleDayList {
             done: item.task.done,
             label: item.task.done ? '取消完成' : '标记完成',
             writable: this.writable(),
+            actionActive: this.activeStartKey === 'task:' + item.task.id,
+            edgePadding: Math.max(8, this.leftPad()),
             action: (): void => {
                 this.closeSwipes();
                 void this.toggle(item);
@@ -623,6 +751,9 @@ export struct ScheduleDayList {
             editLabel: '编辑准备任务',
             deleteLabel: '删除准备任务',
             writable: this.writable(),
+            deleteActive: this.activeDeleteKey === 'task:' + item.task.id,
+            pullExtra: this.activeSwipeKey === 'task:' + item.task.id ? this.activePullExtra : 0,
+            edgePadding: Math.max(8, this.rightPad()),
             onEdit: (): void => {
                 this.closeSwipes();
                 this.edit('preparation', item.task.id, item.task.projectId);
@@ -647,7 +778,10 @@ export struct ScheduleDayList {
             }
             if (this.showTopContent) {
                 ListItem() {
-                    this.topContent()
+                    Column() {
+                        this.topContent()
+                    }.width('100%')
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }
             }
             ListItem() {
@@ -658,54 +792,63 @@ export struct ScheduleDayList {
                         trailing: this.events.length + ' 场活动  ' + this.tasks.length + ' 项任务',
                     }).layoutWeight(1)
                 }.width('100%')
+                    .padding({ left: this.leftPad(), right: this.rightPad() })
             }
             if (this.events.length > 0 || this.tasks.length > 0) {
                 ListItem() {
-                    Text('右滑标记完成，左滑编辑或删除，长按更多操作')
+                    Text('右滑标记完成，左滑可编辑、继续左拉到底删除，长按更多操作')
+                        .width('100%')
                         .fontSize(11)
                         .fontColor(Theme.muted)
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }
             }
             if (this.taskError) {
                 ListItem() {
-                    Row({ space: 8 }) {
-                        SymbolGlyph(Icons.alert).fontSize(16).fontColor([Theme.danger]).accessibilityLevel('no')
-                        Text(this.taskError)
-                            .id('schedule-task-error')
-                            .fontSize(13)
-                            .fontColor(Theme.danger)
-                            .layoutWeight(1)
-                    }.padding(12)
-                        .width('100%')
-                        .borderRadius(Theme.controlRadius)
-                        .backgroundColor(Theme.dangerBg)
-                        .accessibilityText(this.taskError)
+                    Column() {
+                        Row({ space: 8 }) {
+                            SymbolGlyph(Icons.alert).fontSize(16).fontColor([Theme.danger]).accessibilityLevel('no')
+                            Text(this.taskError)
+                                .id('schedule-task-error')
+                                .fontSize(13)
+                                .fontColor(Theme.danger)
+                                .layoutWeight(1)
+                        }.padding(12)
+                            .width('100%')
+                            .borderRadius(Theme.controlRadius)
+                            .backgroundColor(Theme.dangerBg)
+                            .accessibilityText(this.taskError)
+                    }.width('100%')
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }
             }
             ForEach(this.events, (event: CosEvent) => {
                 ListItem() {
-                    ScheduleEventCard({
-                        state: this.state,
-                        event: event,
-                        phaseMode: false,
-                        open: (): void => {
-                            this.open('event', event.id);
-                        },
-                        onToggleDone: (): void => {
-                            this.closeSwipes();
-                            void toggleEventAttendance(this.state, event);
-                        },
-                        onEdit: (): void => {
-                            this.closeSwipes();
-                            this.edit('event', event.id, '');
-                        },
-                        onDelete: (): void => {
-                            this.closeSwipes();
-                            this.remove('event', event.id, (): void => {
+                    Column() {
+                        ScheduleEventCard({
+                            state: this.state,
+                            event: event,
+                            phaseMode: false,
+                            open: (): void => {
+                                this.open('event', event.id);
+                            },
+                            onToggleDone: (): void => {
                                 this.closeSwipes();
-                            });
-                        },
-                    })
+                                void toggleEventAttendance(this.state, event);
+                            },
+                            onEdit: (): void => {
+                                this.closeSwipes();
+                                this.edit('event', event.id, '');
+                            },
+                            onDelete: (): void => {
+                                this.closeSwipes();
+                                this.remove('event', event.id, (): void => {
+                                    this.closeSwipes();
+                                });
+                            },
+                        })
+                    }.width('100%')
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }.swipeAction(createScheduleSwipeActionOptions(
                     (): void => {
                         this.eventSwipeStart(event);
@@ -725,32 +868,44 @@ export struct ScheduleDayList {
                             });
                         }
                     },
+                    (active: boolean): void => {
+                        this.activeStartKey = active ? 'event:' + event.id : (this.activeStartKey === 'event:' + event.id ? '' : this.activeStartKey);
+                    },
+                    (active: boolean): void => {
+                        this.activeDeleteKey = active ? 'event:' + event.id : (this.activeDeleteKey === 'event:' + event.id ? '' : this.activeDeleteKey);
+                    },
+                    (offset: number): void => {
+                        this.updateSwipeOffset('event:' + event.id, offset);
+                    },
                 ))
             }, (event: CosEvent) => eventRowKey(event))
             ForEach(this.tasks, (item: ScheduleTaskItem) => {
                 ListItem() {
-                    ScheduleTaskCard({
-                        state: this.state,
-                        item: item,
-                        writable: this.writable(),
-                        open: (): void => {
-                            this.openTask(scheduleTaskRoute(item));
-                        },
-                        onToggleDone: (): void => {
-                            this.closeSwipes();
-                            void this.toggle(item);
-                        },
-                        onEdit: (): void => {
-                            this.closeSwipes();
-                            this.edit('preparation', item.task.id, item.task.projectId);
-                        },
-                        onDelete: (): void => {
-                            this.closeSwipes();
-                            this.remove('preparation', item.task.id, (): void => {
+                    Column() {
+                        ScheduleTaskCard({
+                            state: this.state,
+                            item: item,
+                            writable: this.writable(),
+                            open: (): void => {
+                                this.openTask(scheduleTaskRoute(item));
+                            },
+                            onToggleDone: (): void => {
                                 this.closeSwipes();
-                            });
-                        },
-                    })
+                                void this.toggle(item);
+                            },
+                            onEdit: (): void => {
+                                this.closeSwipes();
+                                this.edit('preparation', item.task.id, item.task.projectId);
+                            },
+                            onDelete: (): void => {
+                                this.closeSwipes();
+                                this.remove('preparation', item.task.id, (): void => {
+                                    this.closeSwipes();
+                                });
+                            },
+                        })
+                    }.width('100%')
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }.swipeAction(createScheduleSwipeActionOptions(
                     (): void => {
                         this.taskSwipeStart(item);
@@ -770,19 +925,31 @@ export struct ScheduleDayList {
                             });
                         }
                     },
+                    (active: boolean): void => {
+                        this.activeStartKey = active ? 'task:' + item.task.id : (this.activeStartKey === 'task:' + item.task.id ? '' : this.activeStartKey);
+                    },
+                    (active: boolean): void => {
+                        this.activeDeleteKey = active ? 'task:' + item.task.id : (this.activeDeleteKey === 'task:' + item.task.id ? '' : this.activeDeleteKey);
+                    },
+                    (offset: number): void => {
+                        this.updateSwipeOffset('task:' + item.task.id, offset);
+                    },
                 ))
             }, (item: ScheduleTaskItem) => item.task.id + ':' + item.task.done + ':' + item.task.label + ':' + item.task.dueDate + ':' + item.projectName)
             if (!this.events.length && !this.tasks.length) {
                 ListItem() {
-                    EmptyState({
-                        title: '这天没有活动或截止任务',
-                        message: '多天活动会显示在覆盖的每一天；任务截止日期在所属计划中设置。',
-                        button: '添加当天活动',
-                        icon: Icons.event,
-                        action: (): void => {
-                            this.add('event', this.date);
-                        },
-                    })
+                    Column() {
+                        EmptyState({
+                            title: '这天没有活动或截止任务',
+                            message: '多天活动会显示在覆盖的每一天；任务截止日期在所属计划中设置。',
+                            button: '添加当天活动',
+                            icon: Icons.event,
+                            action: (): void => {
+                                this.add('event', this.date);
+                            },
+                        })
+                    }.width('100%')
+                        .padding({ left: this.leftPad(), right: this.rightPad() })
                 }
             }
             ListItem() {
@@ -794,7 +961,6 @@ export struct ScheduleDayList {
             .width('100%')
             .height('100%')
             .constraintSize({ maxWidth: this.maxWidth })
-            .padding({ left: this.horizontalPadding, right: this.horizontalPadding })
             .scrollBar(BarState.Off)
             .edgeEffect(EdgeEffect.Spring)
             .onDidScroll((): void => {

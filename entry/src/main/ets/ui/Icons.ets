@@ -87,6 +87,7 @@ export class Icons {
     static remove: Resource = $r('sys.symbol.trash');
     static close: Resource = $r('sys.symbol.xmark');
     static importPhoto: Resource = $r('sys.symbol.picture');
+    static ai: Resource = $r('sys.symbol.wand_and_stars');
 
     static assetTypeSymbol(type: string): Resource {
         if (type === 'Costume') {
