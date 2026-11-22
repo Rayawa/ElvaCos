@@ -1,3 +1,4 @@
+import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { ArrayDataSource } from '../models/ArrayDataSource';
 import { cardColumnCount } from '../ui/responsive';
 import { filterCharacters } from '../models/CharacterLibrary';
@@ -26,6 +27,8 @@ export struct CosPage {
     @Require @Param state: AppState;
     @Event open: (kind: string, id: string) => void = () => {};
     @Event add: (kind: string, parent: string) => void = () => {};
+    @Event edit: (kind: string, id: string, parent: string) => void = () => {};
+    @Event remove: (kind: string, id: string) => void = () => {};
     @Param projects: boolean = true;
     @Param route: PlanListRoute = new PlanListRoute();
     @Param entranceSession: MainEntranceSession = new MainEntranceSession();
@@ -206,6 +209,8 @@ export struct CosPage {
                 .fontColor([Theme.muted])
                 .accessibilityLevel('no')
         }.width('100%')
+            .height(86)
+            .alignItems(VerticalAlign.Center)
     }
 
     private planSource: ArrayDataSource<CosProject> = new ArrayDataSource<CosProject>([]);
@@ -221,15 +226,15 @@ export struct CosPage {
     @Builder planSectionChips() {
         Row({ space: 8 }) {
             ForEach(PLAN_SECTION_LABELS, (label: string, index: number) => {
-                Button(label, { type: ButtonType.Normal, stateEffect: false })
+                Button(label, { type: ButtonType.Capsule, stateEffect: false })
                     .height(34)
                     .padding({ left: 14, right: 14 })
-                    .borderRadius(Theme.pillRadius)
                     .fontSize(13)
                     .fontWeight(this.route.section === index ? FontWeight.Medium : FontWeight.Regular)
                     .fontColor(this.route.section === index ? Theme.onAccent : Theme.ink)
                     .backgroundColor(this.route.section === index ? Theme.brand : Theme.surface)
-                    .border({ width: 0.8, color: this.route.section === index ? Theme.brand : Theme.line })
+                    .border({ width: 0.8, color: this.route.section === index ? Theme.brand : Theme.line, radius: Theme.pillRadius })
+                    .borderRadius(Theme.pillRadius)
                     .visualEffect(pressVisualEffect(this.pressedSection === index && this.state.settings.effects, true, 5, 84))
                     .compositingFilter(pressLightFieldFilter(this.pressedSection === index && this.state.settings.effects))
                     .onTouch((event: TouchEvent): void => {
@@ -251,7 +256,7 @@ export struct CosPage {
         }.width('100%')
     }
 
-    @LocalBuilder controls() {
+    @Builder controls() {
         Column({ space: 10 }) {
             Blank().height(this.topInset).width('100%')
             DashboardSearch({
@@ -271,7 +276,9 @@ export struct CosPage {
                         .constraintSize({ minHeight: 36, minWidth: 132 })
                         .margin({ right: 8, bottom: 6 })
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                        .borderRadius(Theme.pillRadius)
+                        .clip(true)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.status = index === 0 ? '' : this.statuses()[index - 1];
@@ -285,7 +292,9 @@ export struct CosPage {
                         .constraintSize({ minHeight: 36, minWidth: 132 })
                         .margin({ bottom: 6 })
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                        .borderRadius(Theme.pillRadius)
+                        .clip(true)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.dateRange = ['all', 'undated', 'overdue', 'today', 'week', 'future'][index];
@@ -301,18 +310,19 @@ export struct CosPage {
                         .fontColor(Theme.muted)
                         .layoutWeight(1)
                     if (this.filtered()) {
-                        Button('清除筛选', { type: ButtonType.Normal, stateEffect: false })
+                        Button('清除筛选', { type: ButtonType.Capsule, stateEffect: false })
                             .height(34)
                             .padding({ left: 10, right: 10 })
-                            .borderRadius(12)
                             .backgroundColor(Theme.tint)
+                            .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                            .borderRadius(Theme.pillRadius)
                             .fontSize(12)
                             .fontColor(Theme.muted)
                             .onClick((): void => {
                                 this.clearFilters();
                             })
                     }
-                    Button({ type: ButtonType.Normal, stateEffect: false }) {
+                    Button({ type: ButtonType.Capsule, stateEffect: false }) {
                         Row({ space: 4 }) {
                             SymbolGlyph(Icons.profile).fontSize(13).fontColor([Theme.accent]).accessibilityLevel('no')
                             Text('角色库').fontSize(12).fontWeight(FontWeight.Medium).fontColor(Theme.accent)
@@ -320,8 +330,9 @@ export struct CosPage {
                         }.padding({ left: 10, right: 10 })
                     }.id('plan-role-library')
                         .height(34)
-                        .borderRadius(12)
                         .backgroundColor(Theme.tint)
+                        .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                        .borderRadius(Theme.pillRadius)
                         .onClick((): void => {
                             vibration.dotVibration();
                             this.open('characters', 'all');
@@ -335,7 +346,9 @@ export struct CosPage {
                         .value(this.route.favoriteOnly ? '已收藏角色' : '全部角色')
                         .constraintSize({ minHeight: 36 })
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                        .borderRadius(Theme.pillRadius)
+                        .clip(true)
                         .accessibilityText('角色收藏筛选')
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
@@ -350,11 +363,12 @@ export struct CosPage {
                         .layoutWeight(1)
                         .textAlign(TextAlign.End)
                     if (this.route.query.trim() || this.route.favoriteOnly) {
-                        Button('清除筛选', { type: ButtonType.Normal, stateEffect: false })
+                        Button('清除筛选', { type: ButtonType.Capsule, stateEffect: false })
                             .height(34)
                             .padding({ left: 10, right: 10 })
-                            .borderRadius(12)
                             .backgroundColor(Theme.tint)
+                            .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                            .borderRadius(Theme.pillRadius)
                             .fontSize(12)
                             .fontColor(Theme.muted)
                             .onClick((): void => {
@@ -365,10 +379,65 @@ export struct CosPage {
                     .alignItems(VerticalAlign.Center)
             }
         }.width('100%')
+            .constraintSize({ maxWidth: Theme.contentMaxWidth })
+            .padding({ left: Theme.pagePadding, right: Theme.pagePadding, bottom: 10 })
             .alignItems(HorizontalAlign.Start)
-            .padding({ bottom: 10 })
             .opacity(this.animStep >= 1 ? 1 : 0)
             .translate({ y: this.animStep >= 1 ? 0 : 20 })
+    }
+
+    private writable(): boolean {
+        return !this.state.busy && !this.state.staleScopes.length;
+    }
+
+    @Builder characterMenu(character: Character) {
+        Menu() {
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.profile).fontSize(18).fontColor([Theme.accent]),
+                content: '查看详情',
+            }).onClick((): void => {
+                vibration.dotVibration();
+                this.route.anchorId = character.id;
+                this.open('character', character.id);
+            })
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(character.favorite ? Icons.star : Icons.starFill)
+                    .fontSize(18)
+                    .fontColor([Theme.warning]),
+                content: character.favorite ? '取消收藏' : '收藏角色',
+            }).enabled(this.writable())
+                .onClick((): void => {
+                    vibration.dotVibration();
+                    const copy = JSON.parse(JSON.stringify(character)) as Character;
+                    copy.favorite = !character.favorite;
+                    void this.state.saveCharacter(copy);
+                })
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.add).fontSize(18).fontColor([Theme.accent]),
+                content: '新建关联计划',
+            }).enabled(this.writable())
+                .onClick((): void => {
+                    vibration.dotVibration();
+                    this.add('project', character.id);
+                })
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.edit).fontSize(18).fontColor([Theme.ink]),
+                content: '编辑角色',
+            }).enabled(this.writable())
+                .onClick((): void => {
+                    vibration.dotVibration();
+                    this.edit('character', character.id, '');
+                })
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.remove).fontSize(18).fontColor([Theme.danger]),
+                content: '删除角色',
+            }).contentFontColor(Theme.danger)
+                .enabled(this.writable())
+                .onClick((): void => {
+                    vibration.dotVibration();
+                    this.remove('character', character.id);
+                })
+        }
     }
 
     @Builder empty() {
@@ -384,20 +453,28 @@ export struct CosPage {
     }
 
     build() {
-        List({ space: Theme.cardSpacing, scroller: this.scroller }) {
-            ListItemGroup({ header: this.controls, space: Theme.cardSpacing }) {
+        Column({ space: 0 }) {
+            this.controls()
+            List({ space: Theme.cardSpacing, scroller: this.scroller }) {
                 if (this.projects) {
                     LazyForEach(this.planSource, (project: CosProject) => {
                         ListItem() {
                             ProjectCard({
                                 state: this.state,
                                 project: project,
+                                canManage: true,
                                 open: (): void => {
                                     this.open('project', project.id);
                                 },
+                                edit: (): void => {
+                                    this.edit('project', project.id, '');
+                                },
+                                remove: (): void => {
+                                    this.remove('project', project.id);
+                                },
                             })
                         }.opacity(this.animStep >= 2 ? 1 : 0)
-                    }, (project: CosProject) => project.id)
+                    }, (project: CosProject) => project.id + ':' + project.status + ':' + project.name)
                     if (!this.visiblePlans.length) {
                         ListItem() {
                             this.empty()
@@ -411,6 +488,7 @@ export struct CosPage {
                                 hint: '双击打开角色详情',
                                 effects: this.state.settings.effects,
                                 contentPadding: 14,
+                                hasMenu: true,
                                 action: (): void => {
                                     this.route.anchorId = character.id;
                                     this.open('character', character.id);
@@ -418,47 +496,52 @@ export struct CosPage {
                                 content: (): void => {
                                     this.characterBody(character);
                                 },
+                                contextMenu: (): void => {
+                                    this.characterMenu(character);
+                                },
                             }).id('character-library:' + character.id)
                         }.opacity(this.animStep >= 2 ? 1 : 0)
-                    }, (character: Character) => character.id)
+                    }, (character: Character) => character.id + ':' + character.favorite + ':' + character.name)
                     if (!this.visibleCharacters.length) {
                         ListItem() {
                             this.empty()
                         }
                     }
                 }
-            }
-            ListItem() {
-                Column() {
-                    Blank().height(this.bottomInset).width('100%')
-                }.width('100%')
-            }
-        }.id(this.projects ? 'project-list' : 'character-list')
-            .width('100%')
+                ListItem() {
+                    Column() {
+                        Blank().height(this.bottomInset).width('100%')
+                    }.width('100%')
+                }
+            }.id(this.projects ? 'project-list' : 'character-list')
+                .layoutWeight(1)
+                .width('100%')
+                .constraintSize({ maxWidth: Theme.contentMaxWidth })
+                .lanes((this.projects ? this.visiblePlans.length : this.visibleCharacters.length) > 0 ? this.columns : 1, 12)
+                .cachedCount(4)
+                .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
+                .scrollBar(BarState.Off)
+                .edgeEffect(EdgeEffect.Spring)
+                .onAreaChange((_, area: Area): void => {
+                    const columns = cardColumnCount(Number(area.width));
+                    if (this.columns !== columns) {
+                        this.columns = columns;
+                    }
+                    if (!this.measured && Number(area.height) > 0) {
+                        this.measured = true;
+                        this.restore();
+                    }
+                })
+                .onDidScroll((): void => {
+                    if (this.measured && !this.restoring) {
+                        this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset;
+                    }
+                })
+                .onAxisEvent((event: AxisEvent): void => {
+                    scrollByAxis(this.scroller, event);
+                })
+        }.width('100%')
             .height('100%')
-            .constraintSize({ maxWidth: Theme.contentMaxWidth })
-            .lanes(this.columns, 12)
-            .cachedCount(4)
-            .padding({ left: Theme.pagePadding, right: Theme.pagePadding })
-            .scrollBar(BarState.Off)
-            .edgeEffect(EdgeEffect.Spring)
-            .onAreaChange((_, area: Area): void => {
-                const columns = cardColumnCount(Number(area.width));
-                if (this.columns !== columns) {
-                    this.columns = columns;
-                }
-                if (!this.measured && Number(area.height) > 0) {
-                    this.measured = true;
-                    this.restore();
-                }
-            })
-            .onDidScroll((): void => {
-                if (this.measured && !this.restoring) {
-                    this.route.offsets[this.displayedSection] = this.scroller.currentOffset().yOffset;
-                }
-            })
-            .onAxisEvent((event: AxisEvent): void => {
-                scrollByAxis(this.scroller, event);
-            })
+            .alignItems(HorizontalAlign.Center)
     }
 }

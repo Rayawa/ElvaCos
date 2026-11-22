@@ -163,7 +163,7 @@ export struct TasksPage {
                     }))
                         .value(CATEGORY_LABELS[CATEGORIES.indexOf(this.route.category)])
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .borderRadius(Theme.pillRadius)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.category = CATEGORIES[index];
@@ -177,7 +177,7 @@ export struct TasksPage {
                     Select(this.projectOptions())
                         .value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .borderRadius(Theme.pillRadius)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
@@ -192,7 +192,7 @@ export struct TasksPage {
                     }))
                         .value(RANGE_LABELS[RANGES.indexOf(this.route.range)])
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .borderRadius(Theme.pillRadius)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.range = RANGES[index];

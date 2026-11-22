@@ -40,7 +40,7 @@ export struct PreparationFields {
                 .width('100%')
                 .constraintSize({ minHeight: Theme.controlHeight })
                 .backgroundColor(Theme.tint)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .border({ width: 1, color: Theme.line })
                 .font({ size: 15, weight: FontWeight.Medium })
                 .fontColor(Theme.ink)

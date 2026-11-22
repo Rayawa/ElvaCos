@@ -273,6 +273,8 @@ export struct EventDetail {
                             Row({ space: 8 }) {
                                 Checkbox()
                                     .select(this.state.dayModules[module.id]?.enabled !== false)
+                                    .shape(CheckBoxShape.CIRCLE)
+                                    .selectedColor(Theme.brand)
                                     .enabled(!this.state.settingsBusy)
                                     .onChange((enabled: boolean): void => {
                                         vibration.dotVibration();

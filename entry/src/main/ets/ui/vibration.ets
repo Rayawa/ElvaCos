@@ -125,6 +125,12 @@ export class vibration {
     static dotVibration(): void {
         vibration.startPresetVibration(1, 50);
     }
+
+    /** 微弱触觉提示，用于长按菜单触发与横滑阈值反馈。 */
+    static lightVibration(): void {
+        if (vibration.currentEffectId() === undefined) return;
+        vibration.startPresetVibrationWithEffect(EFFECT_SOFT, 1, 35);
+    }
     /**
     * 返回键、标题栏返回与系统侧滑返回可能在同一帧触发多个回调；短时间去重，
     * 保证一次返回动作只产生一次清晰的触觉反馈。

@@ -80,9 +80,12 @@ export class Icons {
     static edit: Resource = $r('sys.symbol.square_and_pencil');
     static share: Resource = $r('sys.symbol.share');
     static check: Resource = $r('sys.symbol.checkmark');
+    static selectCircle: Resource = $r('sys.symbol.checkmark_circle');
+    static closeCircle: Resource = $r('sys.symbol.xmark_circle');
     static done: Resource = $r('sys.symbol.checkmark_circle_fill');
     static pending: Resource = $r('sys.symbol.circle');
     static remove: Resource = $r('sys.symbol.trash');
+    static close: Resource = $r('sys.symbol.xmark');
     static importPhoto: Resource = $r('sys.symbol.picture');
 
     static assetTypeSymbol(type: string): Resource {
@@ -91,6 +94,9 @@ export class Icons {
         }
         if (type === 'Wig') {
             return $r('sys.symbol.person');
+        }
+        if (type === 'Shoes') {
+            return $r('sys.symbol.shoe');
         }
         if (type === 'Prop') {
             return $r('sys.symbol.wrench_and_screwdriver');
@@ -102,7 +108,7 @@ export class Icons {
             return $r('sys.symbol.eyedropper');
         }
         if (type === 'Makeup') {
-            return $r('sys.symbol.square_and_pencil');
+            return $r('sys.symbol.paintpalette');
         }
         return $r('sys.symbol.archivebox');
     }

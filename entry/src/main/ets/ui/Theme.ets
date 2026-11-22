@@ -38,6 +38,7 @@ class ThemeTokens {
     @Trace warningBg: Resource = $r('app.color.v3_warning_bg');
     @Trace dangerBg: Resource = $r('app.color.v3_danger_bg');
     @Trace noticeBg: Resource = $r('app.color.v3_notice_bg');
+    @Trace purpleBg: Resource = $r('app.color.v3_purple_bg');
     @Trace segmentedSelected: Resource = $r('app.color.segmented_color_selected');
     applyPalette(value: string): void {
         const palette = resolveThemePalette(value);

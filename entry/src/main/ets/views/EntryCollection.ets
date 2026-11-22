@@ -271,6 +271,8 @@ export struct EntryCollection {
                 this.targetKind = this.conversion ? 'project' : 'event';
                 this.targetId = '';
             }).constraintSize({ minHeight: 36 })
+            .backgroundColor(Theme.tint)
+            .borderRadius(Theme.pillRadius)
             .controlSize(ControlSize.SMALL).font({ size: 14 })
         if (!this.conversion || this.conversion === 'reference') {
             Select(this.assignmentScopes().map((scope: string): SelectOption => ({ value: ENTRY_SCOPE_LABELS[ENTRY_SCOPES.indexOf(scope)] })))
@@ -279,6 +281,8 @@ export struct EntryCollection {
                     this.targetKind = this.assignmentScopes()[index];
                     this.targetId = '';
                 }).constraintSize({ minHeight: 36 })
+                .backgroundColor(Theme.tint)
+                .borderRadius(Theme.pillRadius)
                 .controlSize(ControlSize.SMALL).font({ size: 14 })
         }
         if (this.targetKind !== 'global') {
@@ -358,6 +362,8 @@ export struct EntryCollection {
                     .enabled(!this.state.busy).onSelect((index: number): void => {
                         this.entryKind = ENTRY_KINDS[index];
                     }).constraintSize({ minHeight: 36 })
+                    .backgroundColor(Theme.tint)
+                    .borderRadius(Theme.pillRadius)
                     .controlSize(ControlSize.SMALL).font({ size: 14 })
                 Field({ label: '标题（可选）', value: this.title, change: (value: string): void => {
                         this.title = value;
@@ -531,7 +537,7 @@ export struct EntryCollection {
                         .value(this.route.untriagedOnly ? '未归位' : '全部收录')
                         .id('entry-scope-filter')
                         .backgroundColor(Theme.surface)
-                        .borderRadius(12)
+                        .borderRadius(Theme.pillRadius)
                         .onSelect((index: number): void => {
                             vibration.dotVibration();
                             this.route.setUntriagedOnly(index === 0);
@@ -547,7 +553,7 @@ export struct EntryCollection {
                 .value(this.route.kind ? ENTRY_KIND_LABELS[ENTRY_KINDS.indexOf(this.route.kind)] : '所有类型')
                 .id('entry-kind-filter')
                 .backgroundColor(Theme.surface)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .onSelect((index: number): void => {
                     vibration.dotVibration();
                     this.route.setKind(index === 0 ? '' : ENTRY_KINDS[index - 1]);

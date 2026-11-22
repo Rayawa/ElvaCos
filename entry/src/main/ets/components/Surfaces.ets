@@ -18,12 +18,19 @@ export struct InteractiveCard {
     @Param elevated: boolean = false;
     @Param hero: boolean = false;
     @Param cardRadius: number = 0;
+    @Param hasMenu: boolean = false;
     @Event action: () => void = () => {};
     @BuilderParam content: () => void = this.defaultContent;
+    @BuilderParam contextMenu: () => void = this.emptyContextMenu;
     @Local pressed: boolean = false;
+    @Local menuShown: boolean = false;
+    private longPressTriggered: boolean = false;
 
     @Builder defaultContent() {
         Text(this.label)
+    }
+
+    @Builder emptyContextMenu() {
     }
 
     private effect(): VisualEffect | undefined {
@@ -46,8 +53,8 @@ export struct InteractiveCard {
         }.width('100%')
             .padding(this.contentPadding)
             .backgroundColor(Theme.surface)
+            .border({ width: this.hero ? 1 : 0.8, color: this.hero ? Theme.divider : Theme.line, radius: this.resolvedRadius() })
             .borderRadius(this.resolvedRadius())
-            .border({ width: this.hero ? 1 : 0.8, color: this.hero ? Theme.divider : Theme.line })
             .shadow(this.hero || this.elevated ?
                 { radius: 14, color: Theme.shadow, offsetX: 0, offsetY: 4 } :
                 { radius: 8, color: Theme.shadow, offsetX: 0, offsetY: 2 })
@@ -58,13 +65,39 @@ export struct InteractiveCard {
             .onTouch((event: TouchEvent) => {
                 if (event.type === TouchType.Down) {
                     this.pressed = true;
+                    this.longPressTriggered = false;
                 } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
                     this.pressed = false;
                 }
             })
+            .gesture(
+                LongPressGesture({ duration: 350 })
+                    .onAction((): void => {
+                        if (!this.hasMenu) {
+                            return;
+                        }
+                        this.longPressTriggered = true;
+                        this.pressed = false;
+                        vibration.lightVibration();
+                        this.menuShown = true;
+                    })
+            )
             .onClick((): void => {
+                if (this.longPressTriggered) {
+                    this.longPressTriggered = false;
+                    return;
+                }
                 vibration.dotVibration();
                 this.action();
+            })
+            .bindContextMenu(this.menuShown, this.contextMenu, {
+                preview: MenuPreviewMode.IMAGE,
+                aboutToDisappear: (): void => {
+                    this.menuShown = false;
+                },
+                onDisappear: (): void => {
+                    this.menuShown = false;
+                },
             })
             .focusable(true)
             .accessibilityRole(AccessibilityRoleType.BUTTON)

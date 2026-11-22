@@ -202,7 +202,7 @@ export struct SearchPage {
                                 .value(SEARCH_RESOURCE_LABELS[SEARCH_RESOURCE_KINDS.indexOf(this.route.resourceKind)])
                                 .constraintSize({ minHeight: 36 })
                                 .backgroundColor(Theme.surface)
-                                .borderRadius(12)
+                                .borderRadius(Theme.pillRadius)
                                 .onSelect((index: number): void => {
                                     vibration.dotVibration();
                                     this.route.setResourceKind(SEARCH_RESOURCE_KINDS[index]);

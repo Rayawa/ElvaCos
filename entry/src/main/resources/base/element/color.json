@@ -95,6 +95,10 @@
     {
       "name": "v3_notice_bg",
       "value": "#16007D8A"
+    },
+    {
+      "name": "v3_purple_bg",
+      "value": "#167048E8"
     }
   ]
 }

@@ -22,7 +22,7 @@ export struct PreparationTemplatePicker {
                 .width('100%')
                 .constraintSize({ minHeight: Theme.controlHeight })
                 .backgroundColor(Theme.tint)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .border({ width: 1, color: Theme.line })
                 .font({ size: 15, weight: FontWeight.Medium })
                 .fontColor(Theme.ink)
@@ -33,7 +33,10 @@ export struct PreparationTemplatePicker {
                         Text(category.name).fontSize(14).fontWeight(FontWeight.Medium).fontColor(Theme.ink)
                         ForEach(category.tasks.filter((task: TaskTemplate) => this.mode === 1 || !task.purchase), (task: TaskTemplate) => {
                             Row({ space: 8 }) {
-                                Checkbox({ name: task.key }).select(this.keys.includes(task.key)).selectedColor(Theme.brand)
+                                Checkbox({ name: task.key })
+                                    .select(this.keys.includes(task.key))
+                                    .shape(CheckBoxShape.CIRCLE)
+                                    .selectedColor(Theme.brand)
                                     .onChange((checked: boolean): void => {
                                         vibration.dotVibration();
                                         this.change(checked ? this.keys.filter((key: string) => key !== task.key).concat(task.key) : this.keys.filter((key: string) => key !== task.key), this.mode);

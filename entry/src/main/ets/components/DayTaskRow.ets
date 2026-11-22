@@ -19,6 +19,8 @@ export struct DayTaskRow {
         Row({ space: 6 }) {
             Checkbox()
                 .select(this.done)
+                .shape(CheckBoxShape.CIRCLE)
+                .selectedColor(Theme.brand)
                 .width(24)
                 .height(24)
                 .margin({ left: 6, right: 8 })

@@ -215,7 +215,7 @@ export struct PhotoDetail {
                                 .value(photoStatusLabel(this.photo.status))
                                 .constraintSize({ minHeight: 36 })
                                 .backgroundColor(Theme.tint)
-                                .borderRadius(12)
+                                .borderRadius(Theme.pillRadius)
                                 .enabled(!this.state.busy && !this.state.staleScopes.length)
                                 .onSelect((index: number): void => {
                                     vibration.dotVibration();

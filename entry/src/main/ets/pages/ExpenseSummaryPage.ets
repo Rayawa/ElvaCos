@@ -136,7 +136,7 @@ export struct ExpenseSummary {
                 .id('expense-range')
                 .value(RANGE_LABELS[RANGES.indexOf(this.route.range)])
                 .backgroundColor(Theme.surface)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .onSelect((index: number): void => {
                     this.chooseRange(index);
                 })
@@ -149,7 +149,7 @@ export struct ExpenseSummary {
                 .id('expense-project')
                 .value(this.route.projectId ? this.state.projectName(this.route.projectId) : '全部计划')
                 .backgroundColor(Theme.surface)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .onSelect((index: number): void => {
                     vibration.dotVibration();
                     this.route.projectId = index === 0 ? '' : this.state.projects[index - 1].id;
@@ -163,7 +163,7 @@ export struct ExpenseSummary {
                 .id('expense-category-filter')
                 .value(this.route.category || '全部分类')
                 .backgroundColor(Theme.surface)
-                .borderRadius(12)
+                .borderRadius(Theme.pillRadius)
                 .onSelect((index: number): void => {
                     vibration.dotVibration();
                     this.route.category = index === 0 ? '' : this.categoryNames[index - 1];

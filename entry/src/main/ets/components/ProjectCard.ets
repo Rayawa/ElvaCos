@@ -1,3 +1,4 @@
+import { SymbolGlyphModifier } from '@kit.ArkUI';
 import { displayName } from '../utils/format';
 import { PROJECT_LABELS, PROJECT_STATUSES } from '../models/constants';
 import { ManagedImage } from './ManagedImage';
@@ -8,13 +9,17 @@ import { CosProject, Character, ProjectStatus } from '../models/Entities';
 import { InteractiveCard, PillTone, StatusPill } from './Surfaces';
 import { ContextRow } from './ContextRow';
 import { MetaRow } from './MetaRow';
+import { vibration } from '../ui/vibration';
 
 @ComponentV2
 export struct ProjectCard {
     @Require @Param state: AppState;
     @Param hero: boolean = false;
     @Param project: CosProject = new CosProject();
+    @Param canManage: boolean = false;
     @Event open: () => void = () => {};
+    @Event edit: () => void = () => {};
+    @Event remove: () => void = () => {};
 
     private character(): Character | undefined {
         return this.state.characters.find((c: Character) => c.id === this.project.characterId);
@@ -67,7 +72,7 @@ export struct ProjectCard {
                             .fontSize(this.hero ? 20 : 17)
                             .fontWeight(FontWeight.Bold)
                             .fontColor(Theme.ink)
-                            .maxLines(2)
+                            .maxLines(this.hero ? 2 : 1)
                             .textOverflow({ overflow: TextOverflow.Ellipsis })
                             .layoutWeight(1)
                         StatusPill({
@@ -115,7 +120,64 @@ export struct ProjectCard {
                 })
             }
         }.width('100%')
+            .constraintSize(this.hero ? undefined : { minHeight: 130, maxHeight: 130 })
             .alignItems(HorizontalAlign.Start)
+            .justifyContent(FlexAlign.SpaceBetween)
+    }
+
+    private writable(): boolean {
+        return !this.state.busy && !this.state.staleScopes.length;
+    }
+
+    @Builder projectMenu() {
+        Menu() {
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.plan).fontSize(18).fontColor([Theme.accent]),
+                content: '查看详情',
+            }).onClick((): void => {
+                vibration.dotVibration();
+                this.open();
+            })
+            if (this.canManage) {
+                MenuItem({
+                    symbolStartIcon: new SymbolGlyphModifier(Icons.edit).fontSize(18).fontColor([Theme.ink]),
+                    content: '编辑计划',
+                }).enabled(this.writable())
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        this.edit();
+                    })
+            }
+            if (this.project.status === ProjectStatus.COMPLETED) {
+                MenuItem({
+                    symbolStartIcon: new SymbolGlyphModifier(Icons.library).fontSize(18).fontColor([Theme.accent]),
+                    content: '归档计划',
+                }).enabled(this.writable())
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        void this.state.archiveProject(this.project.id);
+                    })
+            }
+            MenuItem({
+                symbolStartIcon: new SymbolGlyphModifier(Icons.share).fontSize(18).fontColor([Theme.ink]),
+                content: '分享计划',
+            }).enabled(!this.state.busy)
+                .onClick((): void => {
+                    vibration.dotVibration();
+                    void this.state.shareProject(this.project.id);
+                })
+            if (this.canManage) {
+                MenuItem({
+                    symbolStartIcon: new SymbolGlyphModifier(Icons.remove).fontSize(18).fontColor([Theme.danger]),
+                    content: '删除计划',
+                }).contentFontColor(Theme.danger)
+                    .enabled(this.writable())
+                    .onClick((): void => {
+                        vibration.dotVibration();
+                        this.remove();
+                    })
+            }
+        }
     }
 
     build() {
@@ -126,8 +188,10 @@ export struct ProjectCard {
             hero: this.hero,
             elevated: true,
             contentPadding: 14,
+            hasMenu: true,
             action: () => this.open(),
             content: (): void => this.body(),
+            contextMenu: (): void => this.projectMenu(),
         }).id('project-card:' + this.project.id)
     }
 }

@@ -41,7 +41,7 @@ import { appSheetOptions, dismissSheet, handleSheetBack } from './ui/sheet';
 import { Theme } from './ui/Theme';
 import { Icons } from './ui/Icons';
 import { SheetHeader } from './components/SheetHeader';
-import { LengthMetrics, SegmentButtonV2Items } from '@kit.ArkUI';
+import { curves, LengthMetrics, SegmentButtonV2Items } from '@kit.ArkUI';
 import { HdsTitleBarSegment } from './components/HdsTitleBarSegment';
 import { HdsViewTabs } from './components/HdsViewTabs';
 import { HapticService } from './ui/HapticService';
@@ -53,6 +53,7 @@ import { HomePage } from './pages/HomePage';
 import { CosPage } from './pages/CosPage';
 import { EventsPage } from './pages/EventsPage';
 import { LibraryPage } from './pages/LibraryPage';
+import { WardrobeSearchPage } from './pages/WardrobeSearchPage';
 import lazy { SettingsPage } from './pages/SettingsPage';
 import lazy { CharacterDetail } from './pages/CharacterDetailPage';
 import lazy { ProjectDetail } from './pages/ProjectDetailPage';
@@ -74,7 +75,7 @@ struct Dashboard {
     @Local state: AppState = getApplicationState();
     private mainEntranceSession: MainEntranceSession = new MainEntranceSession();
     private detailStack: NavPathStack = new NavPathStack();
-    private pageScrollers: Scroller[] = [new Scroller(), new Scroller(), new Scroller(), new Scroller(), new Scroller()];
+    private pageScrollers: Scroller[] = [new Scroller(), new Scroller(), new ListScroller(), new Scroller(), new Scroller()];
     private tabsController: HdsTabsController = new HdsTabsController();
     private planSegmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
         { text: '计划', accessibilityText: '计划' },
@@ -85,13 +86,16 @@ struct Dashboard {
         { text: '日历', accessibilityText: '日历' },
     ]);
     private albumSegmentItems: SegmentButtonV2Items = new SegmentButtonV2Items([
-        { text: '场次', accessibilityText: '场次' },
-        { text: '待修', accessibilityText: '待修' },
+        { text: '相册', accessibilityText: '按计划相册' },
+        { text: '修图', accessibilityText: '待修队列' },
     ]);
     @Local tab: number = 0;
     @Local planTabMode: number = 0;
     @Local planListRoute: PlanListRoute = new PlanListRoute();
     @Local wardrobeRoute: WardrobeRoute = new WardrobeRoute();
+    @Local wardrobeSearchOpen: boolean = false;
+    @Local wardrobeSearchPressed: boolean = false;
+    private readonly wardrobeSearchGeometryId: string = 'wardrobe-search-shared';
     @Local scheduleRoute: ScheduleRoute = new ScheduleRoute(today());
     @Local albumRoute: AlbumRoute = new AlbumRoute();
     @Local rootSheetKind: string = 'form';
@@ -268,6 +272,18 @@ struct Dashboard {
             this.closeDetail();
             return true;
         }
+        if (this.wardrobeSearchOpen) {
+            HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
+            this.closeWardrobeSearch();
+            return true;
+        }
+        if (this.tab === 4 && this.albumRoute.collection.selecting) {
+            if (!this.albumRoute.collection.submitting) {
+                this.albumRoute.collection.selecting = false;
+                this.albumRoute.collection.clearSelection();
+            }
+            return true;
+        }
         HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
         return false;
     }
@@ -289,7 +305,7 @@ struct Dashboard {
             return false;
         }
         if (shortcut === AppShortcut.BACK) {
-            const canReturn = this.formOpen || this.importOpen || this.restoreOpen || this.detailStack.size() > 0;
+            const canReturn = this.formOpen || this.importOpen || this.restoreOpen || this.detailStack.size() > 0 || this.wardrobeSearchOpen;
             return canReturn ? this.onBackPress() : false;
         }
         if (!this.state.ready || this.state.busy || this.state.staleScopes.length || this.formOpen || this.importOpen || this.restoreOpen) {
@@ -332,16 +348,37 @@ struct Dashboard {
         HapticService.back(this.state.settings.haptic, this.state.settings.hapticLevel);
         if (this.detailStack.size() > 0) {
             const index = this.detailStack.size() - 1;
-            if (this.detailStack.getAllPathName()[index] === 'character') {
+            const name = this.detailStack.getAllPathName()[index];
+            if (name === 'album') {
+                const album = this.detailStack.getParamByIndex(index) as AlbumRoute;
+                if (album.collection.selecting) {
+                    if (!album.collection.submitting) {
+                        album.collection.selecting = false;
+                        album.collection.clearSelection();
+                    }
+                    return;
+                }
+            }
+            if (name === 'project') {
+                const project = this.detailStack.getParamByIndex(index) as ProjectRoute;
+                if (project.section === 3 && project.photos.selecting) {
+                    if (!project.photos.submitting) {
+                        project.photos.selecting = false;
+                        project.photos.clearSelection();
+                    }
+                    return;
+                }
+            }
+            if (name === 'character') {
                 (this.detailStack.getParamByIndex(index) as CharacterRoute).restoreSource();
             }
-            if (this.detailStack.getAllPathName()[index] === 'asset') {
+            if (name === 'asset') {
                 const route = this.detailStack.getParamByIndex(index) as AssetRoute;
                 route.restoreSource();
                 this.tab = route.sourceTab;
                 this.tabsController.changeIndex(route.sourceTab);
             }
-            if (this.detailStack.getAllPathName()[index] === 'photo') {
+            if (name === 'photo') {
                 returnToPhotoCollection(this.detailStack.getParamByIndex(index) as PhotoViewerRoute, this.state.photos);
             }
             this.detailStack.pop();
@@ -643,23 +680,27 @@ struct Dashboard {
         this.formOpen = true;
     }
 
-    private async remove(kind: string, id: string): Promise<void> {
-        if (this.state.busy || this.state.staleScopes.length) {
-            return;
-        }
-        const usage = this.state.assetUsage(id);
-        const impact = this.state.removalImpact(kind, id);
-        if (kind !== 'asset' && !impact) {
-            this.state.reportError('记录已不存在，请返回后重新查看');
-            return;
-        }
-        const accepted = await confirm(this.getUIContext(), kind === 'asset' ? '删除装备？' : impact!.title, kind === 'asset' ? usage.removalMessage(this.state.assets.find((asset: Asset) => asset.id === id)?.name || '已失效装备') : impact!.detail, '删除');
-        if (accepted && await (kind === 'asset' ? this.state.removeAsset(id, usage.removalKey) : this.state.remove(kind, id))) {
-            if (kind === 'project' || kind === 'character' || kind === 'asset' || kind === 'event') {
-                this.pruneInvalidDetails(kind, id);
-            } else if (!['variant', 'checklist', 'preparation', 'category', 'team', 'expense'].includes(kind)) {
-                this.detailStack.pop();
+    private async remove(kind: string, id: string, onSettled?: () => void): Promise<void> {
+        try {
+            if (this.state.busy || this.state.staleScopes.length) {
+                return;
             }
+            const usage = this.state.assetUsage(id);
+            const impact = this.state.removalImpact(kind, id);
+            if (kind !== 'asset' && !impact) {
+                this.state.reportError('记录已不存在，请返回后重新查看');
+                return;
+            }
+            const accepted = await confirm(this.getUIContext(), kind === 'asset' ? '删除装备？' : impact!.title, kind === 'asset' ? usage.removalMessage(this.state.assets.find((asset: Asset) => asset.id === id)?.name || '已失效装备') : impact!.detail, '删除');
+            if (accepted && await (kind === 'asset' ? this.state.removeAsset(id, usage.removalKey) : this.state.remove(kind, id))) {
+                if (kind === 'project' || kind === 'character' || kind === 'asset' || kind === 'event' || kind === 'photo') {
+                    this.pruneInvalidDetails(kind, id);
+                } else if (!['variant', 'checklist', 'preparation', 'category', 'team', 'expense'].includes(kind)) {
+                    this.detailStack.pop();
+                }
+            }
+        } finally {
+            onSettled?.();
         }
     }
 
@@ -965,6 +1006,15 @@ struct Dashboard {
                         },
                         photos: this.state.photos, view: (route: PhotoViewerRoute): void => {
                             this.openPhoto(route);
+                        },
+                        applySelection: (): void => {
+                            void this.applyPhotoSelection((param as ProjectRoute).photos);
+                        },
+                        setCover: (photo: PhotoAsset): void => {
+                            void this.setCover(photo);
+                        },
+                        removePhoto: (id: string): void => {
+                            void this.remove('photo', id);
                         }
                     })
                 } else {
@@ -1057,7 +1107,7 @@ struct Dashboard {
             return ['资料', '使用计划'];
         }
         if (kind === 'album') {
-            return ['场次', '待修'];
+            return ['相册', '修图'];
         }
         if (kind === 'search') {
             return SEARCH_SECTIONS;
@@ -1170,14 +1220,26 @@ struct Dashboard {
                     this.open(k, id);
                 }, add: (k: string, parent: string): void => {
                     this.edit(k, '', parent);
+                }, edit: (k: string, id: string, parent: string): void => {
+                    this.edit(k, id, parent);
+                }, remove: (k: string, id: string): void => {
+                    void this.remove(k, id);
                 }
             })
         } else if (kind === 'album') {
             AlbumPage({ state: this.state, route: param as AlbumRoute, entrance: entrance, topInset: Theme.detailTop, bottomInset: Theme.detailFloatingBottom,
-                openPlan: (id: string): void => this.open('album', id), view: (route: PhotoViewerRoute): void => {
+                openPlan: (id: string): void => this.open('album', id),
+                openProject: (id: string): void => this.open('project', id),
+                view: (route: PhotoViewerRoute): void => {
                     this.openPhoto(route);
                 }, importPhotos: (id: string): void => {
                     this.chooseImport(id);
+                }, applySelection: (collection: PhotoCollectionRoute): void => {
+                    void this.applyPhotoSelection(collection);
+                }, setCover: (photo: PhotoAsset): void => {
+                    void this.setCover(photo);
+                }, removePhoto: (id: string): void => {
+                    void this.remove('photo', id);
                 }
             })
         } else if (kind === 'project' || kind === 'expenseStats' || kind === 'photo' || kind === 'asset' || kind === 'character' || kind === 'event') {
@@ -1460,12 +1522,11 @@ struct Dashboard {
         if (!route.planId && !route.queue) { return []; }
         if (!route.selecting && !selectPhotoCollection(this.state.photos, route).length) { return []; }
         if (!route.selecting) {
-            return [{ value: '批量选片', icon: Icons.check, action: (): void => { route.selecting = true; route.clearSelection(); } }];
+            return [{ value: '批量选片', icon: Icons.selectCircle, action: (): void => { route.selecting = true; route.clearSelection(); } }];
         }
         return [
-            { value: '取消选择', icon: Icons.remove, action: (): void => { if (!route.submitting) { route.selecting = false; route.clearSelection(); } } },
-            { value: '全选当前筛选', icon: Icons.check, action: (): void => { if (!route.submitting) { route.selectAll(this.state.photos); } } },
-            { value: '应用状态', icon: Icons.edit, action: (): void => { void this.applyPhotoSelection(route); } },
+            { value: '应用状态', icon: Icons.check, action: (): void => { void this.applyPhotoSelection(route); } },
+            { value: '取消选择', icon: Icons.closeCircle, action: (): void => { if (!route.submitting) { route.selecting = false; route.clearSelection(); } } },
         ];
     }
 
@@ -1485,9 +1546,9 @@ struct Dashboard {
 
     private albumMenus(route: AlbumRoute): HdsNavigationMenuItemOptions[] {
         const tools = this.photoTools(route.collection);
-        if (!route.collection.selecting) { tools.unshift({ value: '导入照片', icon: Icons.importPhoto, action: (): void => { this.chooseImport(route.collection.planId); } }); }
+        if (!route.collection.selecting) { tools.unshift({ value: '导入照片', icon: Icons.add, action: (): void => { this.chooseImport(route.collection.planId); } }); }
         return tools.map((item: ToolbarItem): HdsNavigationMenuItemOptions => ({ content: {
-                label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy && !route.collection.submitting && (item.value !== '应用状态' || route.collection.selectedIds.length > 0),
+                label: item.value, icon: item.icon as Resource, isEnabled: item.value === '取消选择' ? !route.collection.submitting : !this.state.busy && !route.collection.submitting && (item.value !== '应用状态' || route.collection.selectedIds.length > 0),
                 action: item.action, componentId: item.value === '应用状态' ? 'photo-batch-apply' : 'detail-action-' + item.value,
             } }));
     }
@@ -1525,7 +1586,7 @@ struct Dashboard {
         if (index === 4) {
             const items: ToolbarItem[] = [{
                 value: '导入照片',
-                icon: Icons.importPhoto,
+                icon: Icons.add,
                 action: (): void => {
                     this.chooseImport(this.albumRoute.collection.planId);
                 }
@@ -1552,7 +1613,10 @@ struct Dashboard {
             ];
         }
         return this.rootTools(index).map((item: ToolbarItem): HdsNavigationMenuItemOptions => {
-            return { content: { label: item.value, icon: item.icon as Resource, isEnabled: enabled, action: item.action, componentId: item.value === '应用状态' ? 'photo-batch-apply' : 'root-action-' + item.value } };
+            const itemEnabled = item.value === '取消选择' ? !this.albumRoute.collection.submitting :
+                item.value === '应用状态' ? enabled && !this.albumRoute.collection.submitting && this.albumRoute.collection.selectedIds.length > 0 :
+                enabled;
+            return { content: { label: item.value, icon: item.icon as Resource, isEnabled: itemEnabled, action: item.action, componentId: item.value === '应用状态' ? 'photo-batch-apply' : 'root-action-' + item.value } };
         });
     }
 
@@ -1622,7 +1686,7 @@ struct Dashboard {
 
     private projectMenus(route: ProjectRoute): HdsNavigationMenuItemOptions[] {
         if (route.section === 3 && route.photos.selecting) {
-            return this.photoTools(route.photos).map((item: ToolbarItem): HdsNavigationMenuItemOptions => ({ content: { label: item.value, icon: item.icon as Resource, isEnabled: !this.state.busy && !route.photos.submitting, action: item.action, componentId: item.value === '应用状态' ? 'photo-batch-apply' : 'detail-action-' + item.value } }));
+            return this.photoTools(route.photos).map((item: ToolbarItem): HdsNavigationMenuItemOptions => ({ content: { label: item.value, icon: item.icon as Resource, isEnabled: item.value === '取消选择' ? !route.photos.submitting : !this.state.busy && !route.photos.submitting && (item.value !== '应用状态' || route.photos.selectedIds.length > 0), action: item.action, componentId: item.value === '应用状态' ? 'photo-batch-apply' : 'detail-action-' + item.value } }));
         }
         const tools: ToolbarItem[] = [];
         if (route.section === 3) { tools.push(...this.photoTools(route.photos)); }
@@ -1658,7 +1722,7 @@ struct Dashboard {
                 }
             });
         } else if (route.section === 3) {
-            tools.push({ value: '导入照片', icon: Icons.importPhoto, action: (): void => {
+            tools.push({ value: '导入照片', icon: Icons.add, action: (): void => {
                     this.state.importPhotos(route.id);
                 }
             });
@@ -1710,7 +1774,7 @@ struct Dashboard {
     }
 
     private hasRootSegment(index: number): boolean {
-        return index === 1 || index === 2 || (index === 4 && !this.albumRoute.collection.selecting);
+        return index === 1 || index === 2 || index === 3 || (index === 4 && !this.albumRoute.collection.selecting);
     }
 
     private rootSegmentIndex(index: number): number {
@@ -1744,12 +1808,77 @@ struct Dashboard {
         }).align(Alignment.Center).margin({ top: 8 })
     }
 
+    private openWardrobeSearch(): void {
+        if (this.wardrobeSearchOpen) {
+            return;
+        }
+        this.wardrobeSearchPressed = false;
+        HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
+        this.getUIContext().animateTo({ curve: curves.interpolatingSpring(0, 1, 342, 38) }, (): void => {
+            this.wardrobeSearchOpen = true;
+        });
+        this.syncDaySnack();
+    }
+
+    private closeWardrobeSearch(): void {
+        if (!this.wardrobeSearchOpen) {
+            return;
+        }
+        try {
+            this.getUIContext().getFocusController().clearFocus();
+        } catch (_error) {
+        }
+        this.getUIContext().animateTo({ curve: curves.interpolatingSpring(0, 1, 342, 38) }, (): void => {
+            this.wardrobeSearchOpen = false;
+        });
+        this.syncDaySnack();
+    }
+
     @Builder titleSegment(index: number) {
         Column() {
             if (index === 1) {
                 this.rootSegment(1, this.planSegmentItems)
             } else if (index === 2) {
                 this.rootSegment(2, this.scheduleSegmentItems)
+            } else if (index === 3) {
+                if (!this.wardrobeSearchOpen) {
+                    Stack({ alignContent: Alignment.Center }) {
+                        Search({ value: this.wardrobeRoute.query, placeholder: '搜索装备 / 位置' })
+                            .width('100%')
+                            .height('100%')
+                            .backgroundColor(Theme.tint)
+                            .border({ width: 0.8, color: Theme.line, radius: Theme.pillRadius })
+                            .borderRadius(Theme.pillRadius)
+                            .placeholderFont({ size: 13 })
+                            .textFont({ size: 13 })
+                            .defaultFocus(false)
+                            .enableKeyboardOnFocus(false)
+                            .focusable(false)
+                            .hitTestBehavior(HitTestMode.None)
+                    }.id('wardrobe-titlebar-search')
+                        .width('56%')
+                        .constraintSize({ minWidth: 152, maxWidth: 340 })
+                        .height(36)
+                        .margin({ top: 6 })
+                        .scale({
+                            x: this.wardrobeSearchPressed ? 0.985 : 1,
+                            y: this.wardrobeSearchPressed ? 0.985 : 1,
+                        })
+                        .animation({ duration: 120, curve: Curve.EaseOut })
+                        .geometryTransition(this.wardrobeSearchGeometryId, { follow: true })
+                        .transition(TransitionEffect.OPACITY)
+                        .onTouch((event: TouchEvent): void => {
+                            if (event.type === TouchType.Down) {
+                                this.wardrobeSearchPressed = true;
+                            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                                this.wardrobeSearchPressed = false;
+                            }
+                        })
+                        .onClick((): void => {
+                            this.openWardrobeSearch();
+                        })
+                        .accessibilityText('搜索衣柜')
+                }
             } else if (index === 4) {
                 this.rootSegment(4, this.albumSegmentItems)
             }
@@ -1953,12 +2082,16 @@ struct Dashboard {
                     active: this.tab === index,
                     route: this.planListRoute,
                     open: (k: string, id: string) => this.open(k, id),
-                    add: (k: string, parent: string) => this.edit(k, '', parent)
+                    add: (k: string, parent: string) => this.edit(k, '', parent),
+                    edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
+                    remove: (k: string, id: string) => {
+                        void this.remove(k, id);
+                    }
                 })
             } else if (index === 2) {
                 EventsPage({
                     entranceSession: this.mainEntranceSession,
-                    scroller: this.pageScrollers[index],
+                    scroller: this.pageScrollers[index] as ListScroller,
                     state: this.state,
                     topInset: this.mainContentTop,
                     bottomInset: Theme.contentBottom + this.daySnackBottomInset,
@@ -1968,7 +2101,11 @@ struct Dashboard {
                         this.openTaskItem(item);
                     },
                     open: (k: string, id: string) => this.open(k, id),
-                    add: (k: string, parent: string) => this.edit(k, '', parent)
+                    add: (k: string, parent: string) => this.edit(k, '', parent),
+                    edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
+                    remove: (k: string, id: string, onSettled?: () => void) => {
+                        void this.remove(k, id, onSettled);
+                    }
                 })
             } else if (index === 3) {
                 LibraryPage({
@@ -1980,12 +2117,17 @@ struct Dashboard {
                     active: this.tab === index,
                     route: this.wardrobeRoute,
                     open: (k: string, id: string) => this.open(k, id),
-                    add: (k: string, parent: string) => this.edit(k, '', parent)
+                    add: (k: string, parent: string) => this.edit(k, '', parent),
+                    edit: (k: string, id: string, parent: string) => this.edit(k, id, parent),
+                    remove: (k: string, id: string) => {
+                        void this.remove(k, id);
+                    }
                 })
             } else {
                 AlbumPage({
                     state: this.state, route: this.albumRoute,
                     openPlan: (id: string): void => this.open('album', id),
+                    openProject: (id: string): void => this.open('project', id),
                     scroller: this.pageScrollers[index], entranceSession: this.mainEntranceSession,
                     topInset: this.mainContentTop, bottomInset: Theme.contentBottom + this.daySnackBottomInset, active: this.tab === index,
                     view: (route: PhotoViewerRoute): void => {
@@ -1993,6 +2135,15 @@ struct Dashboard {
                     },
                     importPhotos: (id: string): void => {
                         this.chooseImport(id);
+                    },
+                    applySelection: (collection: PhotoCollectionRoute): void => {
+                        void this.applyPhotoSelection(collection);
+                    },
+                    setCover: (photo: PhotoAsset): void => {
+                        void this.setCover(photo);
+                    },
+                    removePhoto: (id: string): void => {
+                        void this.remove('photo', id);
                     }
                 })
             }
@@ -2034,6 +2185,9 @@ struct Dashboard {
             })
             .onChange((index: number): void => {
                 this.tab = index;
+                if (this.wardrobeSearchOpen && index !== 3) {
+                    this.wardrobeSearchOpen = false;
+                }
                 this.state.suspend();
                 HapticService.confirm(this.state.settings.haptic, this.state.settings.hapticLevel);
             })
@@ -2060,7 +2214,7 @@ struct Dashboard {
         }
     }
 
-    @Monitor('state.todayEvents', 'state.ready', 'formOpen', 'importOpen', 'restoreOpen', 'state.settings')
+    @Monitor('state.todayEvents', 'state.ready', 'formOpen', 'importOpen', 'restoreOpen', 'wardrobeSearchOpen', 'state.settings')
     daySnackChanged(): void {
         this.syncDaySnack();
     }
@@ -2085,7 +2239,7 @@ struct Dashboard {
             return;
         }
         const event = this.state.todayEvents[0];
-        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.rootSheetMounted || this.formOpen || this.importOpen || this.restoreOpen || this.closingDaySnack) {
+        if (!this.visible || !this.rootVisible || !this.state.ready || !event || this.detailStack.size() > 0 || this.rootSheetMounted || this.formOpen || this.importOpen || this.restoreOpen || this.wardrobeSearchOpen || this.closingDaySnack) {
             this.hideDaySnack();
             return;
         }
@@ -2137,11 +2291,31 @@ struct Dashboard {
     build() {
         WithTheme({ theme: Theme.nativeTheme }) {
             HdsNavigation(this.detailStack) {
-                this.mainTabs()
+                Stack() {
+                    this.mainTabs()
+                    if (this.wardrobeSearchOpen) {
+                        WardrobeSearchPage({
+                            state: this.state,
+                            route: this.wardrobeRoute,
+                            geometryId: this.wardrobeSearchGeometryId,
+                            onClose: (): void => {
+                                this.closeWardrobeSearch();
+                            },
+                            open: (k: string, id: string): void => this.open(k, id),
+                            edit: (k: string, id: string, parent: string): void => this.edit(k, id, parent),
+                            remove: (k: string, id: string): void => {
+                                void this.remove(k, id);
+                            },
+                        }).width('100%')
+                            .height('100%')
+                            .zIndex(100)
+                            .transition(TransitionEffect.OPACITY)
+                    }
+                }.width('100%').height('100%')
             }.mode(NavigationMode.Stack)
                 .titleMode(HdsNavigationTitleMode.MINI)
                 .hideBackButton(true)
-                .hideTitleBar(false)
+                .hideTitleBar(this.wardrobeSearchOpen)
                 .hideToolBar(true)
                 .titleBar(SystemCapability.titleBar(
                     MAIN_PAGE_TITLES[this.tab],

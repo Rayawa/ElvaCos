@@ -31,6 +31,16 @@ export struct ManagedImage {
         }
     }
 
+    private resolvedRatio(): number {
+        if (this.ratio > 0) {
+            return this.ratio;
+        }
+        if (this.loading || this.failed || this.loadedRatio <= 0) {
+            return 0.85;
+        }
+        return Math.min(1.5, Math.max(0.65, this.loadedRatio));
+    }
+
     build() {
         Stack() {
             if (this.sourcePath && !this.failed) {
@@ -66,7 +76,7 @@ export struct ManagedImage {
                     .accessibilityText(this.label + '，' + this.failureText)
             }
         }.width('100%')
-            .aspectRatio(this.ratio > 0 ? this.ratio : this.loadedRatio)
+            .aspectRatio(this.resolvedRatio())
             .backgroundColor(Theme.tint)
             .borderRadius(this.radius)
             .clip(true)
